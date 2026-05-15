@@ -1,0 +1,110 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Design tokens — Pop light-mode theme ─────────────────────────────────── */
+:root {
+  /* Backgrounds */
+  --color-bg-base:        #ffffff;
+  --color-bg-surface:     #f8f8f6;
+  --color-bg-elevated:    #f0f0ee;
+  --color-bg-overlay:     #ebe8e4;
+
+  /* Borders */
+  --color-border-subtle:  #ebebeb;
+  --color-border:         #d8d8d8;
+  --color-border-strong:  #b0b0b0;
+
+  /* Accent — magenta */
+  --color-accent:         #ff2e88;
+  --color-accent-dim:     #cc1a6a;
+  --color-accent-glow:    rgba(255, 46, 136, 0.12);
+  --color-accent-text:    #ff2e88;
+  --color-accent-blush:   #fff5fa;
+
+  /* Text */
+  --color-text-primary:   #0a0a0a;
+  --color-text-secondary: #555555;
+  --color-text-tertiary:  #999999;
+  --color-text-inverse:   #ffffff;
+
+  /* Status */
+  --color-success:        #16a34a;
+  --color-danger:         #dc2626;
+  --color-warning:        #d97706;
+
+  /* Fonts */
+  --font-sans:   'Inter Tight', system-ui, sans-serif;
+  --font-serif:  'Instrument Serif', Georgia, serif;
+  --font-mono:   'JetBrains Mono', 'Fira Code', monospace;
+}
+
+/* ── Base styles ──────────────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--color-bg-base);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Scrollbars ───────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-border-strong); }
+
+/* ── Design-token utility classes (used by existing components) ───────────── */
+.bg-bg-base     { background-color: var(--color-bg-base);     }
+.bg-bg-surface  { background-color: var(--color-bg-surface);  }
+.bg-bg-elevated { background-color: var(--color-bg-elevated); }
+.bg-bg-overlay  { background-color: var(--color-bg-overlay);  }
+
+.border-border-subtle { border-color: var(--color-border-subtle); }
+.border-border-std    { border-color: var(--color-border);        }
+.border-border-strong { border-color: var(--color-border-strong); }
+
+.text-accent         { color: var(--color-accent);          }
+.text-accent-text    { color: var(--color-accent-text);     }
+.text-text-primary   { color: var(--color-text-primary);    }
+.text-text-secondary { color: var(--color-text-secondary);  }
+.text-text-tertiary  { color: var(--color-text-tertiary);   }
+.text-text-inverse   { color: var(--color-text-inverse);    }
+.text-danger         { color: var(--color-danger);          }
+.text-border-strong  { color: var(--color-border-strong);   }
+
+.bg-accent    { background-color: var(--color-accent); }
+.text-inverse { color: var(--color-text-inverse);      }
+.ring-accent  { --tw-ring-color: var(--color-accent-glow); }
+
+.font-mono  { font-family: var(--font-mono);  }
+.font-sans  { font-family: var(--font-sans);  }
+.font-serif { font-family: var(--font-serif); }
+
+/* Focus / hover state overrides */
+.focus\:border-accent:focus        { border-color: var(--color-accent) !important; }
+.focus\:ring-accent\/10:focus      { box-shadow: 0 0 0 2px var(--color-accent-glow) !important; }
+.hover\:border-danger:hover        { border-color: var(--color-danger) !important; }
+.hover\:text-danger:hover          { color: var(--color-danger) !important; }
+.hover\:text-accent:hover          { color: var(--color-accent) !important; }
+.hover\:bg-bg-overlay:hover        { background-color: var(--color-bg-overlay) !important; }
+.hover\:border-border-strong:hover { border-color: var(--color-border-strong) !important; }
+
+/* ── Pop-specific animations ──────────────────────────────────────────────── */
+@keyframes popfade  { from { opacity: 0 }              to { opacity: 1 } }
+@keyframes popslide { from { opacity: 0; transform: translateY(-8px) } to { opacity: 1; transform: translateY(0) } }
+@keyframes popInRow { from { opacity: 0; transform: translateY(-6px) } to { opacity: 1; transform: translateY(0) } }
+@keyframes popPulse { 0%   { transform: scale(1.08); color: var(--color-accent) } 100% { transform: scale(1) } }
+
+/* ── Print — only show the label ─────────────────────────────────────────── */
+@media print {
+  body * { visibility: hidden !important; }
+  .pop-printable, .pop-printable * { visibility: visible !important; }
+  .pop-printable { position: absolute; left: 0; top: 0; padding: 24px; }
+}

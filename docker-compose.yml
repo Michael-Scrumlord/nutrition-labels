@@ -1,0 +1,18 @@
+version: '3.9'
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    # The DB is baked into the image (built by data/build_db.py during docker build).
+    # If you want to persist a customized DB, mount the data directory:
+    # volumes:
+    #   - ./backend/data:/app/data
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend

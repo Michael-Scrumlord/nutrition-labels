@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<style>
+  /* Page size: width from request, height either explicit or a tall default.
+     WeasyPrint does not support 'auto' height — we use 20in as a safe maximum
+     and WeasyPrint will trim to content when the content is shorter. */
+  @page {
+    size: {{ width_inches }}in {% if height_inches %}{{ height_inches }}in{% else %}20in{% endif %};
+    margin: 0.25in;
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    font-family: Helvetica, Arial, sans-serif;
+    font-size: 10pt;
+    color: #000;
+    background: #fff;
+  }
+
+  /* ── Optional recipe name caption ── */
+  .label-name {
+    font-size: 9pt;
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 4pt;
+    letter-spacing: 0.05em;
+  }
+
+  /* ── Outer label box ── */
+  .label-box {
+    border: 2px solid #000;
+    padding: 4pt 6pt 4pt 6pt;
+    width: 100%;
+  }
+
+  /* ── "Nutrition Facts" header ── */
+  .nf-title {
+    font-size: 28pt;
+    font-weight: 900;
+    line-height: 1;
+    margin-bottom: 2pt;
+  }
+
+  /* ── Servings block ── */
+  .servings-block {
+    font-size: 8pt;
+    border-bottom: 6pt solid #000;
+    padding-bottom: 2pt;
+    margin-bottom: 2pt;
+  }
+
+  /* ── "Amount per serving" + Calories row ── */
+  .amount-label {
+    font-size: 7pt;
+    margin-bottom: 0;
+  }
+
+  .calories-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    border-bottom: 3pt solid #000;
+    padding-bottom: 2pt;
+    margin-bottom: 2pt;
+  }
+
+  .calories-label {
+    font-size: 18pt;
+    font-weight: 900;
+  }
+
+  .calories-value {
+    font-size: 36pt;
+    font-weight: 900;
+    line-height: 1;
+  }
+
+  /* ── %DV header ── */
+  .dv-header {
+    text-align: right;
+    font-size: 6.5pt;
+    font-weight: bold;
+    border-bottom: 1pt solid #000;
+    padding-bottom: 1pt;
+    margin-bottom: 1pt;
+  }
+
+  /* ── Nutrient rows ── */
+  .nutrient-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 8pt;
+    border-bottom: 0.5pt solid #000;
+    padding: 1pt 0;
+  }
+
+  .nutrient-row.bold-label .nutrient-name {
+    font-weight: bold;
+  }
+
+  .nutrient-row.indent-1 .nutrient-name {
+    padding-left: 8pt;
+  }
+
+  .nutrient-row.indent-2 .nutrient-name {
+    padding-left: 16pt;
+  }
+
+  .nutrient-row.no-dv .nutrient-dv {
+    visibility: hidden;
+  }
+
+  /* Greyed-out rows (Trans Fat, Added Sugars — not tracked in DB) */
+  .nutrient-row.not-tracked {
+    color: #666;
+  }
+
+  /* ── Thick divider before micronutrients ── */
+  .thick-divider {
+    border-top: 6pt solid #000;
+    margin: 2pt 0 1pt;
+  }
+
+  /* ── Micronutrient rows (Vitamin D, Calcium, Iron, Potassium) ── */
+  .micro-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 8pt;
+    border-bottom: 0.5pt solid #000;
+    padding: 1pt 0;
+  }
+
+  /* ── Footnote ── */
+  .footnote {
+    font-size: 6pt;
+    margin-top: 3pt;
+    line-height: 1.3;
+  }
+
+  /* ── Ingredients list (below the box) ── */
+  .ingredients-block {
+    margin-top: 6pt;
+    font-size: 7pt;
+    line-height: 1.4;
+  }
+
+  .ingredients-block strong {
+    font-weight: bold;
+  }
+</style>
+</head>
+<body>
+
+{% if label_name %}
+<div class="label-name">{{ label_name }}</div>
+{% endif %}
+
+<div class="label-box">
+
+  <div class="nf-title">Nutrition Facts</div>
+
+  <div class="servings-block">
+    <div>{{ portion_divisor }} servings per container</div>
+    <div><strong>Serving size</strong> <span style="float:right;font-weight:bold;">1 portion</span></div>
+  </div>
+
+  <div class="amount-label">Amount per serving</div>
+
+  <div class="calories-row">
+    <div class="calories-label">Calories</div>
+    <div class="calories-value">{{ macros.calories | int }}</div>
+  </div>
+
+  <div class="dv-header">% Daily Value*</div>
+
+  <!-- Total Fat -->
+  <div class="nutrient-row bold-label">
+    <div class="nutrient-name"><strong>Total Fat</strong> {{ macros.fat_total_g }}g</div>
+    <div class="nutrient-dv"><strong>
+      {%- if daily_values.fat_total_g == 0 and macros.fat_total_g > 0 -%}&lt;1%
+      {%- elif daily_values.fat_total_g is not none -%}{{ daily_values.fat_total_g }}%
+      {%- else -%}&mdash;{%- endif -%}
+    </strong></div>
+  </div>
+
+  <!-- Saturated Fat (indented) -->
+  <div class="nutrient-row indent-1">
+    <div class="nutrient-name">Saturated Fat {{ macros.fat_saturated_g }}g</div>
+    <div class="nutrient-dv"><strong>
+      {%- if daily_values.fat_saturated_g == 0 and macros.fat_saturated_g > 0 -%}&lt;1%
+      {%- elif daily_values.fat_saturated_g is not none -%}{{ daily_values.fat_saturated_g }}%
+      {%- else -%}&mdash;{%- endif -%}
+    </strong></div>
+  </div>
+
+  <!-- Trans Fat (not tracked — always 0, greyed) -->
+  <div class="nutrient-row indent-1 not-tracked no-dv">
+    <div class="nutrient-name"><em>Trans</em> Fat 0g</div>
+    <div class="nutrient-dv">&mdash;</div>
+  </div>
+
+  <!-- Cholesterol -->
+  <div class="nutrient-row bold-label">
+    <div class="nutrient-name"><strong>Cholesterol</strong> {{ macros.cholesterol_mg }}mg</div>
+    <div class="nutrient-dv"><strong>
+      {%- if daily_values.cholesterol_mg == 0 and macros.cholesterol_mg > 0 -%}&lt;1%
+      {%- elif daily_values.cholesterol_mg is not none -%}{{ daily_values.cholesterol_mg }}%
+      {%- else -%}&mdash;{%- endif -%}
+    </strong></div>
+  </div>
+
+  <!-- Sodium -->
+  <div class="nutrient-row bold-label">
+    <div class="nutrient-name"><strong>Sodium</strong> {{ macros.sodium_mg }}mg</div>
+    <div class="nutrient-dv"><strong>
+      {%- if daily_values.sodium_mg == 0 and macros.sodium_mg > 0 -%}&lt;1%
+      {%- elif daily_values.sodium_mg is not none -%}{{ daily_values.sodium_mg }}%
+      {%- else -%}&mdash;{%- endif -%}
+    </strong></div>
+  </div>
+
+  <!-- Total Carbohydrate -->
+  <div class="nutrient-row bold-label">
+    <div class="nutrient-name"><strong>Total Carbohydrate</strong> {{ macros.carbohydrates_total_g }}g</div>
+    <div class="nutrient-dv"><strong>
+      {%- if daily_values.carbohydrates_total_g == 0 and macros.carbohydrates_total_g > 0 -%}&lt;1%
+      {%- elif daily_values.carbohydrates_total_g is not none -%}{{ daily_values.carbohydrates_total_g }}%
+      {%- else -%}&mdash;{%- endif -%}
+    </strong></div>
+  </div>
+
+  <!-- Dietary Fiber (indented) -->
+  <div class="nutrient-row indent-1">
+    <div class="nutrient-name">Dietary Fiber {{ macros.fiber_g }}g</div>
+    <div class="nutrient-dv"><strong>
+      {%- if daily_values.fiber_g == 0 and macros.fiber_g > 0 -%}&lt;1%
+      {%- elif daily_values.fiber_g is not none -%}{{ daily_values.fiber_g }}%
+      {%- else -%}&mdash;{%- endif -%}
+    </strong></div>
+  </div>
+
+  <!-- Total Sugars (indented, no DV) -->
+  <div class="nutrient-row indent-1 no-dv">
+    <div class="nutrient-name">Total Sugars {{ macros.sugar_g }}g</div>
+    <div class="nutrient-dv">&mdash;</div>
+  </div>
+
+  <!-- Added Sugars (indented further, not tracked) -->
+  <div class="nutrient-row indent-2 not-tracked no-dv">
+    <div class="nutrient-name">Includes 0g Added Sugars</div>
+    <div class="nutrient-dv">&mdash;</div>
+  </div>
+
+  <!-- Protein (no DV) -->
+  <div class="nutrient-row bold-label no-dv" style="border-bottom: 6pt solid #000;">
+    <div class="nutrient-name"><strong>Protein</strong> {{ macros.protein_g }}g</div>
+    <div class="nutrient-dv">&mdash;</div>
+  </div>
+
+  <!-- Micronutrients -->
+  <div class="micro-row">
+    <div>Vitamin D {{ macros.vitamin_d_mcg }}mcg</div>
+    <div>
+      {%- if daily_values.vitamin_d_mcg == 0 and macros.vitamin_d_mcg > 0 -%}&lt;1%
+      {%- elif daily_values.vitamin_d_mcg is not none -%}{{ daily_values.vitamin_d_mcg }}%
+      {%- else -%}&mdash;{%- endif -%}
+    </div>
+  </div>
+
+  <div class="micro-row">
+    <div>Calcium {{ macros.calcium_mg }}mg</div>
+    <div>
+      {%- if daily_values.calcium_mg == 0 and macros.calcium_mg > 0 -%}&lt;1%
+      {%- elif daily_values.calcium_mg is not none -%}{{ daily_values.calcium_mg }}%
+      {%- else -%}&mdash;{%- endif -%}
+    </div>
+  </div>
+
+  <div class="micro-row">
+    <div>Iron {{ macros.iron_mg }}mg</div>
+    <div>
+      {%- if daily_values.iron_mg == 0 and macros.iron_mg > 0 -%}&lt;1%
+      {%- elif daily_values.iron_mg is not none -%}{{ daily_values.iron_mg }}%
+      {%- else -%}&mdash;{%- endif -%}
+    </div>
+  </div>
+
+  <div class="micro-row" style="border-bottom: none;">
+    <div>Potassium {{ macros.potassium_mg }}mg</div>
+    <div>
+      {%- if daily_values.potassium_mg == 0 and macros.potassium_mg > 0 -%}&lt;1%
+      {%- elif daily_values.potassium_mg is not none -%}{{ daily_values.potassium_mg }}%
+      {%- else -%}&mdash;{%- endif -%}
+    </div>
+  </div>
+
+  <div class="footnote">
+    * The % Daily Value (DV) tells you how much a nutrient in a serving of food contributes to a daily
+    diet. 2,000 calories a day is used for general nutrition advice.
+  </div>
+
+</div>
+
+{% if ingredients_string %}
+<div class="ingredients-block">
+  <strong>INGREDIENTS:</strong> {{ ingredients_string }}
+</div>
+{% endif %}
+
+</body>
+</html>
