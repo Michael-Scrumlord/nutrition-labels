@@ -237,24 +237,25 @@ PORTIONS = [
     (1108002, 1, "cup", 145.0),
 ]
 
-# The "Common" foods tab in the frontend hardcodes these fdc_ids.
-# Keep this list in sync with frontend/src/components/search/FoodTabs.tsx.
+# NOTE: build_db.py is kept as a reference for the original hand-curated dataset.
+# Production DB is now built by build_db_full.py (USDA SR Legacy, ~7,793 foods).
+# The Common foods tab (frontend/src/constants/commonFoods.ts) uses SR Legacy fdc_ids:
 COMMON_FDC_IDS = [
-    1097512,  # Butter, unsalted
-    1097517,  # Eggs, whole
-    1104330,  # Sugar, granulated white
-    1100209,  # All-purpose flour
-    1097516,  # Whole milk
-    1097514,  # Cream cheese
-    1104332,  # Honey
-    1102201,  # Baking powder
-    1102203,  # Salt
-    1102204,  # Vanilla extract
-    1103301,  # Olive oil
-    1105001,  # Chicken breast
-    1105002,  # Ground beef
-    1100216,  # Cocoa powder
-    1108001,  # Chocolate chips
+    173430,  # Butter, without salt
+    171287,  # Egg, whole, raw, fresh
+    169655,  # Sugars, granulated
+    168894,  # Wheat flour, white, all-purpose
+    171265,  # Milk, whole, 3.25% milkfat
+    173418,  # Cheese, cream
+    169640,  # Honey
+    172804,  # Leavening agents, baking powder
+    173468,  # Salt, table
+    173471,  # Vanilla extract
+    171413,  # Oil, olive, salad or cooking
+    171509,  # Chicken, breast, skinless, boneless, raw
+    174036,  # Beef, ground, 80% lean / 20% fat, raw
+    169593,  # Cocoa, dry powder, unsweetened
+    167976,  # Candies, semisweet chocolate
 ]
 
 
