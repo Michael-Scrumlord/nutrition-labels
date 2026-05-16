@@ -9,14 +9,29 @@ from app.constants import UNIT_CONVERSIONS
 
 
 # ---------------------------------------------------------------------------
+# Validation constants
+# ---------------------------------------------------------------------------
+
+MAX_NAME_LENGTH = 120         # Max length for ingredient/label names
+MAX_INGREDIENT_AMOUNT = 1_000_000  # Max amount in any unit conversion
+MIN_INGREDIENTS = 1           # Minimum ingredients required
+MAX_INGREDIENTS = 100         # Maximum ingredients allowed
+MIN_PORTION_DIVISOR = 1       # Minimum servings
+MAX_PORTION_DIVISOR = 999     # Maximum servings
+MIN_WIDTH = 0.1               # Minimum label width in inches
+MAX_WIDTH = 12                # Maximum label width in inches
+MAX_HEIGHT = 20               # Maximum label height in inches
+
+
+# ---------------------------------------------------------------------------
 # Request models
 # ---------------------------------------------------------------------------
 
 class IngredientItem(BaseModel):
     """One ingredient in a recipe: which food, how much, and what unit."""
     fdc_id: int
-    name: str = Field(..., min_length=1, max_length=120)  # Display name on the label (user can edit this)
-    amount: float = Field(..., gt=0, le=1_000_000)
+    name: str = Field(..., min_length=1, max_length=MAX_NAME_LENGTH)  # Display name on the label (user can edit this)
+    amount: float = Field(..., gt=0, le=MAX_INGREDIENT_AMOUNT)
     unit: str        # Must be a key in UNIT_CONVERSIONS: g, ml, oz, lb, kg
 
     @field_validator("unit")
@@ -30,11 +45,11 @@ class IngredientItem(BaseModel):
 
 class GenerateLabelRequest(BaseModel):
     """The full payload sent when the user clicks Generate PDF."""
-    portion_divisor: int = Field(8, ge=1, le=999)       # How many servings are in the batch
-    label_name: str = Field("", max_length=120)           # Optional recipe name printed above the label
-    width_inches: float = Field(2.75, gt=0, le=12)        # Label width for the PDF page
-    height_inches: float | None = Field(None, gt=0, le=20)  # None = WeasyPrint auto-sizes height
-    ingredients: list[IngredientItem] = Field(..., min_length=1, max_length=100)
+    portion_divisor: int = Field(8, ge=MIN_PORTION_DIVISOR, le=MAX_PORTION_DIVISOR)       # How many servings are in the batch
+    label_name: str = Field("", max_length=MAX_NAME_LENGTH)           # Optional recipe name printed above the label
+    width_inches: float = Field(2.75, gt=MIN_WIDTH, le=MAX_WIDTH)        # Label width for the PDF page
+    height_inches: float | None = Field(None, gt=0, le=MAX_HEIGHT)  # None = WeasyPrint auto-sizes height
+    ingredients: list[IngredientItem] = Field(..., min_length=MIN_INGREDIENTS, max_length=MAX_INGREDIENTS)
 
     @field_validator("width_inches")
     @classmethod

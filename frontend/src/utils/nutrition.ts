@@ -32,6 +32,7 @@ export const NUTRIENT_FIELDS: (keyof MacroProfile)[] = [
 /**
  * Round to the specified number of digits using round-half-away-from-zero.
  * This ensures consistent rounding behavior between frontend and backend.
+ * Note: For very high precision (ndigits > 15), floating-point precision limits apply.
  */
 function roundHalfUp(x: number, ndigits: number = 0): number {
   const factor = Math.pow(10, ndigits);

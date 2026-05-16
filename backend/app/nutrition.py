@@ -13,7 +13,7 @@ def round_half_up(x: float, ndigits: int = 0) -> float:
     """
     Round to the specified number of digits using ROUND_HALF_UP.
     This ensures consistent rounding behavior (half away from zero),
-    matching IEEE-754 rounding used in JavaScript Math.round().
+    matching the behavior of JavaScript's Math.round().
     """
     q = Decimal(10) ** -ndigits
     return float(Decimal(x).quantize(q, rounding=ROUND_HALF_UP))

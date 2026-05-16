@@ -43,9 +43,10 @@ def render_label_html(macros: MacroProfile, request: GenerateLabelRequest, unrou
                          If None, uses the rounded values (fallback for compatibility)
     """
     # Use unrounded values for %DV calculation, or fall back to rounded values
-    dv_source = unrounded_macros if unrounded_macros else {
-        field: getattr(macros, field) for field in NUTRIENT_FIELDS
-    }
+    if unrounded_macros:
+        dv_source = unrounded_macros
+    else:
+        dv_source = macros.model_dump()
     
     # Build %DV for every nutrient that has a daily value
     daily_values: dict[str, int | None] = {
