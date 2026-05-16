@@ -80,7 +80,7 @@ async def test_generate_label_returns_pdf(client):
 
 
 async def test_generate_label_empty_ingredients(client):
-    """POST /api/generate_label with no ingredients should return 400."""
+    """POST /api/generate_label with no ingredients should return 422 (Pydantic validation)."""
     payload = {
         "portion_divisor": 8,
         "label_name": "",
@@ -90,7 +90,7 @@ async def test_generate_label_empty_ingredients(client):
     }
     async with client as c:
         response = await c.post("/api/generate_label", json=payload)
-    assert response.status_code == 400
+    assert response.status_code == 422
 
 
 async def test_generate_label_invalid_divisor(client):

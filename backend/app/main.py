@@ -77,7 +77,7 @@ def get_food(fdc_id: int) -> FoodDetail:
 
 @app.post("/api/generate_label")
 @limiter.limit("10/minute")
-def generate_label(request_obj: Request, request: GenerateLabelRequest) -> Response:
+def generate_label(request: Request, label_request: GenerateLabelRequest) -> Response:
     """
     Calculate macros for the recipe, render the FDA label as HTML,
     convert to PDF, and return the binary PDF as a download.
@@ -85,11 +85,8 @@ def generate_label(request_obj: Request, request: GenerateLabelRequest) -> Respo
     The backend recalculates macros independently — this is intentional.
     It catches any drift between frontend and backend constants.
     """
-    if not request.ingredients:
-        raise HTTPException(status_code=400, detail="Recipe must have at least one ingredient")
-
     # Fetch all food rows in one query
-    fdc_ids = [ing.fdc_id for ing in request.ingredients]
+    fdc_ids = [ing.fdc_id for ing in label_request.ingredients]
     food_rows = database.get_foods_by_ids(fdc_ids)
 
     # Make sure every fdc_id was found
@@ -104,13 +101,13 @@ def generate_label(request_obj: Request, request: GenerateLabelRequest) -> Respo
     # Calculate per-serving macros
     try:
         unrounded_macros, macros = nutrition.calculate_recipe_macros(
-            request.ingredients, food_rows, request.portion_divisor
+            label_request.ingredients, food_rows, label_request.portion_divisor
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
     # Render the label and generate the PDF
-    html = pdf.render_label_html(macros, request, unrounded_macros)
+    html = pdf.render_label_html(macros, label_request, unrounded_macros)
     pdf_bytes = pdf.generate_pdf(html)
 
     return Response(
