@@ -30,9 +30,10 @@ export function useRecipeActions() {
       removeVariable:   s.removeVariable,
 
       // Recipe lifecycle
-      loadRecipe:       s.loadRecipe,
-      loadVersion:      s.loadVersion,
-      exitVersionView:  s.exitVersionView,
+      loadRecipe:          s.loadRecipe,
+      loadVersion:         s.loadVersion,
+      exitVersionView:     s.exitVersionView,
+      setCurrentRecipeId:  s.setCurrentRecipeId,
     })),
   );
 }

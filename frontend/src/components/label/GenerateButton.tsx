@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRecipeStore } from "../../store/recipeStore";
 import { useActiveTheme } from "../../store/themeStore";
-import { generateLabel, downloadBlob } from "../../api/client";
+import { generateLabel, downloadBlob, ApiError } from "../../api/client";
 
 export function GenerateButton() {
   const ingredients    = useRecipeStore((s) => s.ingredients);
@@ -12,24 +12,36 @@ export function GenerateButton() {
   const dimensions     = useRecipeStore((s) => s.dimensions);
   const { def }        = useActiveTheme();
 
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError]         = useState<string | null>(null);
+  const [isLoading, setIsLoading]   = useState(false);
+  const [error, setError]           = useState<string | null>(null);
+  const [retryAfter, setRetryAfter] = useState<number | null>(null);
 
   async function handleGenerate() {
     if (ingredients.length === 0) return;
     setIsLoading(true);
     setError(null);
+    setRetryAfter(null);
     try {
       const blob = await generateLabel(ingredients, portionDivisor, labelName, dimensions);
       downloadBlob(blob, "nutrition_label.pdf");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "PDF generation failed");
+      if (err instanceof ApiError) {
+        if (err.status === 429) {
+          const wait = err.retryAfter ?? 60;
+          setRetryAfter(wait);
+          setError(`Rate limit reached — try again in ${wait}s.`);
+        } else {
+          setError(err.message);
+        }
+      } else {
+        setError("PDF generation failed. Please try again.");
+      }
     } finally {
       setIsLoading(false);
     }
   }
 
-  const disabled = ingredients.length === 0;
+  const disabled = ingredients.length === 0 || !!retryAfter;
 
   return (
     <div style={{ marginTop: 4, width: "100%" }}>
