@@ -22,7 +22,9 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 
 // Reset the Zustand store before each test so state doesn't bleed between tests
 beforeEach(() => {
-  useRecipeStore.setState({ ingredients: [], portionDivisor: 8, labelName: "" });
+  useRecipeStore.setState({
+    ingredients: [], portionDivisor: 8, labelName: "", highlightedNutrients: new Set(),
+  });
 });
 
 describe("RecipeBuilder", () => {
@@ -31,13 +33,14 @@ describe("RecipeBuilder", () => {
     expect(screen.getByText(/No ingredients yet/i)).toBeInTheDocument();
   });
 
-  it("renders a row when an ingredient is added", () => {
+  it("renders ingredient name when an ingredient is added", () => {
     useRecipeStore.getState().addIngredient({
       fdc_id: 1097512, name: "Butter", amount: 100, unit: "g",
       baseMacros: BUTTER_MACROS,
     });
     render(<RecipeBuilder />, { wrapper: Wrapper });
-    expect(screen.getByDisplayValue("Butter")).toBeInTheDocument();
+    // Name appears in the magazine ingredient row and in the breakdown table
+    expect(screen.getAllByText("Butter").length).toBeGreaterThan(0);
   });
 
   it("removes the row when the remove button is clicked", () => {
@@ -54,13 +57,14 @@ describe("RecipeBuilder", () => {
     expect(screen.getByText(/No ingredients yet/i)).toBeInTheDocument();
   });
 
-  it("updates portionDivisor when the servings input changes", () => {
+  it("updates portionDivisor when the servings scrubber changes via keyboard", () => {
     render(<RecipeBuilder />, { wrapper: Wrapper });
 
-    const input = screen.getByLabelText(/servings per batch/i);
-    fireEvent.change(input, { target: { value: "12" } });
+    const scrubber = screen.getByLabelText(/servings per batch/i);
+    // ArrowUp increments by 1 step
+    fireEvent.keyDown(scrubber, { key: "ArrowUp" });
 
-    expect(useRecipeStore.getState().portionDivisor).toBe(12);
+    expect(useRecipeStore.getState().portionDivisor).toBe(9);
   });
 
   it("shows breakdown table when ingredients are present", () => {
@@ -69,7 +73,7 @@ describe("RecipeBuilder", () => {
       baseMacros: BUTTER_MACROS,
     });
     render(<RecipeBuilder />, { wrapper: Wrapper });
-    // Table header row should be visible
+    // NutritionBreakdownTable header row must be visible
     expect(screen.getByText(/Weight \(g\)/i)).toBeInTheDocument();
   });
 });

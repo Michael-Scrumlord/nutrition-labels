@@ -78,3 +78,9 @@ export interface LabelDimensions {
   widthInches: number;
   heightInches: number | null;  // null = auto (content-driven)
 }
+
+// ── Synchronized label highlight (set of nutrient keys) ───────────────────
+// Defined here (not in a layout component) because it is shared across
+// the recipe builder, label column, and label preview.
+
+export type HighlightSet = Set<keyof MacroProfile>;

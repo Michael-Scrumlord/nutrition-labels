@@ -5,6 +5,7 @@
 # Response models describe what goes back out.
 
 from pydantic import BaseModel, field_validator
+from app.constants import UNIT_CONVERSIONS
 
 
 # ---------------------------------------------------------------------------
@@ -28,7 +29,7 @@ class IngredientItem(BaseModel):
     @field_validator("unit")
     @classmethod
     def unit_must_be_valid(cls, v: str) -> str:
-        valid = {"g", "ml", "oz", "lb", "kg"}
+        valid = set(UNIT_CONVERSIONS.keys())
         if v not in valid:
             raise ValueError(f"unit must be one of {valid}")
         return v

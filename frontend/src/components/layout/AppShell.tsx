@@ -1,23 +1,19 @@
 // layout/AppShell.tsx
 //
-// Pop redesign: 2-column magazine grid.
-//   Left (1fr):   sticky header + magazine recipe body + footer
+// 2-column magazine grid.
+//   Left (1fr):   sticky header + recipe body + footer
 //   Right (460px): sticky FDA label panel
 //
-// Hover state is lifted here so the ingredient row that's hovered
-// can simultaneously tint its corresponding rows in the FDA label.
+// Highlight state (which nutrients to tint on the label when the user
+// hovers an ingredient row) is now managed in recipeStore, so this
+// component no longer needs to act as a message bus between siblings.
 
-import { useState } from "react";
 import { Header } from "./Header";
 import { RecipeBuilder } from "../recipe/RecipeBuilder";
 import { LabelColumn } from "../label/LabelColumn";
-import type { MacroProfile } from "../../types";
-
-export type HighlightSet = Set<keyof MacroProfile>;
+import { INK } from "../../constants/theme";
 
 export function AppShell() {
-  const [highlightSet, setHighlightSet] = useState<HighlightSet>(new Set());
-
   return (
     <div
       style={{
@@ -27,21 +23,21 @@ export function AppShell() {
         gridTemplateAreas: '"head head" "body label" "foot label"',
         minHeight: "100vh",
         background: "#ffffff",
-        color: "#0a0a0a",
+        color: INK,
         fontFamily: "'Inter Tight', system-ui, sans-serif",
       }}
     >
       <Header />
 
-      <RecipeBuilder onHighlightChange={setHighlightSet} />
+      <RecipeBuilder />
 
-      <LabelColumn highlightSet={highlightSet} />
+      <LabelColumn />
 
       <footer
         style={{
           gridArea: "foot",
           padding: "14px 48px",
-          borderTop: "1px solid #0a0a0a",
+          borderTop: `1px solid ${INK}`,
           fontFamily: "'JetBrains Mono', monospace",
           fontSize: 10,
           color: "#999",

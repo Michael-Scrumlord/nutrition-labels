@@ -4,7 +4,7 @@
 // This mirrors the logic in backend/app/nutrition.py exactly.
 // If you change the math here, change it there too (and vice versa).
 
-import type { IngredientItem, MacroProfile } from "../types";
+import type { IngredientItem, MacroProfile, HighlightSet } from "../types";
 import { UNIT_CONVERSIONS } from "./units";
 
 // FDA 2020 daily values. Nutrients without a DV show a dash on the label.
@@ -79,8 +79,22 @@ export function calculateRecipeMacros(
 }
 
 /** Round to 1 decimal place. */
-function round1(n: number): number {
+export function round1(n: number): number {
   return Math.round(n * 10) / 10;
+}
+
+/**
+ * Return the 2 nutrients most influenced by a food (by %DV contribution).
+ * Used to highlight the corresponding rows in the FDA label when the
+ * user hovers an ingredient in the recipe builder.
+ */
+export function getHighlightKeys(baseMacros: MacroProfile): HighlightSet {
+  const ranked: [keyof MacroProfile, number][] = [];
+  for (const [key, dv] of Object.entries(FDA_DAILY_VALUES) as [keyof MacroProfile, number][]) {
+    if (dv && baseMacros[key] > 0) ranked.push([key, baseMacros[key] / dv]);
+  }
+  ranked.sort((a, b) => b[1] - a[1]);
+  return new Set(ranked.slice(0, 2).map(([k]) => k));
 }
 
 /**

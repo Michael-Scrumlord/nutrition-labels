@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRecipeStore } from "../../store/recipeStore";
 import { generateLabel, downloadBlob } from "../../api/client";
+import { ACCENT } from "../../constants/theme";
 
 export function GenerateButton() {
   const ingredients    = useRecipeStore((s) => s.ingredients);
@@ -35,7 +36,7 @@ export function GenerateButton() {
         onClick={handleGenerate}
         disabled={disabled || isLoading}
         style={{
-          background: disabled ? "#e5e5e5" : "var(--color-accent)",
+          background: disabled ? "#e5e5e5" : ACCENT,
           color: disabled ? "#bbb" : "#fff",
           border: "none",
           padding: "16px 18px",
