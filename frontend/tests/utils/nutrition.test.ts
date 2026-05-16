@@ -67,11 +67,10 @@ describe("calculateRecipeMacros", () => {
     expect(result.fat_total_g).toBe(Math.round((81.1 + 1.0) * 10) / 10);
   });
 
-  it("uses divisor=1 when divisor is 0 (defensive)", () => {
+  it("throws error when divisor is 0", () => {
     const ingredient = makeIngredient(1, 100, "g");
-    const result = calculateRecipeMacros([ingredient], 0);
-    // Should not crash, and should not divide by 0
-    expect(result.calories).toBeGreaterThan(0);
+    // Should throw an error to match backend validation
+    expect(() => calculateRecipeMacros([ingredient], 0)).toThrow(RangeError);
   });
 });
 
