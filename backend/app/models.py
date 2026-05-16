@@ -4,7 +4,7 @@
 # Request models describe what comes in from the client.
 # Response models describe what goes back out.
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 from app.constants import UNIT_CONVERSIONS
 
 
@@ -15,16 +15,9 @@ from app.constants import UNIT_CONVERSIONS
 class IngredientItem(BaseModel):
     """One ingredient in a recipe: which food, how much, and what unit."""
     fdc_id: int
-    name: str        # Display name on the label (user can edit this)
-    amount: float
+    name: str = Field(..., min_length=1, max_length=120)  # Display name on the label (user can edit this)
+    amount: float = Field(..., gt=0, le=1_000_000)
     unit: str        # Must be a key in UNIT_CONVERSIONS: g, ml, oz, lb, kg
-
-    @field_validator("amount")
-    @classmethod
-    def amount_must_be_positive(cls, v: float) -> float:
-        if v <= 0:
-            raise ValueError("amount must be greater than 0")
-        return v
 
     @field_validator("unit")
     @classmethod
@@ -37,18 +30,11 @@ class IngredientItem(BaseModel):
 
 class GenerateLabelRequest(BaseModel):
     """The full payload sent when the user clicks Generate PDF."""
-    portion_divisor: int = 8       # How many servings are in the batch
-    label_name: str = ""           # Optional recipe name printed above the label
-    width_inches: float = 2.75     # Label width for the PDF page
-    height_inches: float | None = None  # None = WeasyPrint auto-sizes height
-    ingredients: list[IngredientItem]
-
-    @field_validator("portion_divisor")
-    @classmethod
-    def divisor_in_range(cls, v: int) -> int:
-        if v < 1 or v > 999:
-            raise ValueError("portion_divisor must be between 1 and 999")
-        return v
+    portion_divisor: int = Field(8, ge=1, le=999)       # How many servings are in the batch
+    label_name: str = Field("", max_length=120)           # Optional recipe name printed above the label
+    width_inches: float = Field(2.75, gt=0, le=12)        # Label width for the PDF page
+    height_inches: float | None = Field(None, gt=0, le=20)  # None = WeasyPrint auto-sizes height
+    ingredients: list[IngredientItem] = Field(..., min_length=1, max_length=100)
 
     @field_validator("width_inches")
     @classmethod

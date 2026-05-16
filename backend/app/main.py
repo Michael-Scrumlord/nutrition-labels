@@ -4,8 +4,10 @@
 # Each route does: validate → fetch → calculate → return.
 # No business logic lives here.
 
-from fastapi import FastAPI, HTTPException, Response
+from fastapi import FastAPI, HTTPException, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from app import database, search as search_module, nutrition, pdf
 from app.config import settings
@@ -20,12 +22,16 @@ from app.constants import NUTRIENT_FIELDS
 
 app = FastAPI(title="NutritionLabels API")
 
+# Initialize the rate limiter
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
 )
 
 
@@ -70,7 +76,8 @@ def get_food(fdc_id: int) -> FoodDetail:
 
 
 @app.post("/api/generate_label")
-def generate_label(request: GenerateLabelRequest) -> Response:
+@limiter.limit("10/minute")
+def generate_label(request_obj: Request, request: GenerateLabelRequest) -> Response:
     """
     Calculate macros for the recipe, render the FDA label as HTML,
     convert to PDF, and return the binary PDF as a download.
@@ -96,14 +103,14 @@ def generate_label(request: GenerateLabelRequest) -> Response:
 
     # Calculate per-serving macros
     try:
-        macros = nutrition.calculate_recipe_macros(
+        unrounded_macros, macros = nutrition.calculate_recipe_macros(
             request.ingredients, food_rows, request.portion_divisor
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
     # Render the label and generate the PDF
-    html = pdf.render_label_html(macros, request)
+    html = pdf.render_label_html(macros, request, unrounded_macros)
     pdf_bytes = pdf.generate_pdf(html)
 
     return Response(

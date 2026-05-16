@@ -5,7 +5,7 @@
 # No database access, no macro math.
 
 import os
-from jinja2 import Environment, FileSystemLoader
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 from weasyprint import HTML
 
 from app.models import MacroProfile, GenerateLabelRequest
@@ -16,18 +16,40 @@ from app.constants import UNIT_CONVERSIONS, NUTRIENT_FIELDS
 # Jinja2's FileSystemLoader already caches compiled templates, but recreating
 # the Environment object on every call adds unnecessary overhead.
 _TEMPLATES_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "templates"))
-_jinja_env = Environment(loader=FileSystemLoader(_TEMPLATES_DIR))
+_jinja_env = Environment(
+    loader=FileSystemLoader(_TEMPLATES_DIR),
+    autoescape=select_autoescape(["html", "xml"]),
+)
 _label_template = _jinja_env.get_template("label.html")
 
 
-def render_label_html(macros: MacroProfile, request: GenerateLabelRequest) -> str:
+def _no_external_fetch(url: str) -> bytes:
+    """
+    URL fetcher for WeasyPrint that denies all external and file:// URLs.
+    This prevents SSRF, local file disclosure, and other URL-based attacks.
+    """
+    raise ValueError(f"External resources are disabled: {url}")
+
+
+def render_label_html(macros: MacroProfile, request: GenerateLabelRequest, unrounded_macros: dict[str, float] | None = None) -> str:
     """
     Fill the Jinja2 label template with computed values and return the HTML string.
     The HTML is what WeasyPrint will turn into a PDF.
+    
+    Args:
+        macros: The rounded per-serving MacroProfile to display
+        request: The GenerateLabelRequest with label metadata
+        unrounded_macros: The unrounded per-serving values for %DV calculation
+                         If None, uses the rounded values (fallback for compatibility)
     """
+    # Use unrounded values for %DV calculation, or fall back to rounded values
+    dv_source = unrounded_macros if unrounded_macros else {
+        field: getattr(macros, field) for field in NUTRIENT_FIELDS
+    }
+    
     # Build %DV for every nutrient that has a daily value
     daily_values: dict[str, int | None] = {
-        field: compute_daily_value_pct(getattr(macros, field), field)
+        field: compute_daily_value_pct(dv_source.get(field, 0), field)
         for field in NUTRIENT_FIELDS
     }
 
@@ -56,4 +78,4 @@ def render_label_html(macros: MacroProfile, request: GenerateLabelRequest) -> st
 
 def generate_pdf(html: str) -> bytes:
     """Convert an HTML string to PDF bytes using WeasyPrint."""
-    return HTML(string=html).write_pdf()
+    return HTML(string=html, url_fetcher=_no_external_fetch).write_pdf()
