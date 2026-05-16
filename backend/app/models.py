@@ -4,7 +4,7 @@
 # Request models describe what comes in from the client.
 # Response models describe what goes back out.
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.constants import UNIT_CONVERSIONS
 
 
@@ -29,6 +29,8 @@ MAX_HEIGHT = 20               # Maximum label height in inches
 
 class IngredientItem(BaseModel):
     """One ingredient in a recipe: which food, how much, and what unit."""
+    model_config = ConfigDict(extra="forbid")
+
     fdc_id: int
     name: str = Field(..., min_length=1, max_length=MAX_NAME_LENGTH)  # Display name on the label (user can edit this)
     amount: float = Field(..., gt=0, le=MAX_INGREDIENT_AMOUNT)
@@ -45,18 +47,13 @@ class IngredientItem(BaseModel):
 
 class GenerateLabelRequest(BaseModel):
     """The full payload sent when the user clicks Generate PDF."""
+    model_config = ConfigDict(extra="forbid")
+
     portion_divisor: int = Field(8, ge=MIN_PORTION_DIVISOR, le=MAX_PORTION_DIVISOR)       # How many servings are in the batch
     label_name: str = Field("", max_length=MAX_NAME_LENGTH)           # Optional recipe name printed above the label
     width_inches: float = Field(2.75, gt=MIN_WIDTH, le=MAX_WIDTH)        # Label width for the PDF page
     height_inches: float | None = Field(None, gt=0, le=MAX_HEIGHT)  # None = WeasyPrint auto-sizes height
     ingredients: list[IngredientItem] = Field(..., min_length=MIN_INGREDIENTS, max_length=MAX_INGREDIENTS)
-
-    @field_validator("width_inches")
-    @classmethod
-    def width_must_be_positive(cls, v: float) -> float:
-        if v <= 0:
-            raise ValueError("width_inches must be greater than 0")
-        return v
 
 
 # ---------------------------------------------------------------------------

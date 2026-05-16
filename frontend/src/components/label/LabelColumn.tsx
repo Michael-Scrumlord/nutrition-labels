@@ -8,6 +8,7 @@
 //   • Sponsored AdSlot anchored at the very bottom of the column
 
 import { useState, useCallback, useMemo } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { useRecipeStore } from "../../store/recipeStore";
 import { useSavedRecipesStore, type RecipeSnapshot } from "../../store/savedRecipesStore";
 import { useActiveTheme } from "../../store/themeStore";
@@ -19,30 +20,178 @@ import { GenerateButton } from "./GenerateButton";
 import { AdSlot } from "./AdSlot";
 import { AuroraGlow } from "../theme/AuroraGlow";
 
-export function LabelColumn() {
-  const ingredients          = useRecipeStore((s) => s.ingredients);
-  const portionDivisor       = useRecipeStore((s) => s.portionDivisor);
-  const labelName            = useRecipeStore((s) => s.labelName);
-  const dimensions           = useRecipeStore((s) => s.dimensions);
-  const highlightedNutrients = useRecipeStore((s) => s.highlightedNutrients);
-  const instructions         = useRecipeStore((s) => s.instructions);
-  const variables            = useRecipeStore((s) => s.variables);
-  const currentRecipeId      = useRecipeStore((s) => s.currentRecipeId);
-  const viewingVersionId     = useRecipeStore((s) => s.viewingVersionId);
-  const setCurrentRecipeId   = useRecipeStore.setState;
+// ── Sub-component: save/version controls ─────────────────────────────────────
 
-  const { clearRecipe }      = useRecipeActions();
-  const createRecipe         = useSavedRecipesStore((s) => s.createRecipe);
-  const appendVersion        = useSavedRecipesStore((s) => s.appendVersion);
-  const savedRecipe          = useSavedRecipesStore((s) =>
-    currentRecipeId ? s.recipes.find((r) => r.id === currentRecipeId) : undefined,
-  );
-  const macros               = useNutritionCalc();
-  const { def: themeDef }    = useActiveTheme();
+interface SaveControlsProps {
+  canSave: boolean;
+  isLoaded: boolean;
+  versionCount: number;
+  viewingVersionId: string | null;
+  lastSavedRel: string | null;
+  savedRecipeName: string | undefined;
+  onSaveVersion: () => void;
+  onSaveAsNew: () => void;
+  onReset: () => void;
+  feedback: string | null;
+}
 
-  const [feedback, setFeedback] = useState<string | null>(null);
+function SaveControls({
+  canSave, isLoaded, versionCount, viewingVersionId,
+  lastSavedRel, savedRecipeName,
+  onSaveVersion, onSaveAsNew, onReset, feedback,
+}: SaveControlsProps) {
   const [noteOpen, setNoteOpen] = useState(false);
   const [note, setNote]         = useState("");
+
+  function handleSave() {
+    onSaveVersion();
+    setNote("");
+    setNoteOpen(false);
+  }
+
+  return (
+    <div
+      style={{
+        width: "100%", maxWidth: 380,
+        display: "flex", flexDirection: "column", gap: 8,
+        padding: "12px 0 0",
+        borderTop: "1px solid var(--hair)",
+      }}
+    >
+      {isLoaded && (
+        <div className="pl-meta" style={{ fontSize: 9, lineHeight: 1.5, color: "var(--ink-3)" }}>
+          EDITING — <span style={{ color: "var(--ink)", fontWeight: 700 }}>{savedRecipeName?.toUpperCase()}</span>
+          <br />
+          v{versionCount} {viewingVersionId ? "· VIEWING OLDER" : `· SAVED ${lastSavedRel?.toUpperCase()}`}
+        </div>
+      )}
+
+      {noteOpen && (
+        <input
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") { e.preventDefault(); handleSave(); }
+            if (e.key === "Escape") { setNoteOpen(false); setNote(""); }
+          }}
+          placeholder="what changed? (optional)"
+          autoFocus
+          style={{
+            padding: "8px 10px",
+            border: "1px solid var(--ink)",
+            background: "var(--bg)",
+            color: "var(--ink)",
+            outline: "none",
+            fontFamily: "var(--f-display)",
+            fontStyle: "var(--f-display-style)",
+            fontSize: 13,
+          }}
+        />
+      )}
+
+      <button
+        onClick={handleSave}
+        onMouseEnter={() => { if (isLoaded && !feedback) setNoteOpen(true); }}
+        disabled={!canSave}
+        style={{
+          background: feedback
+            ? "var(--color-success)"
+            : canSave
+            ? "transparent"
+            : "color-mix(in srgb, var(--ink) 6%, transparent)",
+          color: feedback
+            ? "#ffffff"
+            : canSave
+            ? "var(--ink)"
+            : "var(--ink-3)",
+          border: `1px solid ${canSave ? "var(--ink)" : "var(--hair)"}`,
+          padding: "10px 14px",
+          fontFamily: "var(--f-body)",
+          fontWeight: 700,
+          letterSpacing: "0.08em",
+          fontSize: 11,
+          textTransform: "uppercase",
+          cursor: canSave ? "pointer" : "not-allowed",
+          transition: "background 0.2s ease",
+          animation: feedback ? "popPulse 0.42s ease-out" : "none",
+        }}
+      >
+        {feedback ?? (isLoaded ? "SAVE NEW VERSION" : "SAVE RECIPE")}
+      </button>
+
+      {isLoaded && (
+        <button
+          onClick={onSaveAsNew}
+          disabled={!canSave}
+          style={{
+            background: "transparent",
+            border: "1px solid var(--hair-strong)",
+            padding: "8px 14px",
+            fontFamily: "var(--f-body)",
+            fontWeight: 600,
+            letterSpacing: "0.08em",
+            fontSize: 10,
+            cursor: canSave ? "pointer" : "not-allowed",
+            color: "var(--ink-2)",
+            textTransform: "uppercase",
+          }}
+        >
+          SAVE AS NEW
+        </button>
+      )}
+
+      <button
+        onClick={onReset}
+        style={{
+          background: "transparent",
+          border: "1px solid var(--hair-strong)",
+          padding: "8px 14px",
+          fontFamily: "var(--f-body)",
+          fontWeight: 600,
+          letterSpacing: "0.08em",
+          fontSize: 10,
+          textTransform: "uppercase",
+          cursor: "pointer",
+          color: "var(--ink-2)",
+        }}
+      >
+        RESET RECIPE
+      </button>
+    </div>
+  );
+}
+
+// ── Main column ───────────────────────────────────────────────────────────────
+
+export function LabelColumn() {
+  const {
+    ingredients, portionDivisor, labelName, dimensions,
+    highlightedNutrients, instructions, variables,
+    currentRecipeId, viewingVersionId,
+  } = useRecipeStore(
+    useShallow((s) => ({
+      ingredients:          s.ingredients,
+      portionDivisor:       s.portionDivisor,
+      labelName:            s.labelName,
+      dimensions:           s.dimensions,
+      highlightedNutrients: s.highlightedNutrients,
+      instructions:         s.instructions,
+      variables:            s.variables,
+      currentRecipeId:      s.currentRecipeId,
+      viewingVersionId:     s.viewingVersionId,
+    })),
+  );
+
+  const { clearRecipe, setCurrentRecipeId } = useRecipeActions();
+  const createRecipe  = useSavedRecipesStore((s) => s.createRecipe);
+  const appendVersion = useSavedRecipesStore((s) => s.appendVersion);
+  const savedRecipe   = useSavedRecipesStore((s) =>
+    currentRecipeId ? s.recipes.find((r) => r.id === currentRecipeId) : undefined,
+  );
+  const macros        = useNutritionCalc();
+  const { def: themeDef } = useActiveTheme();
+
+  const [feedback, setFeedback] = useState<string | null>(null);
 
   const baseWidthPx = 288;
   const targetPx    = Math.max(dimensions.widthInches * 96, 192);
@@ -70,9 +219,10 @@ export function LabelColumn() {
     return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(new Date(lastSavedAt));
   }, [lastSavedAt]);
 
-  const snapshot: RecipeSnapshot = {
-    ingredients, portionDivisor, labelName, dimensions, instructions, variables,
-  };
+  const snapshot = useMemo<RecipeSnapshot>(
+    () => ({ ingredients, portionDivisor, labelName, dimensions, instructions, variables }),
+    [ingredients, portionDivisor, labelName, dimensions, instructions, variables],
+  );
 
   function flash(msg: string) {
     setFeedback(msg);
@@ -82,27 +232,21 @@ export function LabelColumn() {
   const handleSaveVersion = useCallback(() => {
     if (!canSave) return;
     if (isLoaded) {
-      appendVersion(currentRecipeId!, snapshot, note.trim() || undefined);
-      setNote("");
-      setNoteOpen(false);
+      appendVersion(currentRecipeId!, snapshot);
       flash("SAVED ✓");
     } else {
-      const newId = createRecipe(snapshot, note.trim() || undefined);
-      setCurrentRecipeId({ currentRecipeId: newId, viewingVersionId: null });
-      setNote("");
-      setNoteOpen(false);
+      const newId = createRecipe(snapshot);
+      setCurrentRecipeId(newId);
       flash("SAVED ✓");
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canSave, isLoaded, currentRecipeId, snapshot, note, createRecipe, appendVersion]);
+  }, [canSave, isLoaded, currentRecipeId, snapshot, createRecipe, appendVersion, setCurrentRecipeId]);
 
   const handleSaveAsNew = useCallback(() => {
     if (!canSave) return;
     const newId = createRecipe(snapshot);
-    setCurrentRecipeId({ currentRecipeId: newId, viewingVersionId: null });
+    setCurrentRecipeId(newId);
     flash("SAVED AS NEW ✓");
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canSave, snapshot, createRecipe]);
+  }, [canSave, snapshot, createRecipe, setCurrentRecipeId]);
 
   return (
     <aside
@@ -184,117 +328,20 @@ export function LabelColumn() {
           <GenerateButton />
         </div>
 
-        {/* ── Save section ──────────────────────────────────────────────── */}
-        <div
-          style={{
-            width: "100%", maxWidth: 380,
-            display: "flex", flexDirection: "column", gap: 8,
-            padding: "12px 0 0",
-            borderTop: "1px solid var(--hair)",
+        <SaveControls
+          canSave={canSave}
+          isLoaded={isLoaded}
+          versionCount={versionCount}
+          viewingVersionId={viewingVersionId}
+          lastSavedRel={lastSavedRel}
+          savedRecipeName={savedRecipe?.name}
+          onSaveVersion={handleSaveVersion}
+          onSaveAsNew={handleSaveAsNew}
+          onReset={() => {
+            if (confirm("Reset recipe? This clears the editor — saved recipes are untouched.")) clearRecipe();
           }}
-        >
-          {isLoaded && (
-            <div className="pl-meta" style={{ fontSize: 9, lineHeight: 1.5, color: "var(--ink-3)" }}>
-              EDITING — <span style={{ color: "var(--ink)", fontWeight: 700 }}>{savedRecipe!.name.toUpperCase()}</span>
-              <br />
-              v{versionCount} {viewingVersionId ? "· VIEWING OLDER" : `· SAVED ${lastSavedRel?.toUpperCase()}`}
-            </div>
-          )}
-
-          {noteOpen && (
-            <input
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") { e.preventDefault(); handleSaveVersion(); }
-                if (e.key === "Escape") { setNoteOpen(false); setNote(""); }
-              }}
-              placeholder="what changed? (optional)"
-              autoFocus
-              style={{
-                padding: "8px 10px",
-                border: "1px solid var(--ink)",
-                background: "var(--bg)",
-                color: "var(--ink)",
-                outline: "none",
-                fontFamily: "var(--f-display)",
-                fontStyle: "var(--f-display-style)",
-                fontSize: 13,
-              }}
-            />
-          )}
-
-          <button
-            onClick={handleSaveVersion}
-            onMouseEnter={() => { if (isLoaded && !feedback) setNoteOpen(true); }}
-            disabled={!canSave}
-            style={{
-              background: feedback
-                ? "var(--color-success)"
-                : canSave
-                ? "transparent"
-                : "color-mix(in srgb, var(--ink) 6%, transparent)",
-              color: feedback
-                ? "#ffffff"
-                : canSave
-                ? "var(--ink)"
-                : "var(--ink-3)",
-              border: `1px solid ${canSave ? "var(--ink)" : "var(--hair)"}`,
-              padding: "10px 14px",
-              fontFamily: "var(--f-body)",
-              fontWeight: 700,
-              letterSpacing: "0.08em",
-              fontSize: 11,
-              textTransform: "uppercase",
-              cursor: canSave ? "pointer" : "not-allowed",
-              transition: "background 0.2s ease",
-              animation: feedback ? "popPulse 0.42s ease-out" : "none",
-            }}
-          >
-            {feedback ?? (isLoaded ? "SAVE NEW VERSION" : "SAVE RECIPE")}
-          </button>
-
-          {isLoaded && (
-            <button
-              onClick={handleSaveAsNew}
-              disabled={!canSave}
-              style={{
-                background: "transparent",
-                border: "1px solid var(--hair-strong)",
-                padding: "8px 14px",
-                fontFamily: "var(--f-body)",
-                fontWeight: 600,
-                letterSpacing: "0.08em",
-                fontSize: 10,
-                cursor: canSave ? "pointer" : "not-allowed",
-                color: "var(--ink-2)",
-                textTransform: "uppercase",
-              }}
-            >
-              SAVE AS NEW
-            </button>
-          )}
-
-          <button
-            onClick={() => {
-              if (confirm("Reset recipe? This clears the editor — saved recipes are untouched.")) clearRecipe();
-            }}
-            style={{
-              background: "transparent",
-              border: "1px solid var(--hair-strong)",
-              padding: "8px 14px",
-              fontFamily: "var(--f-body)",
-              fontWeight: 600,
-              letterSpacing: "0.08em",
-              fontSize: 10,
-              textTransform: "uppercase",
-              cursor: "pointer",
-              color: "var(--ink-2)",
-            }}
-          >
-            RESET RECIPE
-          </button>
-        </div>
+          feedback={feedback}
+        />
 
         {/* Sponsored slot — anchored to the bottom of the column. */}
         <AdSlot />
