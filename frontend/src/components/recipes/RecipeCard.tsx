@@ -1,12 +1,15 @@
 // recipes/RecipeCard.tsx
 //
-// A single saved recipe row inside the RecipesModal. Supports inline rename,
-// inline load confirmation, and inline delete confirmation.
+// A single saved recipe row inside the RecipesModal. Shows the latest version's
+// summary, supports inline rename, inline load confirmation, inline delete,
+// and an expandable timeline of all versions.
 
 import { useState } from "react";
 import type { SavedRecipe } from "../../types";
 import { useSavedRecipesStore } from "../../store/savedRecipesStore";
 import { useRecipeStore } from "../../store/recipeStore";
+import { useRecipeActions } from "../../hooks/useRecipeActions";
+import { VersionTimeline } from "./VersionTimeline";
 import { ACCENT, INK } from "../../constants/theme";
 
 interface RecipeCardProps {
@@ -20,14 +23,27 @@ export function RecipeCard({ recipe, index, onLoad }: RecipeCardProps) {
   const [confirmLoad,   setConfirmLoad]   = useState(false);
   const [editingName,   setEditingName]   = useState(false);
   const [draftName,     setDraftName]     = useState(recipe.name);
+  const [expanded,      setExpanded]      = useState(false);
 
-  const deleteRecipe  = useSavedRecipesStore((s) => s.deleteRecipe);
-  const renameRecipe  = useSavedRecipesStore((s) => s.renameRecipe);
-  const ingredients   = useRecipeStore((s) => s.ingredients);
-  const loadRecipe    = useRecipeStore((s) => s.loadRecipe);
+  const deleteRecipe    = useSavedRecipesStore((s) => s.deleteRecipe);
+  const renameRecipe    = useSavedRecipesStore((s) => s.renameRecipe);
+  const ingredients     = useRecipeStore((s) => s.ingredients);
+  const currentRecipeId = useRecipeStore((s) => s.currentRecipeId);
+  const { loadRecipe }  = useRecipeActions();
+
+  const latest = recipe.versions.length > 0
+    ? recipe.versions[recipe.versions.length - 1]
+    : undefined;
+  if (!latest) return null;
+
+  const isCurrent = currentRecipeId === recipe.id;
+  const ingCount  = latest.ingredients.length;
+  const versionCount = recipe.versions.length;
+  const indexStr  = String(index + 1).padStart(2, "0");
+  const savedDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date(latest.savedAt));
 
   function handleLoadClick() {
-    if (ingredients.length > 0) {
+    if (ingredients.length > 0 && !isCurrent) {
       setConfirmLoad(true);
     } else {
       doLoad();
@@ -49,10 +65,6 @@ export function RecipeCard({ recipe, index, onLoad }: RecipeCardProps) {
     }
   }
 
-  const indexStr  = String(index + 1).padStart(2, "0");
-  const savedDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date(recipe.savedAt));
-  const ingCount  = recipe.ingredients.length;
-
   return (
     <li
       style={{
@@ -62,9 +74,8 @@ export function RecipeCard({ recipe, index, onLoad }: RecipeCardProps) {
         borderBottom: "1px solid #ebebeb",
         alignItems: "flex-start",
         animation: "popfade 0.2s ease",
+        background: isCurrent ? "var(--color-accent-blush)" : "transparent",
       }}
-      onMouseEnter={(e) => { (e.currentTarget as HTMLLIElement).style.background = "var(--color-accent-blush)"; }}
-      onMouseLeave={(e) => { (e.currentTarget as HTMLLIElement).style.background = ""; }}
     >
       {/* Big italic index numeral */}
       <span
@@ -128,16 +139,41 @@ export function RecipeCard({ recipe, index, onLoad }: RecipeCardProps) {
         )}
 
         {/* Metadata */}
-        <span
-          style={{
+        <div style={{ display: "flex", gap: 14, alignItems: "baseline", flexWrap: "wrap" }}>
+          <span style={{
             fontFamily: "'JetBrains Mono', monospace",
             fontSize: 10,
             color: "var(--color-text-tertiary)",
             letterSpacing: "0.12em",
-          }}
-        >
-          {ingCount} INGREDIENT{ingCount !== 1 ? "S" : ""} · {recipe.portionDivisor} SERVING{recipe.portionDivisor !== 1 ? "S" : ""} · {savedDate}
+          }}>
+            {ingCount} INGREDIENT{ingCount !== 1 ? "S" : ""} · {latest.portionDivisor} SERVING{latest.portionDivisor !== 1 ? "S" : ""}
+            {latest.instructions.length > 0 && ` · ${latest.instructions.length} STEP${latest.instructions.length !== 1 ? "S" : ""}`}
+          </span>
+          <button
+            onClick={() => setExpanded(!expanded)}
+            style={{
+              background: "transparent", border: "none",
+              cursor: "pointer", padding: 0,
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: 10, letterSpacing: "0.14em", color: ACCENT,
+              fontWeight: 700,
+            }}
+          >
+            {versionCount} VERSION{versionCount !== 1 ? "S" : ""} {expanded ? "▴" : "▾"}
+          </button>
+        </div>
+        <span style={{
+          fontFamily: "'JetBrains Mono', monospace",
+          fontSize: 10,
+          color: "var(--color-text-tertiary)",
+          letterSpacing: "0.12em",
+        }}>
+          LATEST {savedDate}
+          {latest.note && <span style={{ color: "#777" }}> · &ldquo;{latest.note}&rdquo;</span>}
         </span>
+
+        {/* Version timeline (expanded) */}
+        {expanded && <VersionTimeline recipe={recipe} onView={onLoad} />}
 
         {/* Inline load confirmation */}
         {confirmLoad && (
@@ -174,7 +210,7 @@ export function RecipeCard({ recipe, index, onLoad }: RecipeCardProps) {
         {confirmDelete && (
           <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6, flexWrap: "wrap", animation: "popfade 0.14s ease" }}>
             <span style={{ fontFamily: "'Inter Tight', sans-serif", fontSize: 11, color: "#666" }}>
-              Delete this recipe? This can&apos;t be undone.
+              Delete this recipe and all {versionCount} version{versionCount !== 1 ? "s" : ""}?
             </span>
             <button
               onClick={() => deleteRecipe(recipe.id)}
@@ -202,19 +238,23 @@ export function RecipeCard({ recipe, index, onLoad }: RecipeCardProps) {
         )}
       </div>
 
-      {/* Action buttons (hidden while a confirmation is shown) */}
+      {/* Action buttons */}
       {!confirmLoad && !confirmDelete && (
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
           <button
             onClick={handleLoadClick}
+            disabled={isCurrent}
             style={{
-              background: ACCENT, color: "#fff", border: "none",
-              padding: "8px 14px", cursor: "pointer",
+              background: isCurrent ? "transparent" : ACCENT,
+              color: isCurrent ? "#999" : "#fff",
+              border: isCurrent ? `1px solid #ccc` : "none",
+              padding: "8px 14px",
+              cursor: isCurrent ? "default" : "pointer",
               fontFamily: "'Inter Tight', sans-serif", fontWeight: 700,
               fontSize: 11, letterSpacing: "0.1em",
             }}
           >
-            LOAD
+            {isCurrent ? "LOADED" : "LOAD"}
           </button>
           <button
             onClick={() => setConfirmDelete(true)}

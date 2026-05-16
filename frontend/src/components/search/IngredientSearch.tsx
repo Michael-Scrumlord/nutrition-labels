@@ -229,7 +229,7 @@ export function IngredientSearch({ open, onClose }: IngredientSearchProps) {
             <p style={{ padding: "16px 22px", color: "#bbb", fontStyle: "italic", fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 16 }}>
               {tab === "recent"    ? "No recents yet." :
                tab === "favorites" ? "No favorites yet — star an ingredient to save it." :
-               tab === "search"    ? "Type to search the USDA database." :
+               tab === "search"    ? (query.length >= 2 ? `No results for "${query}".` : "Type to search the USDA database.") :
                "No items."}
             </p>
           )}

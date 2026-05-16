@@ -1,6 +1,8 @@
 import type { SavedFood } from "../types";
 
-// fdc_ids are USDA SR Legacy identifiers — must match nutrition.db (built by build_db_full.py)
+// fdc_ids must match nutrition.db, which is built from the USDA SR Legacy dataset
+// (backend/data/build_db_full.py). These are the canonical SR Legacy fdc_ids.
+// The display name is a friendly shorthand — the API returns the full USDA description.
 export const COMMON_FOODS: SavedFood[] = [
   { fdc_id: 173430, name: "Butter, unsalted"            },
   { fdc_id: 171287, name: "Eggs, whole, raw"            },
