@@ -84,3 +84,15 @@ export interface LabelDimensions {
 // the recipe builder, label column, and label preview.
 
 export type HighlightSet = Set<keyof MacroProfile>;
+
+// ── Saved recipe catalog ───────────────────────────────────────────────────
+
+export interface SavedRecipe {
+  id: string;
+  name: string;
+  savedAt: number;
+  ingredients: IngredientItem[];
+  portionDivisor: number;
+  labelName: string;
+  dimensions: LabelDimensions;
+}

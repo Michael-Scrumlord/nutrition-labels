@@ -1,10 +1,11 @@
 // label/LabelColumn.tsx
 //
-// Sticky right panel: FDA label preview, W/H controls, Generate PDF button.
-// Reads highlightedNutrients from the recipe store directly — no props needed
-// from AppShell, eliminating the sibling-to-sibling prop relay.
+// Sticky right panel: FDA label preview, W/H controls, Generate PDF button,
+// Save Recipe button, and Reset Recipe button.
 
+import { useState, useCallback } from "react";
 import { useRecipeStore } from "../../store/recipeStore";
+import { useSavedRecipesStore } from "../../store/savedRecipesStore";
 import { useRecipeActions } from "../../hooks/useRecipeActions";
 import { useNutritionCalc } from "../../hooks/useNutritionCalc";
 import { LabelPreview } from "./LabelPreview";
@@ -15,10 +16,14 @@ import { ACCENT, INK } from "../../constants/theme";
 export function LabelColumn() {
   const ingredients          = useRecipeStore((s) => s.ingredients);
   const portionDivisor       = useRecipeStore((s) => s.portionDivisor);
+  const labelName            = useRecipeStore((s) => s.labelName);
   const dimensions           = useRecipeStore((s) => s.dimensions);
   const highlightedNutrients = useRecipeStore((s) => s.highlightedNutrients);
   const { clearRecipe }      = useRecipeActions();
+  const saveRecipe           = useSavedRecipesStore((s) => s.saveRecipe);
   const macros               = useNutritionCalc();
+
+  const [savedFeedback, setSavedFeedback] = useState(false);
 
   const baseWidthPx = 288;
   const targetPx    = Math.max(dimensions.widthInches * 96, 192);
@@ -27,6 +32,15 @@ export function LabelColumn() {
   const containerH  = dimensions.heightInches
     ? dimensions.heightInches * 96
     : estimatedH * scale;
+
+  const handleSave = useCallback(() => {
+    if (ingredients.length === 0) return;
+    saveRecipe({ ingredients, portionDivisor, labelName, dimensions });
+    setSavedFeedback(true);
+    setTimeout(() => setSavedFeedback(false), 1500);
+  }, [ingredients, portionDivisor, labelName, dimensions, saveRecipe]);
+
+  const canSave = ingredients.length > 0;
 
   return (
     <aside
@@ -72,6 +86,28 @@ export function LabelColumn() {
 
       <GenerateButton />
 
+      {/* Save recipe */}
+      <button
+        onClick={handleSave}
+        disabled={!canSave}
+        style={{
+          background: savedFeedback ? "var(--color-success)" : canSave ? ACCENT : "#e5e5e5",
+          color: canSave ? "#fff" : "#bbb",
+          border: "none",
+          padding: "10px 14px",
+          fontFamily: "'Inter Tight', sans-serif",
+          fontWeight: 700,
+          letterSpacing: "0.08em",
+          fontSize: 11,
+          cursor: canSave ? "pointer" : "not-allowed",
+          transition: "background 0.2s ease",
+          animation: savedFeedback ? "popPulse 0.42s ease-out" : "none",
+        }}
+      >
+        {savedFeedback ? "SAVED ✓" : "SAVE RECIPE"}
+      </button>
+
+      {/* Reset recipe */}
       <button
         onClick={() => {
           if (confirm("Reset recipe?")) clearRecipe();
