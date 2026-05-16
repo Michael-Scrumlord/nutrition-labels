@@ -2,8 +2,7 @@
 
 import { useRecipeStore } from "../../store/recipeStore";
 import { ScrubNumber } from "../ui/ScrubNumber";
-
-const ACCENT = "var(--color-accent)";
+import { ACCENT, INK } from "../../constants/theme";
 
 export function LabelDimensions() {
   const dimensions    = useRecipeStore((s) => s.dimensions);
@@ -26,7 +25,7 @@ export function LabelDimensions() {
             min={2} max={8} step={0.1}
             onChange={setWidth}
             suffix="″"
-            style={{ fontSize: 22, fontWeight: 700, color: "#0a0a0a" }}
+            style={{ fontSize: 22, fontWeight: 700, color: INK }}
           />
         </span>
         <span style={{ fontSize: 9, color: "#bbb" }}>FDA min 2″</span>
@@ -45,7 +44,7 @@ export function LabelDimensions() {
                 min={2} max={12} step={0.1}
                 onChange={setHeight}
                 suffix="″"
-                style={{ fontSize: 22, fontWeight: 700, color: "#0a0a0a" }}
+                style={{ fontSize: 22, fontWeight: 700, color: INK }}
               />
               <span
                 onClick={clearHeight}

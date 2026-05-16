@@ -4,9 +4,9 @@
 // Accepts an optional `highlightSet` — nutrient keys whose rows are
 // tinted with the blush accent when an ingredient is hovered.
 
-import type { MacroProfile, IngredientItem } from "../../types";
+import type { MacroProfile, IngredientItem, HighlightSet } from "../../types";
 import { formatDV, buildIngredientsString } from "../../utils/nutrition";
-import type { HighlightSet } from "../layout/AppShell";
+import { INK } from "../../constants/theme";
 
 interface LabelPreviewProps {
   macros: MacroProfile;
@@ -15,8 +15,6 @@ interface LabelPreviewProps {
   widthPx: number;
   highlightSet?: HighlightSet;
 }
-
-const INK = "#0a0a0a";
 
 function MacroRow({
   label, value, unit, bold = false, indent = 0, nutrient, macros, faded = false, highlight = false,

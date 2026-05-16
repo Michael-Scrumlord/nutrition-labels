@@ -1,34 +1,30 @@
 // label/LabelColumn.tsx
 //
-// Pop sticky right panel: FDA label, W/H size controls, Generate PDF button.
-// Receives `highlightSet` from AppShell (derived from the hovered ingredient row).
+// Sticky right panel: FDA label preview, W/H controls, Generate PDF button.
+// Reads highlightedNutrients from the recipe store directly — no props needed
+// from AppShell, eliminating the sibling-to-sibling prop relay.
 
 import { useRecipeStore } from "../../store/recipeStore";
+import { useRecipeActions } from "../../hooks/useRecipeActions";
 import { useNutritionCalc } from "../../hooks/useNutritionCalc";
 import { LabelPreview } from "./LabelPreview";
 import { LabelDimensions } from "./LabelDimensions";
 import { GenerateButton } from "./GenerateButton";
-import type { HighlightSet } from "../layout/AppShell";
+import { ACCENT, INK } from "../../constants/theme";
 
-interface LabelColumnProps {
-  highlightSet: HighlightSet;
-}
+export function LabelColumn() {
+  const ingredients          = useRecipeStore((s) => s.ingredients);
+  const portionDivisor       = useRecipeStore((s) => s.portionDivisor);
+  const dimensions           = useRecipeStore((s) => s.dimensions);
+  const highlightedNutrients = useRecipeStore((s) => s.highlightedNutrients);
+  const { clearRecipe }      = useRecipeActions();
+  const macros               = useNutritionCalc();
 
-const ACCENT = "var(--color-accent)";
-const INK    = "#0a0a0a";
-
-export function LabelColumn({ highlightSet }: LabelColumnProps) {
-  const ingredients    = useRecipeStore((s) => s.ingredients);
-  const portionDivisor = useRecipeStore((s) => s.portionDivisor);
-  const dimensions     = useRecipeStore((s) => s.dimensions);
-  const clearRecipe    = useRecipeStore((s) => s.clearRecipe);
-  const macros         = useNutritionCalc();
-
-  const baseWidthPx  = 288;
-  const targetPx     = Math.max(dimensions.widthInches * 96, 192);
-  const scale        = targetPx / baseWidthPx;
-  const estimatedH   = 560; // approximate label height before scale
-  const containerH   = dimensions.heightInches
+  const baseWidthPx = 288;
+  const targetPx    = Math.max(dimensions.widthInches * 96, 192);
+  const scale       = targetPx / baseWidthPx;
+  const estimatedH  = 560;
+  const containerH  = dimensions.heightInches
     ? dimensions.heightInches * 96
     : estimatedH * scale;
 
@@ -67,7 +63,7 @@ export function LabelColumn({ highlightSet }: LabelColumnProps) {
             portionDivisor={portionDivisor}
             ingredients={ingredients}
             widthPx={baseWidthPx}
-            highlightSet={highlightSet}
+            highlightSet={highlightedNutrients}
           />
         </div>
       </div>

@@ -1,11 +1,12 @@
 import { create } from "zustand";
-import type { IngredientItem, LabelDimensions, UnitKey } from "../types";
+import type { IngredientItem, LabelDimensions, UnitKey, HighlightSet } from "../types";
 
 interface RecipeState {
   ingredients: IngredientItem[];
   portionDivisor: number;
   labelName: string;
   dimensions: LabelDimensions;
+  highlightedNutrients: HighlightSet;
 
   addIngredient:           (ingredient: IngredientItem) => void;
   removeIngredient:        (fdc_id: number) => void;
@@ -16,14 +17,16 @@ interface RecipeState {
   setPortionDivisor:       (divisor: number) => void;
   setLabelName:            (name: string) => void;
   setDimensions:           (dimensions: Partial<LabelDimensions>) => void;
+  setHighlightedNutrients: (nutrients: HighlightSet) => void;
   clearRecipe:             () => void;
 }
 
 export const useRecipeStore = create<RecipeState>((set) => ({
-  ingredients:    [],
-  portionDivisor: 8,
-  labelName:      "",
-  dimensions:     { widthInches: 2.75, heightInches: null },
+  ingredients:          [],
+  portionDivisor:       8,
+  labelName:            "",
+  dimensions:           { widthInches: 2.75, heightInches: null },
+  highlightedNutrients: new Set(),
 
   addIngredient: (ingredient) =>
     set((state) => ({ ingredients: [...state.ingredients, ingredient] })),
@@ -63,5 +66,9 @@ export const useRecipeStore = create<RecipeState>((set) => ({
   setDimensions: (partial) =>
     set((state) => ({ dimensions: { ...state.dimensions, ...partial } })),
 
-  clearRecipe: () => set({ ingredients: [], portionDivisor: 8, labelName: "" }),
+  setHighlightedNutrients: (nutrients) => set({ highlightedNutrients: nutrients }),
+
+  clearRecipe: () => set({
+    ingredients: [], portionDivisor: 8, labelName: "", highlightedNutrients: new Set(),
+  }),
 }));

@@ -6,14 +6,11 @@
 
 import { useRecipeStore } from "../../store/recipeStore";
 import { UNIT_CONVERSIONS } from "../../utils/units";
+import { round1 } from "../../utils/nutrition";
 import type { IngredientItem } from "../../types";
 
 function ingredientWeightGrams(ing: IngredientItem): number {
   return ing.amount * UNIT_CONVERSIONS[ing.unit];
-}
-
-function round1(n: number): number {
-  return Math.round(n * 10) / 10;
 }
 
 /** Macros for a single ingredient at its full (un-divided) quantity. */
