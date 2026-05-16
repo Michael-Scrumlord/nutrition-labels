@@ -1,34 +1,79 @@
 import { create } from "zustand";
-import type { IngredientItem, LabelDimensions, UnitKey, HighlightSet, SavedRecipe } from "../types";
+import type {
+  IngredientItem, LabelDimensions, UnitKey, HighlightSet,
+  RecipeStep, RecipeVariable, SavedRecipe, RecipeVersion,
+} from "../types";
+
+// crypto.randomUUID() is unavailable in insecure contexts (http://hostname).
+function makeId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 11)}`;
+}
 
 interface RecipeState {
+  // ── Recipe content ────────────────────────────────────────────────────
   ingredients: IngredientItem[];
   portionDivisor: number;
   labelName: string;
   dimensions: LabelDimensions;
   highlightedNutrients: HighlightSet;
+  instructions: RecipeStep[];
+  variables: RecipeVariable[];
 
+  // ── Version tracking ──────────────────────────────────────────────────
+  currentRecipeId:   string | null;   // null = unsaved/new recipe
+  viewingVersionId:  string | null;   // non-null when viewing an older version
+
+  // ── Ingredient actions ────────────────────────────────────────────────
   addIngredient:           (ingredient: IngredientItem) => void;
   removeIngredient:        (fdc_id: number) => void;
   updateIngredientName:    (fdc_id: number, name: string) => void;
   updateIngredientAmount:  (fdc_id: number, amount: number) => void;
   updateIngredientUnit:    (fdc_id: number, unit: UnitKey) => void;
   moveIngredient:          (fdc_id: number, direction: -1 | 1) => void;
+
+  // ── Recipe meta actions ───────────────────────────────────────────────
   setPortionDivisor:       (divisor: number) => void;
   setLabelName:            (name: string) => void;
   setDimensions:           (dimensions: Partial<LabelDimensions>) => void;
   setHighlightedNutrients: (nutrients: HighlightSet) => void;
-  clearRecipe:             () => void;
-  loadRecipe:              (recipe: SavedRecipe) => void;
+
+  // ── Method actions ────────────────────────────────────────────────────
+  addStep:           (afterId?: string) => string;
+  updateStepText:    (id: string, text: string) => void;
+  removeStep:        (id: string) => void;
+  moveStep:          (id: string, direction: -1 | 1) => void;
+
+  addVariable:       (variable: RecipeVariable) => void;
+  setVariableValue:  (name: string, value: number) => void;
+  updateVariable:    (name: string, patch: Partial<RecipeVariable>) => void;
+  removeVariable:    (name: string) => void;
+
+  // ── Recipe lifecycle ──────────────────────────────────────────────────
+  clearRecipe:  () => void;
+  loadRecipe:   (recipe: SavedRecipe)  => void;   // loads latest version
+  loadVersion:  (recipe: SavedRecipe, version: RecipeVersion) => void;
+  exitVersionView: () => void;
 }
 
-export const useRecipeStore = create<RecipeState>((set) => ({
-  ingredients:          [],
+const DEFAULTS = {
+  ingredients:          [] as IngredientItem[],
   portionDivisor:       8,
   labelName:            "",
-  dimensions:           { widthInches: 2.75, heightInches: null },
-  highlightedNutrients: new Set(),
+  dimensions:           { widthInches: 2.75, heightInches: null } as LabelDimensions,
+  highlightedNutrients: new Set() as HighlightSet,
+  instructions:         [] as RecipeStep[],
+  variables:            [] as RecipeVariable[],
+  currentRecipeId:      null as string | null,
+  viewingVersionId:     null as string | null,
+};
 
+export const useRecipeStore = create<RecipeState>((set) => ({
+  ...DEFAULTS,
+
+  // ── Ingredient actions ────────────────────────────────────────────────
   addIngredient: (ingredient) =>
     set((state) => ({ ingredients: [...state.ingredients, ingredient] })),
 
@@ -61,6 +106,7 @@ export const useRecipeStore = create<RecipeState>((set) => ({
       return { ingredients: next };
     }),
 
+  // ── Recipe meta actions ───────────────────────────────────────────────
   setPortionDivisor: (portionDivisor) => set({ portionDivisor }),
   setLabelName:      (labelName)      => set({ labelName }),
 
@@ -69,15 +115,96 @@ export const useRecipeStore = create<RecipeState>((set) => ({
 
   setHighlightedNutrients: (nutrients) => set({ highlightedNutrients: nutrients }),
 
-  clearRecipe: () => set({
-    ingredients: [], portionDivisor: 8, labelName: "", highlightedNutrients: new Set(),
-  }),
+  // ── Method actions ────────────────────────────────────────────────────
+  addStep: (afterId) => {
+    const id = makeId();
+    set((state) => {
+      const next: RecipeStep = { id, text: "" };
+      if (!afterId) return { instructions: [...state.instructions, next] };
+      const idx = state.instructions.findIndex((s) => s.id === afterId);
+      if (idx === -1) return { instructions: [...state.instructions, next] };
+      const out = [...state.instructions];
+      out.splice(idx + 1, 0, next);
+      return { instructions: out };
+    });
+    return id;
+  },
 
-  loadRecipe: (recipe) => set({
-    ingredients:          recipe.ingredients,
-    portionDivisor:       recipe.portionDivisor,
-    labelName:            recipe.labelName,
-    dimensions:           recipe.dimensions,
+  updateStepText: (id, text) =>
+    set((state) => ({
+      instructions: state.instructions.map((s) => s.id === id ? { ...s, text } : s),
+    })),
+
+  removeStep: (id) =>
+    set((state) => ({ instructions: state.instructions.filter((s) => s.id !== id) })),
+
+  moveStep: (id, direction) =>
+    set((state) => {
+      const idx = state.instructions.findIndex((s) => s.id === id);
+      if (idx === -1) return state;
+      const to = idx + direction;
+      if (to < 0 || to >= state.instructions.length) return state;
+      const next = [...state.instructions];
+      [next[idx], next[to]] = [next[to], next[idx]];
+      return { instructions: next };
+    }),
+
+  addVariable: (variable) =>
+    set((state) => {
+      // No duplicate names — if it exists, leave it alone
+      if (state.variables.some((v) => v.name === variable.name)) return state;
+      return { variables: [...state.variables, variable] };
+    }),
+
+  setVariableValue: (name, value) =>
+    set((state) => ({
+      variables: state.variables.map((v) => v.name === name ? { ...v, value } : v),
+    })),
+
+  updateVariable: (name, patch) =>
+    set((state) => ({
+      variables: state.variables.map((v) => v.name === name ? { ...v, ...patch } : v),
+    })),
+
+  removeVariable: (name) =>
+    set((state) => ({ variables: state.variables.filter((v) => v.name !== name) })),
+
+  // ── Recipe lifecycle ──────────────────────────────────────────────────
+  clearRecipe: () => set({
+    ...DEFAULTS,
+    dimensions: { widthInches: 2.75, heightInches: null },
     highlightedNutrients: new Set(),
   }),
+
+  loadRecipe: (recipe) => {
+    const latest = recipe.versions.length > 0
+      ? recipe.versions[recipe.versions.length - 1]
+      : undefined;
+    if (!latest) return;
+    set({
+      ingredients:          latest.ingredients,
+      portionDivisor:       latest.portionDivisor,
+      labelName:            latest.labelName,
+      dimensions:           latest.dimensions,
+      instructions:         latest.instructions ?? [],
+      variables:            latest.variables ?? [],
+      highlightedNutrients: new Set(),
+      currentRecipeId:      recipe.id,
+      viewingVersionId:     null,
+    });
+  },
+
+  loadVersion: (recipe, version) => set({
+    ingredients:          version.ingredients,
+    portionDivisor:       version.portionDivisor,
+    labelName:            version.labelName,
+    dimensions:           version.dimensions,
+    instructions:         version.instructions ?? [],
+    variables:            version.variables ?? [],
+    highlightedNutrients: new Set(),
+    currentRecipeId:      recipe.id,
+    viewingVersionId:     version.id,
+  }),
+
+  exitVersionView: () => set({ viewingVersionId: null }),
 }));

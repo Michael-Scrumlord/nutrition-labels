@@ -12,15 +12,17 @@ import { ScrubNumber } from "../ui/ScrubNumber";
 import { IngredientSearch } from "../search/IngredientSearch";
 import { IngredientRow } from "./IngredientRow";
 import { NutritionBreakdownTable } from "./NutritionBreakdownTable";
+import { MethodSection } from "./MethodSection";
 import { convertToGrams } from "../../utils/units";
 import { getHighlightKeys } from "../../utils/nutrition";
 import { ACCENT, INK } from "../../constants/theme";
 
 export function RecipeBuilder() {
-  const ingredients    = useRecipeStore((s) => s.ingredients);
-  const portionDivisor = useRecipeStore((s) => s.portionDivisor);
-  const labelName      = useRecipeStore((s) => s.labelName);
-  const { setLabelName, setPortionDivisor, setHighlightedNutrients } = useRecipeActions();
+  const ingredients      = useRecipeStore((s) => s.ingredients);
+  const portionDivisor   = useRecipeStore((s) => s.portionDivisor);
+  const labelName        = useRecipeStore((s) => s.labelName);
+  const viewingVersionId = useRecipeStore((s) => s.viewingVersionId);
+  const { setLabelName, setPortionDivisor, setHighlightedNutrients, exitVersionView } = useRecipeActions();
 
   const [pickerOpen, setPickerOpen] = useState(false);
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
@@ -52,6 +54,49 @@ export function RecipeBuilder() {
           fontFamily: "'Inter Tight', system-ui, sans-serif",
         }}
       >
+        {/* ── Viewing older version banner ─────────────────────────────── */}
+        {viewingVersionId && (
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 14,
+            marginBottom: 18,
+            padding: "10px 14px",
+            background: "var(--color-accent-blush)",
+            border: `1px solid ${ACCENT}`,
+            animation: "popfade 0.18s ease",
+          }}>
+            <span style={{
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: 10, letterSpacing: "0.18em", color: ACCENT, fontWeight: 700,
+            }}>
+              ◉ VIEWING OLDER VERSION
+            </span>
+            <span style={{
+              fontFamily: "'Inter Tight', sans-serif",
+              fontSize: 12, color: "#666", flex: 1,
+            }}>
+              saving will append a new version on top of the current latest — nothing is overwritten.
+            </span>
+            <button
+              onClick={exitVersionView}
+              style={{
+                background: "transparent",
+                border: `1px solid ${INK}`,
+                padding: "5px 12px",
+                cursor: "pointer",
+                fontFamily: "'Inter Tight', sans-serif",
+                fontWeight: 700,
+                fontSize: 10,
+                letterSpacing: "0.12em",
+                color: INK,
+              }}
+            >
+              DISMISS
+            </button>
+          </div>
+        )}
+
         {/* ── "A RECIPE FOR —" strip ───────────────────────────────────── */}
         <div style={{ display: "flex", alignItems: "baseline", gap: 24, marginBottom: 18 }}>
           <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#999", letterSpacing: "0.2em" }}>
@@ -145,6 +190,9 @@ export function RecipeBuilder() {
         >
           + add an ingredient
         </button>
+
+        {/* ── Method (instructions + variables) ───────────────────────── */}
+        <MethodSection />
 
         {/* ── Methodology footnote ──────────────────────────────────────── */}
         <p style={{ marginTop: 56, maxWidth: 720, fontSize: 13, lineHeight: 1.55, color: "#888" }}>

@@ -18,6 +18,21 @@ export function useRecipeActions() {
       setDimensions:           s.setDimensions,
       clearRecipe:             s.clearRecipe,
       setHighlightedNutrients: s.setHighlightedNutrients,
+
+      // Method actions
+      addStep:          s.addStep,
+      updateStepText:   s.updateStepText,
+      removeStep:       s.removeStep,
+      moveStep:         s.moveStep,
+      addVariable:      s.addVariable,
+      setVariableValue: s.setVariableValue,
+      updateVariable:   s.updateVariable,
+      removeVariable:   s.removeVariable,
+
+      // Recipe lifecycle
+      loadRecipe:       s.loadRecipe,
+      loadVersion:      s.loadVersion,
+      exitVersionView:  s.exitVersionView,
     })),
   );
 }

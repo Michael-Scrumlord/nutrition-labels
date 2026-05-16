@@ -25,9 +25,9 @@ COPY app/ ./app/
 COPY templates/ ./templates/
 COPY data/ ./data/
 
-# Build the SQLite database from the seed script
+# Build the SQLite database from the full USDA SR Legacy dataset (~7,793 foods)
 # This bakes the DB into the image so it's available at runtime
-RUN python data/build_db.py
+RUN python data/build_db_full.py
 
 # Final image — same base, copy from builder
 FROM python:3.11-slim AS final

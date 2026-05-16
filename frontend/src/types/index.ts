@@ -85,14 +85,40 @@ export interface LabelDimensions {
 
 export type HighlightSet = Set<keyof MacroProfile>;
 
+// ── Method (instructions + tweakable variables) ────────────────────────────
+
+export interface RecipeStep {
+  id: string;
+  text: string;        // plain text with {Variable Label} tokens
+}
+
+export interface RecipeVariable {
+  name: string;        // canonical key (slugified label); used as React key
+  label: string;       // user-facing label, e.g. "Bake Time" — matched in {…} tokens
+  value: number;
+  suffix?: string;     // e.g. "°F", "minutes" — rendered after the value in read mode
+  min?: number;
+  max?: number;
+  step?: number;
+}
+
 // ── Saved recipe catalog ───────────────────────────────────────────────────
 
-export interface SavedRecipe {
+export interface RecipeVersion {
   id: string;
-  name: string;
   savedAt: number;
+  note?: string;
   ingredients: IngredientItem[];
   portionDivisor: number;
   labelName: string;
   dimensions: LabelDimensions;
+  instructions: RecipeStep[];
+  variables: RecipeVariable[];
+}
+
+export interface SavedRecipe {
+  id: string;
+  name: string;
+  createdAt: number;
+  versions: RecipeVersion[];   // versions.at(-1) is the latest
 }
