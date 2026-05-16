@@ -1,1 +1,202 @@
-# TODO
+# CLAUDE CONTEXT — nutrition-labels
+# React + FastAPI app: users build a recipe, get an FDA nutrition-label PDF.
+
+## STACK
+- Backend: FastAPI + SQLite + WeasyPrint + Jinja2 (port 8000)
+- Frontend: React + TypeScript + Vite + Zustand + TanStack Query (port 5173)
+- Infra: docker-compose (services: backend, frontend)
+
+---
+
+## DATA FLOW: Recipe Input → PDF Output
+
+1. User searches ingredient → GET /api/search?query=
+2. Selects result → GET /api/food/{fdc_id} (returns MacroProfile per 100g + portions)
+3. Adds ingredient (name, amount, unit) → stored in Zustand recipeStore
+4. useNutritionCalc() derives per-serving MacroProfile in real-time (mirrors backend math)
+5. User clicks "Generate PDF" → POST /api/generate_label → PDF bytes → browser download
+
+Backend on POST:
+  a. Validates ≥1 ingredient, all fdc_ids exist in DB
+  b. Fetches all food rows (get_foods_by_ids)
+  c. Recalculates macros (independent of frontend calc)
+  d. render_label_html() → Jinja2 fills label.html, builds %DV, INGREDIENTS string
+  e. generate_pdf() → WeasyPrint → bytes returned with Content-Disposition: attachment
+
+---
+
+## ARCHITECTURAL RULES
+
+- **All DB values are per 100g.** Multiplier = (amount_in_grams / 100).
+- **Nutrition math is intentionally duplicated** (backend/app/nutrition.py ↔ frontend/src/utils/nutrition.ts). If you change the math, change BOTH.
+- **Rounding (21 CFR 101.9(c)):** calories → int; all others → 1 decimal.
+- **Ingredients string:** sorted by gram weight descending, ALL CAPS, period-terminated.
+- **Search ranking:** prefix matches first (alpha), then contains matches (alpha); top 40.
+- **DB is read-only at runtime**; all writes happen in data/build_db.py.
+- **SQLite opened with nolock=1** for network-FS compatibility.
+
+---
+
+## CONSTANTS (must stay in sync: backend ↔ frontend)
+
+### UNIT_CONVERSIONS (→ grams)
+  g: 1.0 | ml: 1.0 (water density) | oz: 28.3495 | lb: 453.592 | kg: 1000.0
+
+### FDA_DAILY_VALUES (2020 reference)
+  fat_total_g: 78 | fat_saturated_g: 20 | cholesterol_mg: 300 | sodium_mg: 2300
+  carbohydrates_total_g: 275 | fiber_g: 28 | vitamin_d_mcg: 20 | calcium_mg: 1300
+  iron_mg: 18 | potassium_mg: 4700
+  (calories, sugar_g, protein_g have NO %DV)
+
+### NUTRIENT_FIELDS (FDA label order, 13 total)
+  calories, fat_total_g, fat_saturated_g, cholesterol_mg, sodium_mg,
+  carbohydrates_total_g, fiber_g, sugar_g, protein_g,
+  vitamin_d_mcg, calcium_mg, iron_mg, potassium_mg
+
+### Label defaults
+  widthInches: 2.75 | heightInches: null (auto) | portionDivisor: 8
+
+### Preferences (localStorage)
+  key: "nl_preferences" | recents: max 15 | partialKeys: "nl_recents", "nl_favorites"
+
+---
+
+## BACKEND SIGNATURE MAP — backend/app/
+
+### config.py
+  Settings.db_path: str = "data/nutrition.db"
+  Settings.cors_origins: list[str] = ["http://localhost:5173", "http://localhost:80"]
+  settings = Settings()
+
+### models.py
+  IngredientItem(fdc_id: int, name: str, amount: float>0, unit: UnitKey)
+  GenerateLabelRequest(portion_divisor: int[1-999]=8, label_name: str="",
+                       width_inches: float>0=2.75, height_inches: float|None,
+                       ingredients: list[IngredientItem]≥1)
+  MacroProfile(calories, fat_total_g, fat_saturated_g, cholesterol_mg, sodium_mg,
+               carbohydrates_total_g, fiber_g, sugar_g, protein_g,
+               vitamin_d_mcg, calcium_mg, iron_mg, potassium_mg)  # all float
+  FoodSearchResult(fdc_id: int, name: str)
+  PortionSize(amount: float, modifier: str, gram_weight: float)
+  FoodDetail(fdc_id: int, name: str, macros: MacroProfile, portions: list[PortionSize])
+
+### database.py
+  get_connection(db_path=None) → sqlite3.Connection  # row_factory=Row, nolock=1
+  search_foods(query: str, limit=80, db_path=None) → list[Row]  # LIKE %query%
+  get_food_by_id(fdc_id: int, db_path=None) → Row | None
+  get_portions_by_id(fdc_id: int, db_path=None) → list[Row]
+  get_foods_by_ids(fdc_ids: list[int], db_path=None) → list[Row]
+
+  DB SCHEMA:
+    food_macros(fdc_id PK, description, calories, fat_total_g, fat_saturated_g,
+                cholesterol_mg, sodium_mg, carbohydrates_total_g, fiber_g, sugar_g,
+                protein_g, vitamin_d_mcg, calcium_mg, iron_mg, potassium_mg)
+    food_portions(id PK, fdc_id FK, amount, modifier, gram_weight)
+
+### nutrition.py
+  calculate_recipe_macros(ingredients: list[IngredientItem],
+                           food_rows: list,
+                           portion_divisor: int) → MacroProfile
+    # grams = amount * UNIT_CONVERSIONS[unit]
+    # total[f] += db_row[f] * (grams/100)  for each ingredient
+    # returns total[f] / portion_divisor, rounded per CFR rules
+    # raises ValueError if portion_divisor ≤ 0 or fdc_id missing
+
+  compute_daily_value_pct(value: float, nutrient: str) → int | None
+    # None if nutrient has no DV; else round((value/DV)*100)
+
+### search.py
+  ranked_search(query: str, food_rows: list) → list[{"fdc_id": int, "name": str}]
+    # Returns [] if len(query)<2
+    # Group1: prefix matches (alpha); Group2: contains matches (alpha); top 40
+
+### pdf.py
+  render_label_html(macros: MacroProfile, request: GenerateLabelRequest) → str
+    # Jinja2 render of templates/label.html; computes %DV; builds INGREDIENTS string
+  generate_pdf(html: str) → bytes
+    # WeasyPrint HTML(string=html).write_pdf()
+
+### main.py — Routes
+  GET  /api/search?query=        → list[FoodSearchResult]  ([] if query<2 chars)
+  GET  /api/food/{fdc_id}        → FoodDetail              (404 if missing)
+  POST /api/generate_label       → PDF bytes Response      (400 if bad request)
+
+---
+
+## FRONTEND SIGNATURE MAP — frontend/src/utils/
+
+### units.ts
+  UNIT_CONVERSIONS: Record<UnitKey, number>  # same values as backend
+  convertToGrams(amount: number, unit: UnitKey) → number
+
+### nutrition.ts
+  FDA_DAILY_VALUES: Partial<Record<keyof MacroProfile, number>>
+  NUTRIENT_FIELDS: (keyof MacroProfile)[]
+  calculateRecipeMacros(ingredients: IngredientItem[], portionDivisor: number) → MacroProfile
+    # Uses ingredient.baseMacros (cached from API) instead of DB; same math as backend
+  computeDailyValues(profile: MacroProfile) → Partial<Record<keyof MacroProfile, number>>
+    # Returns {nutrient: Math.round((val/DV)*100)} only for nutrients with DV
+  formatDV(nutrient: keyof MacroProfile, profile: MacroProfile) → string
+    # "—" if no DV | "<1%" if rounds to 0 but val>0 | "{n}%"
+  buildIngredientsString(ingredients: IngredientItem[]) → string
+    # Sorted by gram weight desc, ALL CAPS, period-terminated; "" if empty
+
+---
+
+## FRONTEND SIGNATURE MAP — frontend/src/
+
+### types/index.ts (key types)
+  IngredientItem: { fdc_id, name, amount, unit: UnitKey, baseMacros: MacroProfile }
+  UnitKey: "g" | "ml" | "oz" | "lb" | "kg"
+  MacroProfile: { calories, fat_total_g, ...13 nutrients... }  # all number
+  LabelDimensions: { widthInches: number, heightInches: number | null }
+
+### api/client.ts
+  searchFoods(query: string) → Promise<FoodSearchResult[]>
+  getFoodDetail(fdc_id: number) → Promise<FoodDetail>
+  generateLabel(ingredients, portionDivisor, labelName, dimensions) → Promise<Blob>
+    # Transforms IngredientItem → {fdc_id, name, amount, unit} before POST
+  downloadBlob(blob: Blob, filename: string) → void
+
+### store/recipeStore.ts (Zustand)
+  state: { ingredients[], portionDivisor=8, labelName="", dimensions={w:2.75,h:null} }
+  actions: addIngredient, removeIngredient, updateIngredientName, updateIngredientAmount,
+           updateIngredientUnit, moveIngredient, setPortionDivisor, setLabelName,
+           setDimensions(Partial<LabelDimensions>), clearRecipe
+
+### store/preferencesStore.ts (Zustand + localStorage persist)
+  state: { recents: SavedFood[], favorites: SavedFood[] }
+  actions: addRecent(food) [dedupes, prepend, trim to 15], toggleFavorite, isFavorite(id)
+
+### hooks/
+  useNutritionCalc() → MacroProfile  # useMemo over calculateRecipeMacros
+  useIngredientSearch(query) → { results, isLoading, isError }  # 300ms debounce, stale 30s
+  useLabelResize() → { onMouseDown }  # drag resize; 1px=1/96in; clamp [200,600]px
+  useAnimatedNumber(target, duration=420) → number  # cubic-out easing, returns Math.round
+
+---
+
+## FILE INDEX
+
+backend/app/
+  main.py       routes (114 ln)
+  config.py     settings (18 ln)
+  constants.py  UNIT_CONVERSIONS, FDA_DAILY_VALUES, NUTRIENT_FIELDS (49 ln)
+  models.py     Pydantic models (100 ln)
+  database.py   SQLite queries (83 ln)
+  nutrition.py  macro calc + %DV (81 ln)
+  search.py     ranking (38 ln)
+  pdf.py        Jinja2 + WeasyPrint (60 ln)
+
+backend/
+  data/build_db.py    DB builder; 73 foods, 145+ portions (284 ln)
+  templates/label.html  FDA label Jinja2 template
+
+frontend/src/
+  utils/nutrition.ts  (131 ln)  utils/units.ts (21 ln)
+  types/index.ts      (81 ln)
+  api/client.ts       (67 ln)
+  store/recipeStore.ts (68 ln)  store/preferencesStore.ts (69 ln)
+  hooks/useNutritionCalc.ts (20 ln)  hooks/useIngredientSearch.ts (38 ln)
+  hooks/useLabelResize.ts (50 ln)    hooks/useAnimatedNumber.ts (27 ln)
+  components/recipe/  components/label/  components/search/  components/ui/
