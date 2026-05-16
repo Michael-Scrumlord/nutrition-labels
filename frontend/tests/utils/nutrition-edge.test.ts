@@ -131,12 +131,10 @@ describe("calculateRecipeMacros — portion divisor", () => {
     expect(result.fat_total_g).toBeLessThanOrEqual(0.1);
   });
 
-  it("divisor=0 falls back to 1 (defensive — frontend is permissive)", () => {
+  it("divisor=0 throws error to match backend validation", () => {
     const ingredient = makeIngredient(1, 100, "g");
-    const withZeroDivisor = calculateRecipeMacros([ingredient], 0);
-    const withOneDivisor  = calculateRecipeMacros([ingredient], 1);
-    // Should not throw and should equal the divisor=1 result
-    expect(withZeroDivisor.calories).toBe(withOneDivisor.calories);
+    // Should throw an error to match backend validation
+    expect(() => calculateRecipeMacros([ingredient], 0)).toThrow(RangeError);
   });
 });
 

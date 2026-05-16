@@ -11,19 +11,18 @@ from app.config import settings
 
 def get_connection(db_path: str | None = None) -> sqlite3.Connection:
     """
-    Open a SQLite connection.
+    Open a SQLite connection in read-only mode.
     Using row_factory = sqlite3.Row means you can access columns by name:
         row["calories"]  instead of  row[2]
 
-    We use URI mode with `nolock=1` so the database works on network-mounted
-    filesystems (Docker volumes, NFS shares) that don't support POSIX locks.
-    The database is read-only at runtime — all writes happen only during the
-    build step (data/build_db.py).
+    We use URI mode with `mode=ro` to enforce read-only access at the SQLite level,
+    and `nolock=1` so the database works on network-mounted filesystems
+    (Docker volumes, NFS shares) that don't support POSIX locks.
     """
     path = db_path or settings.db_path
     # Convert to absolute path for the URI
     abs_path = os.path.abspath(path)
-    uri = f"file:{abs_path}?nolock=1"
+    uri = f"file:{abs_path}?mode=ro&nolock=1"
     conn = sqlite3.connect(uri, uri=True)
     conn.row_factory = sqlite3.Row
     return conn
