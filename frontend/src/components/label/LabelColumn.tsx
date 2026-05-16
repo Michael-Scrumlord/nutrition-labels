@@ -1,17 +1,23 @@
 // label/LabelColumn.tsx
 //
-// Sticky right panel: FDA label preview, W/H controls, Generate PDF button,
-// smart save controls (Save / Save As New), and Reset Recipe button.
+// Editorial plinth aside (Final A · Editorial direction):
+//   • plinth-bg surface with the moonlit accent glow on Midnight only
+//   • white FDA label paper sitting on the plinth (treated as a print artifact)
+//   • size controls + GENERATE PDF as the primary action
+//   • Save / Save-As-New / Reset controls (existing functionality)
+//   • Sponsored AdSlot anchored at the very bottom of the column
 
 import { useState, useCallback, useMemo } from "react";
 import { useRecipeStore } from "../../store/recipeStore";
 import { useSavedRecipesStore, type RecipeSnapshot } from "../../store/savedRecipesStore";
+import { useActiveTheme } from "../../store/themeStore";
 import { useRecipeActions } from "../../hooks/useRecipeActions";
 import { useNutritionCalc } from "../../hooks/useNutritionCalc";
 import { LabelPreview } from "./LabelPreview";
 import { LabelDimensions } from "./LabelDimensions";
 import { GenerateButton } from "./GenerateButton";
-import { ACCENT, INK } from "../../constants/theme";
+import { AdSlot } from "./AdSlot";
+import { AuroraGlow } from "../theme/AuroraGlow";
 
 export function LabelColumn() {
   const ingredients          = useRecipeStore((s) => s.ingredients);
@@ -23,7 +29,7 @@ export function LabelColumn() {
   const variables            = useRecipeStore((s) => s.variables);
   const currentRecipeId      = useRecipeStore((s) => s.currentRecipeId);
   const viewingVersionId     = useRecipeStore((s) => s.viewingVersionId);
-  const setCurrentRecipeId   = useRecipeStore.setState;   // for promoting a new save to the loaded recipe
+  const setCurrentRecipeId   = useRecipeStore.setState;
 
   const { clearRecipe }      = useRecipeActions();
   const createRecipe         = useSavedRecipesStore((s) => s.createRecipe);
@@ -32,6 +38,7 @@ export function LabelColumn() {
     currentRecipeId ? s.recipes.find((r) => r.id === currentRecipeId) : undefined,
   );
   const macros               = useNutritionCalc();
+  const { def: themeDef }    = useActiveTheme();
 
   const [feedback, setFeedback] = useState<string | null>(null);
   const [noteOpen, setNoteOpen] = useState(false);
@@ -45,10 +52,10 @@ export function LabelColumn() {
     ? dimensions.heightInches * 96
     : estimatedH * scale;
 
-  const canSave = ingredients.length > 0;
-  const isLoaded = !!currentRecipeId && !!savedRecipe;
+  const canSave      = ingredients.length > 0;
+  const isLoaded     = !!currentRecipeId && !!savedRecipe;
   const versionCount = savedRecipe?.versions.length ?? 0;
-  const lastSavedAt = savedRecipe && savedRecipe.versions.length > 0
+  const lastSavedAt  = savedRecipe && savedRecipe.versions.length > 0
     ? savedRecipe.versions[savedRecipe.versions.length - 1].savedAt
     : undefined;
 
@@ -101,154 +108,197 @@ export function LabelColumn() {
     <aside
       style={{
         gridArea: "label",
-        borderLeft: `1px solid ${INK}`,
-        background: "var(--color-accent-blush)",
-        padding: "32px 28px",
-        display: "flex",
-        flexDirection: "column",
-        gap: 18,
         position: "sticky",
         top: 0,
         alignSelf: "start",
         height: "100vh",
-        overflow: "auto",
+        overflow: "hidden", // glow is clipped here; inner scroller handles content
+        background: "var(--plinth-bg)",
+        borderLeft: "1px solid var(--hair-strong)",
       }}
     >
-      {/* Panel caption */}
-      <div style={{
-        display: "flex", justifyContent: "space-between", alignItems: "baseline",
-        fontFamily: "'JetBrains Mono', monospace", fontSize: 10,
-        letterSpacing: "0.22em", color: "#999",
-      }}>
-        <span>FIG. A — LABEL · LIVE</span>
-        <span style={{ color: ACCENT }}>● REC</span>
-      </div>
+      {/* Aurora plinth glow — only renders on Midnight per Final A direction. */}
+      <AuroraGlow plinth />
 
-      {/* Printable label */}
-      <div className="pop-printable" style={{ overflow: "hidden", width: targetPx, height: containerH }}>
-        <div style={{ width: baseWidthPx, transform: `scale(${scale})`, transformOrigin: "top left" }}>
-          <LabelPreview
-            macros={macros}
-            portionDivisor={portionDivisor}
-            ingredients={ingredients}
-            widthPx={baseWidthPx}
-            highlightSet={highlightedNutrients}
-          />
-        </div>
-      </div>
-
-      <LabelDimensions />
-
-      <GenerateButton />
-
-      {/* ── Save section ──────────────────────────────────────────────── */}
-      <div style={{
-        display: "flex", flexDirection: "column", gap: 8,
-        padding: "12px 0 0",
-        borderTop: "1px solid var(--color-border-subtle)",
-      }}>
-        {isLoaded && (
-          <div style={{
-            fontFamily: "'JetBrains Mono', monospace",
-            fontSize: 9, letterSpacing: "0.16em", color: "#999",
-            lineHeight: 1.5,
-          }}>
-            EDITING — <span style={{ color: INK, fontWeight: 700 }}>{savedRecipe!.name.toUpperCase()}</span>
-            <br />
-            v{versionCount} {viewingVersionId ? "· VIEWING OLDER" : `· SAVED ${lastSavedRel?.toUpperCase()}`}
-          </div>
-        )}
-
-        {/* Optional note input — only shown when expanded */}
-        {noteOpen && (
-          <input
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") { e.preventDefault(); handleSaveVersion(); }
-              if (e.key === "Escape") { setNoteOpen(false); setNote(""); }
-            }}
-            placeholder="what changed? (optional)"
-            autoFocus
+      <div
+        style={{
+          position: "relative",
+          zIndex: 1,
+          height: "100%",
+          padding: "32px 28px",
+          overflow: "auto",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 18,
+        }}
+      >
+        {/* Panel caption */}
+        <div style={{
+          display: "flex", justifyContent: "space-between", alignItems: "baseline",
+          width: "100%", maxWidth: 380,
+          fontFamily: "var(--f-mono)", fontSize: 10,
+          letterSpacing: "0.22em", textTransform: "uppercase",
+          color: "var(--ink-2)",
+        }}>
+          <span style={{ opacity: 0.85 }}>Label · proof</span>
+          <span
             style={{
-              padding: "8px 10px",
-              border: `1px solid ${INK}`,
-              background: "#fff",
-              outline: "none",
-              fontFamily: "'Inter Tight', sans-serif",
-              fontStyle: "italic",
-              fontSize: 12,
+              color: "var(--accent)",
+              filter: themeDef.oled ? "drop-shadow(0 0 6px var(--accent))" : "none",
             }}
-          />
-        )}
+          >
+            ● live
+          </span>
+        </div>
 
-        {/* Primary save button */}
-        <button
-          onClick={handleSaveVersion}
-          onMouseEnter={() => { if (isLoaded && !feedback) setNoteOpen(true); }}
-          disabled={!canSave}
+        {/* Printable label — always white paper */}
+        <div style={{ display: "flex", justifyContent: "center" }}>
+          <div
+            className="pop-printable"
+            style={{
+              width: targetPx,
+              height: containerH,
+              overflow: "hidden",
+              background: "#ffffff",
+              boxShadow: "var(--paper-shadow)",
+            }}
+          >
+            <div style={{ width: baseWidthPx, transform: `scale(${scale})`, transformOrigin: "top left" }}>
+              <LabelPreview
+                macros={macros}
+                portionDivisor={portionDivisor}
+                ingredients={ingredients}
+                widthPx={baseWidthPx}
+                highlightSet={highlightedNutrients}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div style={{ width: "100%", maxWidth: 380 }}>
+          <LabelDimensions />
+        </div>
+
+        <div style={{ width: "100%", maxWidth: 380 }}>
+          <GenerateButton />
+        </div>
+
+        {/* ── Save section ──────────────────────────────────────────────── */}
+        <div
           style={{
-            background: feedback ? "var(--color-success)" : canSave ? ACCENT : "#e5e5e5",
-            color: canSave ? "#fff" : "#bbb",
-            border: "none",
-            padding: "10px 14px",
-            fontFamily: "'Inter Tight', sans-serif",
-            fontWeight: 700,
-            letterSpacing: "0.08em",
-            fontSize: 11,
-            cursor: canSave ? "pointer" : "not-allowed",
-            transition: "background 0.2s ease",
-            animation: feedback ? "popPulse 0.42s ease-out" : "none",
+            width: "100%", maxWidth: 380,
+            display: "flex", flexDirection: "column", gap: 8,
+            padding: "12px 0 0",
+            borderTop: "1px solid var(--hair)",
           }}
         >
-          {feedback ?? (isLoaded ? `SAVE NEW VERSION` : "SAVE RECIPE")}
-        </button>
+          {isLoaded && (
+            <div className="pl-meta" style={{ fontSize: 9, lineHeight: 1.5, color: "var(--ink-3)" }}>
+              EDITING — <span style={{ color: "var(--ink)", fontWeight: 700 }}>{savedRecipe!.name.toUpperCase()}</span>
+              <br />
+              v{versionCount} {viewingVersionId ? "· VIEWING OLDER" : `· SAVED ${lastSavedRel?.toUpperCase()}`}
+            </div>
+          )}
 
-        {/* Save-as-new (only when editing a loaded recipe) */}
-        {isLoaded && (
+          {noteOpen && (
+            <input
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") { e.preventDefault(); handleSaveVersion(); }
+                if (e.key === "Escape") { setNoteOpen(false); setNote(""); }
+              }}
+              placeholder="what changed? (optional)"
+              autoFocus
+              style={{
+                padding: "8px 10px",
+                border: "1px solid var(--ink)",
+                background: "var(--bg)",
+                color: "var(--ink)",
+                outline: "none",
+                fontFamily: "var(--f-display)",
+                fontStyle: "var(--f-display-style)",
+                fontSize: 13,
+              }}
+            />
+          )}
+
           <button
-            onClick={handleSaveAsNew}
+            onClick={handleSaveVersion}
+            onMouseEnter={() => { if (isLoaded && !feedback) setNoteOpen(true); }}
             disabled={!canSave}
             style={{
+              background: feedback
+                ? "var(--color-success)"
+                : canSave
+                ? "transparent"
+                : "color-mix(in srgb, var(--ink) 6%, transparent)",
+              color: feedback
+                ? "#ffffff"
+                : canSave
+                ? "var(--ink)"
+                : "var(--ink-3)",
+              border: `1px solid ${canSave ? "var(--ink)" : "var(--hair)"}`,
+              padding: "10px 14px",
+              fontFamily: "var(--f-body)",
+              fontWeight: 700,
+              letterSpacing: "0.08em",
+              fontSize: 11,
+              textTransform: "uppercase",
+              cursor: canSave ? "pointer" : "not-allowed",
+              transition: "background 0.2s ease",
+              animation: feedback ? "popPulse 0.42s ease-out" : "none",
+            }}
+          >
+            {feedback ?? (isLoaded ? "SAVE NEW VERSION" : "SAVE RECIPE")}
+          </button>
+
+          {isLoaded && (
+            <button
+              onClick={handleSaveAsNew}
+              disabled={!canSave}
+              style={{
+                background: "transparent",
+                border: "1px solid var(--hair-strong)",
+                padding: "8px 14px",
+                fontFamily: "var(--f-body)",
+                fontWeight: 600,
+                letterSpacing: "0.08em",
+                fontSize: 10,
+                cursor: canSave ? "pointer" : "not-allowed",
+                color: "var(--ink-2)",
+                textTransform: "uppercase",
+              }}
+            >
+              SAVE AS NEW
+            </button>
+          )}
+
+          <button
+            onClick={() => {
+              if (confirm("Reset recipe? This clears the editor — saved recipes are untouched.")) clearRecipe();
+            }}
+            style={{
               background: "transparent",
-              border: `1px solid ${INK}`,
+              border: "1px solid var(--hair-strong)",
               padding: "8px 14px",
-              fontFamily: "'Inter Tight', sans-serif",
+              fontFamily: "var(--f-body)",
               fontWeight: 600,
               letterSpacing: "0.08em",
               fontSize: 10,
-              cursor: canSave ? "pointer" : "not-allowed",
-              color: INK,
+              textTransform: "uppercase",
+              cursor: "pointer",
+              color: "var(--ink-2)",
             }}
-            onMouseEnter={(e) => { if (canSave) (e.currentTarget as HTMLButtonElement).style.background = "#f0f0f0"; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}
           >
-            SAVE AS NEW
+            RESET RECIPE
           </button>
-        )}
-      </div>
+        </div>
 
-      {/* Reset recipe */}
-      <button
-        onClick={() => {
-          if (confirm("Reset recipe? This clears the editor — saved recipes are untouched.")) clearRecipe();
-        }}
-        style={{
-          background: "transparent",
-          border: `1px solid ${INK}`,
-          padding: "10px 14px",
-          fontFamily: "'Inter Tight', sans-serif",
-          fontWeight: 600,
-          letterSpacing: "0.08em",
-          fontSize: 11,
-          cursor: "pointer",
-          color: INK,
-        }}
-        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#f0f0f0"; }}
-        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}
-      >
-        RESET RECIPE
-      </button>
+        {/* Sponsored slot — anchored to the bottom of the column. */}
+        <AdSlot />
+      </div>
     </aside>
   );
 }

@@ -6,7 +6,10 @@
 
 import type { MacroProfile, IngredientItem, HighlightSet } from "../../types";
 import { formatDV, buildIngredientsString } from "../../utils/nutrition";
-import { INK } from "../../constants/theme";
+
+// The FDA label is a regulated print artifact — always black ink on white
+// paper. Keep this local so theme changes never recolor the label borders.
+const INK = "#0a0a0a";
 
 interface LabelPreviewProps {
   macros: MacroProfile;

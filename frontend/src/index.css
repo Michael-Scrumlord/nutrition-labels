@@ -2,105 +2,153 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ── Design tokens — Pop light-mode theme ─────────────────────────────────── */
+/* ── Design tokens — 4-theme system (Paper default) ──────────────────────────
+   The four runtime themes (paper / overcast / twilight / midnight) overwrite
+   these via inline style on <ThemedFrame>. Values below are the Paper
+   defaults so SSR / no-JS fallback still renders sensibly. */
 :root {
-  /* Backgrounds */
-  --color-bg-base:        #ffffff;
-  --color-bg-surface:     #f8f8f6;
-  --color-bg-elevated:    #f0f0ee;
-  --color-bg-overlay:     #ebe8e4;
+  /* Theme tokens (overwritten by ThemedFrame) */
+  --bg:              #ffffff;
+  --surface:         #faf9f5;
+  --elevated:        #f1efe9;
+  --ink:             #0a0a0a;
+  --ink-2:           #555555;
+  --ink-3:           #9a9a9a;
+  --hair:            #e8e6e0;
+  --hair-strong:     #c8c6bf;
+  --paper-bg:        #ffffff;
+  --paper-shadow:    0 1px 2px rgba(0,0,0,.06), 0 16px 36px -12px rgba(0,0,0,.18);
+  --plinth-bg:       #f3f1eb;
+  --accent:          #ff2e88;
+  --accent-glow:     none;
 
-  /* Borders */
-  --color-border-subtle:  #ebebeb;
-  --color-border:         #d8d8d8;
-  --color-border-strong:  #b0b0b0;
+  /* Font system — IBM Plex (Editorial direction) */
+  --f-display:           'IBM Plex Serif', Georgia, serif;
+  --f-display-style:     italic;
+  --f-display-weight:    500;
+  --f-display-tracking:  -0.01em;
+  --f-body:              'IBM Plex Sans', system-ui, sans-serif;
+  --f-mono:              'IBM Plex Mono', 'JetBrains Mono', ui-monospace, monospace;
 
-  /* Accent — magenta */
-  --color-accent:         #ff2e88;
-  --color-accent-dim:     #cc1a6a;
+  /* Back-compat aliases used by some pre-redesign components */
+  --color-bg-base:        var(--bg);
+  --color-bg-surface:     var(--surface);
+  --color-bg-elevated:    var(--elevated);
+  --color-bg-overlay:     var(--elevated);
+  --color-border-subtle:  var(--hair);
+  --color-border:         var(--hair-strong);
+  --color-border-strong:  var(--hair-strong);
+  --color-accent:         var(--accent);
+  --color-accent-dim:     var(--accent);
   --color-accent-glow:    rgba(255, 46, 136, 0.12);
-  --color-accent-text:    #ff2e88;
-  --color-accent-blush:   #fff5fa;
-
-  /* Text */
-  --color-text-primary:   #0a0a0a;
-  --color-text-secondary: #555555;
-  --color-text-tertiary:  #999999;
-  --color-text-inverse:   #ffffff;
-
-  /* Status */
+  --color-accent-text:    var(--accent);
+  --color-accent-blush:   color-mix(in srgb, var(--accent) 6%, var(--bg));
+  --color-text-primary:   var(--ink);
+  --color-text-secondary: var(--ink-2);
+  --color-text-tertiary:  var(--ink-3);
+  --color-text-inverse:   var(--bg);
   --color-success:        #16a34a;
   --color-danger:         #dc2626;
   --color-warning:        #d97706;
-
-  /* Fonts */
-  --font-sans:   'Inter Tight', system-ui, sans-serif;
-  --font-serif:  'Instrument Serif', Georgia, serif;
-  --font-mono:   'JetBrains Mono', 'Fira Code', monospace;
+  --font-sans:            var(--f-body);
+  --font-serif:           var(--f-display);
+  --font-mono:            var(--f-mono);
 }
 
 /* ── Base styles ──────────────────────────────────────────────────────────── */
-*, *::before, *::after {
-  box-sizing: border-box;
-}
+*, *::before, *::after { box-sizing: border-box; }
 
 html, body {
   margin: 0;
   padding: 0;
-  background: var(--color-bg-base);
-  color: var(--color-text-primary);
-  font-family: var(--font-sans);
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--f-body);
   font-size: 15px;
   -webkit-font-smoothing: antialiased;
+  transition: background 220ms ease, color 220ms ease;
 }
 
 /* ── Scrollbars ───────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--color-border-strong); }
+::-webkit-scrollbar-thumb { background: var(--hair-strong); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--ink-3); }
 
 /* ── Design-token utility classes (used by existing components) ───────────── */
-.bg-bg-base     { background-color: var(--color-bg-base);     }
-.bg-bg-surface  { background-color: var(--color-bg-surface);  }
-.bg-bg-elevated { background-color: var(--color-bg-elevated); }
-.bg-bg-overlay  { background-color: var(--color-bg-overlay);  }
+.bg-bg-base     { background-color: var(--bg);       }
+.bg-bg-surface  { background-color: var(--surface);  }
+.bg-bg-elevated { background-color: var(--elevated); }
+.bg-bg-overlay  { background-color: var(--elevated); }
 
-.border-border-subtle { border-color: var(--color-border-subtle); }
-.border-border-std    { border-color: var(--color-border);        }
-.border-border-strong { border-color: var(--color-border-strong); }
+.border-border-subtle { border-color: var(--hair); }
+.border-border-std    { border-color: var(--hair-strong); }
+.border-border-strong { border-color: var(--hair-strong); }
 
-.text-accent         { color: var(--color-accent);          }
-.text-accent-text    { color: var(--color-accent-text);     }
-.text-text-primary   { color: var(--color-text-primary);    }
-.text-text-secondary { color: var(--color-text-secondary);  }
-.text-text-tertiary  { color: var(--color-text-tertiary);   }
-.text-text-inverse   { color: var(--color-text-inverse);    }
-.text-danger         { color: var(--color-danger);          }
-.text-border-strong  { color: var(--color-border-strong);   }
+.text-accent         { color: var(--accent); }
+.text-accent-text    { color: var(--accent); }
+.text-text-primary   { color: var(--ink); }
+.text-text-secondary { color: var(--ink-2); }
+.text-text-tertiary  { color: var(--ink-3); }
+.text-text-inverse   { color: var(--bg); }
+.text-danger         { color: var(--color-danger); }
+.text-border-strong  { color: var(--hair-strong); }
 
-.bg-accent    { background-color: var(--color-accent); }
-.text-inverse { color: var(--color-text-inverse);      }
+.bg-accent    { background-color: var(--accent); }
+.text-inverse { color: var(--bg); }
 .ring-accent  { --tw-ring-color: var(--color-accent-glow); }
 
-.font-mono  { font-family: var(--font-mono);  }
-.font-sans  { font-family: var(--font-sans);  }
-.font-serif { font-family: var(--font-serif); }
+.font-mono  { font-family: var(--f-mono); }
+.font-sans  { font-family: var(--f-body); }
+.font-serif { font-family: var(--f-display); }
 
-/* Focus / hover state overrides */
-.focus\:border-accent:focus        { border-color: var(--color-accent) !important; }
+.focus\:border-accent:focus        { border-color: var(--accent) !important; }
 .focus\:ring-accent\/10:focus      { box-shadow: 0 0 0 2px var(--color-accent-glow) !important; }
 .hover\:border-danger:hover        { border-color: var(--color-danger) !important; }
 .hover\:text-danger:hover          { color: var(--color-danger) !important; }
-.hover\:text-accent:hover          { color: var(--color-accent) !important; }
-.hover\:bg-bg-overlay:hover        { background-color: var(--color-bg-overlay) !important; }
-.hover\:border-border-strong:hover { border-color: var(--color-border-strong) !important; }
+.hover\:text-accent:hover          { color: var(--accent) !important; }
+.hover\:bg-bg-overlay:hover        { background-color: var(--elevated) !important; }
+.hover\:border-border-strong:hover { border-color: var(--hair-strong) !important; }
 
-/* ── Pop-specific animations ──────────────────────────────────────────────── */
+/* ── Editorial primitives shared across components ───────────────────────── */
+.pl-display {
+  font-family: var(--f-display);
+  font-style:  var(--f-display-style);
+  font-weight: var(--f-display-weight);
+  letter-spacing: var(--f-display-tracking);
+}
+.pl-meta {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  color: var(--ink-3);
+  text-transform: uppercase;
+}
+.pl-scrub {
+  color: var(--accent);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  font-family: var(--f-body);
+  cursor: ew-resize;
+}
+
+/* Step variable token — accent chip for inline scrubable values. */
+.step-var {
+  padding: 0 5px;
+  border-radius: 2px;
+  display: inline-flex;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  margin: 0 1px;
+}
+
+/* ── Animations ──────────────────────────────────────────────────────────── */
 @keyframes popfade  { from { opacity: 0 }              to { opacity: 1 } }
 @keyframes popslide { from { opacity: 0; transform: translateY(-8px) } to { opacity: 1; transform: translateY(0) } }
 @keyframes popInRow { from { opacity: 0; transform: translateY(-6px) } to { opacity: 1; transform: translateY(0) } }
-@keyframes popPulse { 0%   { transform: scale(1.08); color: var(--color-accent) } 100% { transform: scale(1) } }
+@keyframes popPulse { 0%   { transform: scale(1.08); color: var(--accent) } 100% { transform: scale(1) } }
+
+@keyframes nlSweep        { 0% { transform: translateX(0); } 100% { transform: translateX(-105%); } }
+@keyframes nlSweepLeader  { 0% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
 
 /* ── Print — only show the label ─────────────────────────────────────────── */
 @media print {

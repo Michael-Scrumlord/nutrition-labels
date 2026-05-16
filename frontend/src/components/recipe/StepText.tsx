@@ -21,18 +21,14 @@ export function StepText({ text }: StepTextProps) {
 
   if (text.trim() === "") {
     return (
-      <span style={{
-        color: "var(--color-text-tertiary)",
-        fontStyle: "italic",
-        fontFamily: "'Instrument Serif', Georgia, serif",
-      }}>
+      <span className="pl-display" style={{ color: "var(--ink-3)" }}>
         Empty step — click to edit.
       </span>
     );
   }
 
   return (
-    <span style={{ lineHeight: 1.55, fontSize: 17 }}>
+    <span style={{ lineHeight: 1.55, fontSize: 16 }}>
       {tokens.map((token, i) => {
         if (token.kind === "text") {
           return <span key={i}>{token.content}</span>;
@@ -40,17 +36,7 @@ export function StepText({ text }: StepTextProps) {
         if (token.kind === "var") {
           const v = token.variable;
           return (
-            <span
-              key={i}
-              title={v.label}
-              style={{
-                display: "inline-flex", alignItems: "baseline", gap: 2,
-                padding: "0 6px", margin: "0 2px",
-                background: "var(--color-accent-blush)",
-                borderRadius: 3,
-                whiteSpace: "nowrap",
-              }}
-            >
+            <span key={i} title={v.label} className="step-var">
               <ScrubNumber
                 value={v.value}
                 onChange={(n) => setVariableValue(v.name, n)}
@@ -60,18 +46,21 @@ export function StepText({ text }: StepTextProps) {
                 ariaLabel={v.label}
                 style={{
                   color: ACCENT,
-                  fontWeight: 800,
-                  fontFamily: "'JetBrains Mono', monospace",
+                  fontWeight: 700,
+                  fontFamily: "var(--f-body)",
                   fontSize: 16,
+                  fontVariantNumeric: "tabular-nums",
                 }}
               />
               {v.suffix && (
-                <span style={{
-                  color: ACCENT,
-                  fontSize: 12,
-                  fontFamily: "'Inter Tight', sans-serif",
-                  letterSpacing: "0.04em",
-                }}>
+                <span
+                  style={{
+                    color: ACCENT,
+                    fontSize: 13,
+                    fontFamily: "var(--f-body)",
+                    letterSpacing: "0.04em",
+                  }}
+                >
                   {v.suffix}
                 </span>
               )}
@@ -84,7 +73,7 @@ export function StepText({ text }: StepTextProps) {
             key={i}
             title={`Undefined variable: ${token.label}`}
             style={{
-              color: "var(--color-text-tertiary)",
+              color: "var(--ink-3)",
               textDecoration: "underline dotted",
               padding: "0 2px",
             }}

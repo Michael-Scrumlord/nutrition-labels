@@ -9,7 +9,6 @@ import { useRecipeStore } from "../../store/recipeStore";
 import { useRecipeActions } from "../../hooks/useRecipeActions";
 import { ScrubNumber } from "../ui/ScrubNumber";
 import { referencedVariableNames } from "../../utils/stepText";
-import { ACCENT, INK } from "../../constants/theme";
 
 export function VariablesPanel() {
   const variables    = useRecipeStore((s) => s.variables);
@@ -34,15 +33,18 @@ export function VariablesPanel() {
   if (variables.length === 0) return null;
 
   return (
-    <section style={{ marginTop: 18, borderTop: "1px solid var(--color-border-subtle)", paddingTop: 16 }}>
+    <section style={{ marginTop: 22, paddingTop: 16, borderTop: "1px solid var(--hair)" }}>
       <button
         onClick={() => setOpen(!open)}
+        className="pl-meta"
         style={{
-          background: "transparent", border: "none", cursor: "pointer",
+          background: "transparent",
+          border: "none",
+          cursor: "pointer",
           padding: 0,
-          display: "flex", alignItems: "baseline", gap: 10,
-          fontFamily: "'JetBrains Mono', monospace",
-          fontSize: 10, letterSpacing: "0.22em", color: "#999",
+          display: "flex",
+          alignItems: "baseline",
+          gap: 10,
         }}
       >
         <span>{open ? "▾" : "▸"}</span>
@@ -62,33 +64,35 @@ export function VariablesPanel() {
                   gap: 12,
                   alignItems: "center",
                   padding: "8px 0",
-                  borderBottom: "1px solid var(--color-border-subtle)",
+                  borderBottom: "1px solid var(--hair)",
                 }}
               >
                 {/* Label (editable) */}
                 <input
                   value={v.label}
                   onChange={(e) => updateVariable(v.name, { label: e.target.value })}
+                  className="pl-display"
                   style={{
                     background: "transparent",
                     border: "none",
                     outline: "none",
-                    fontFamily: "'Instrument Serif', Georgia, serif",
-                    fontStyle: "italic",
                     fontSize: 19,
-                    color: INK,
+                    color: "var(--ink)",
                     padding: 0,
                   }}
                 />
 
                 {/* Value (scrub) */}
-                <span style={{
-                  display: "inline-flex", alignItems: "baseline",
-                  padding: "2px 8px",
-                  background: "var(--color-accent-blush)",
-                  borderRadius: 3,
-                  justifySelf: "start",
-                }}>
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "baseline",
+                    padding: "2px 10px",
+                    background: "color-mix(in srgb, var(--accent) 12%, transparent)",
+                    borderRadius: 2,
+                    justifySelf: "start",
+                  }}
+                >
                   <ScrubNumber
                     value={v.value}
                     onChange={(n) => setVariableValue(v.name, n)}
@@ -97,8 +101,10 @@ export function VariablesPanel() {
                     step={v.step ?? 1}
                     ariaLabel={v.label}
                     style={{
-                      color: ACCENT, fontWeight: 800,
-                      fontFamily: "'JetBrains Mono', monospace", fontSize: 14,
+                      color: "var(--accent)",
+                      fontWeight: 800,
+                      fontFamily: "var(--f-mono)",
+                      fontSize: 14,
                     }}
                   />
                 </span>
@@ -110,35 +116,41 @@ export function VariablesPanel() {
                   placeholder="suffix"
                   style={{
                     background: "transparent",
-                    border: "1px solid var(--color-border-subtle)",
+                    border: "1px solid var(--hair)",
                     outline: "none",
-                    fontFamily: "'Inter Tight', sans-serif",
-                    fontSize: 12,
+                    fontFamily: "var(--f-mono)",
+                    fontSize: 11,
                     padding: "3px 6px",
-                    color: INK,
+                    color: "var(--ink-2)",
                   }}
                 />
 
                 {/* Usage */}
-                <span style={{
-                  fontFamily: "'JetBrains Mono', monospace",
-                  fontSize: 9, letterSpacing: "0.14em", color: "#999",
-                }}>
-                  {usage.length === 0
-                    ? <span style={{ color: "#ccc" }}>UNUSED</span>
-                    : `STEP ${usage.map((n) => String(n).padStart(2, "0")).join(", ")}`}
+                <span
+                  className="pl-meta"
+                  style={{ fontSize: 9, letterSpacing: "0.14em", textAlign: "right" }}
+                >
+                  {usage.length === 0 ? (
+                    <span style={{ color: "var(--hair-strong)" }}>UNUSED</span>
+                  ) : (
+                    `STEP ${usage.map((n) => String(n).padStart(2, "0")).join(", ")}`
+                  )}
                 </span>
 
                 {/* Remove */}
                 <button
                   onClick={() => removeVariable(v.name)}
                   style={{
-                    background: "transparent", border: "none",
-                    cursor: "pointer", color: "#ccc", fontSize: 16,
-                    padding: "2px 6px", lineHeight: 1,
+                    background: "transparent",
+                    border: "none",
+                    cursor: "pointer",
+                    color: "var(--ink-3)",
+                    fontSize: 16,
+                    padding: "2px 6px",
+                    lineHeight: 1,
                   }}
                   onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "var(--color-danger)"; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#ccc"; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "var(--ink-3)"; }}
                   aria-label={`Remove ${v.label}`}
                 >
                   ×

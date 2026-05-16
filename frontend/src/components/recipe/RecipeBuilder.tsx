@@ -1,7 +1,10 @@
 // recipe/RecipeBuilder.tsx
 //
-// Pop magazine-spread recipe editor.
-// Highlight state is managed in recipeStore — no props needed from AppShell.
+// Editorial recipe body — Final A direction.
+//   • 56px hero recipe name (IBM Plex Serif italic 500)
+//   • Single-line stats: "yields X servings · per serving Y kcal · batch Z g"
+//   • Ingredient rows on hairline rules
+//   • Method section below
 
 import { useState, useMemo } from "react";
 import { useRecipeStore } from "../../store/recipeStore";
@@ -15,7 +18,6 @@ import { NutritionBreakdownTable } from "./NutritionBreakdownTable";
 import { MethodSection } from "./MethodSection";
 import { convertToGrams } from "../../utils/units";
 import { getHighlightKeys } from "../../utils/nutrition";
-import { ACCENT, INK } from "../../constants/theme";
 
 export function RecipeBuilder() {
   const ingredients      = useRecipeStore((s) => s.ingredients);
@@ -49,9 +51,12 @@ export function RecipeBuilder() {
       <main
         style={{
           gridArea: "body",
-          padding: "32px 48px 8px",
+          padding: "40px 48px 48px",
           overflow: "auto",
-          fontFamily: "'Inter Tight', system-ui, sans-serif",
+          fontFamily: "var(--f-body)",
+          color: "var(--ink)",
+          position: "relative",
+          zIndex: 1,
         }}
       >
         {/* ── Viewing older version banner ─────────────────────────────── */}
@@ -62,34 +67,26 @@ export function RecipeBuilder() {
             gap: 14,
             marginBottom: 18,
             padding: "10px 14px",
-            background: "var(--color-accent-blush)",
-            border: `1px solid ${ACCENT}`,
+            background: "color-mix(in srgb, var(--accent) 6%, transparent)",
+            border: "1px solid var(--accent)",
             animation: "popfade 0.18s ease",
           }}>
-            <span style={{
-              fontFamily: "'JetBrains Mono', monospace",
-              fontSize: 10, letterSpacing: "0.18em", color: ACCENT, fontWeight: 700,
-            }}>
+            <span className="pl-meta" style={{ color: "var(--accent)", fontWeight: 700 }}>
               ◉ VIEWING OLDER VERSION
             </span>
-            <span style={{
-              fontFamily: "'Inter Tight', sans-serif",
-              fontSize: 12, color: "#666", flex: 1,
-            }}>
+            <span style={{ fontSize: 12, color: "var(--ink-2)", flex: 1 }}>
               saving will append a new version on top of the current latest — nothing is overwritten.
             </span>
             <button
               onClick={exitVersionView}
+              className="pl-meta"
               style={{
                 background: "transparent",
-                border: `1px solid ${INK}`,
+                border: "1px solid var(--ink)",
                 padding: "5px 12px",
                 cursor: "pointer",
-                fontFamily: "'Inter Tight', sans-serif",
                 fontWeight: 700,
-                fontSize: 10,
-                letterSpacing: "0.12em",
-                color: INK,
+                color: "var(--ink)",
               }}
             >
               DISMISS
@@ -97,68 +94,85 @@ export function RecipeBuilder() {
           </div>
         )}
 
-        {/* ── "A RECIPE FOR —" strip ───────────────────────────────────── */}
-        <div style={{ display: "flex", alignItems: "baseline", gap: 24, marginBottom: 18 }}>
-          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#999", letterSpacing: "0.2em" }}>
-            A RECIPE FOR —
-          </span>
-          <span style={{ flex: 1, height: 1, background: INK }} />
-          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#999", letterSpacing: "0.2em" }}>
-            {ingredients.length} INGREDIENT{ingredients.length !== 1 ? "S" : ""} · DRAFT
-          </span>
-        </div>
+        {/* ── Recipe № mark ────────────────────────────────────────────── */}
+        <div className="pl-meta" style={{ marginBottom: 4 }}>RECIPE №&nbsp;04</div>
 
-        {/* ── Recipe name ───────────────────────────────────────────────── */}
-        <div style={{ containerType: "inline-size", width: "100%", marginBottom: 12 }}>
+        {/* ── Recipe name (editorial hero — 56px) ──────────────────────── */}
+        <div style={{ width: "100%", marginBottom: 18 }}>
           <input
             value={labelName}
             onChange={(e) => setLabelName(e.target.value)}
             placeholder="Name your recipe…"
+            className="pl-display"
             style={{
               background: "transparent", border: "none", outline: "none",
-              fontFamily: "'Instrument Serif', Georgia, serif",
-              fontStyle: "italic",
-              fontSize: "clamp(40px, 8vw, 96px)",
-              lineHeight: 0.92,
-              letterSpacing: "-0.035em",
-              width: "100%", minWidth: 0, color: INK, padding: 0,
+              fontSize: 56,
+              lineHeight: 1,
+              width: "100%", minWidth: 0, color: "var(--ink)", padding: 0,
             }}
           />
         </div>
 
-        {/* ── Stats bar ─────────────────────────────────────────────────── */}
-        <div style={{ display: "flex", gap: 28, alignItems: "baseline", marginBottom: 28, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 18, color: "#666" }}>
-            yields&nbsp;
+        {/* ── Stats — single typographic line (editorial mode) ─────────── */}
+        <div style={{
+          display: "flex",
+          alignItems: "baseline",
+          gap: 18,
+          flexWrap: "wrap",
+          marginBottom: 28,
+          paddingBottom: 20,
+          borderBottom: "1px solid var(--hair-strong)",
+          fontSize: 18,
+          color: "var(--ink-2)",
+        }}>
+          <span>yields&nbsp;
             <ScrubNumber
               value={portionDivisor} min={1} max={96} step={1}
               onChange={setPortionDivisor}
               ariaLabel="servings per batch"
-              style={{ fontSize: 22, fontWeight: 800, color: ACCENT, cursor: "ew-resize" }}
+              className="pl-scrub"
+              style={{ fontSize: 24 }}
             />
             &nbsp;servings
           </span>
-          <span style={{ fontSize: 18, color: "#666" }}>·</span>
-          <span style={{ fontSize: 18, color: "#666" }}>
-            batch <span style={{ fontSize: 22, fontWeight: 800, color: ACCENT }}>{Math.round(totalGrams)}g</span>
-          </span>
-          <span style={{ fontSize: 18, color: "#666" }}>·</span>
-          <span style={{ fontSize: 18, color: "#666" }}>
-            per serving{" "}
+          <span style={{ color: "var(--hair-strong)" }}>·</span>
+          <span>per serving&nbsp;
             <span
               key={animatedCal}
-              style={{ fontSize: 22, fontWeight: 800, color: ACCENT, display: "inline-block", animation: "popPulse 0.42s ease-out" }}
+              className="pl-scrub"
+              style={{ fontSize: 24, display: "inline-block", animation: "popPulse 0.42s ease-out" }}
             >
               {animatedCal}
-            </span>{" "}
-            kcal
+            </span>
+            &nbsp;kcal
+          </span>
+          <span style={{ color: "var(--hair-strong)" }}>·</span>
+          <span>batch&nbsp;
+            <span className="pl-scrub" style={{ fontSize: 24 }}>{Math.round(totalGrams)}</span>
+            &nbsp;g
           </span>
         </div>
 
-        {/* ── Ingredient rows ───────────────────────────────────────────── */}
-        <ul style={{ listStyle: "none", margin: 0, padding: 0, borderTop: `2px solid ${INK}` }}>
+        {/* ── Ingredients section header ───────────────────────────────── */}
+        <div style={{ display: "flex", alignItems: "baseline", gap: 18, marginBottom: 8 }}>
+          <span className="pl-meta">INGREDIENTS —</span>
+          <span style={{ flex: 1, height: 1, background: "var(--hair-strong)" }} />
+          <span className="pl-meta">
+            {ingredients.length} ITEM{ingredients.length !== 1 ? "S" : ""} · DRAFT
+          </span>
+        </div>
+
+        {/* ── Ingredient rows ──────────────────────────────────────────── */}
+        <ul style={{ listStyle: "none", margin: 0, padding: 0, borderTop: "1px solid var(--hair-strong)" }}>
           {ingredients.length === 0 && (
-            <li style={{ padding: "28px 0", color: "#bbb", fontStyle: "italic", fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 22 }}>
+            <li
+              className="pl-display"
+              style={{
+                padding: "28px 0",
+                color: "var(--ink-3)",
+                fontSize: 22,
+              }}
+            >
               No ingredients yet — add one below.
             </li>
           )}
@@ -176,16 +190,17 @@ export function RecipeBuilder() {
           ))}
         </ul>
 
-        {/* ── Per-ingredient breakdown ──────────────────────────────────── */}
+        {/* ── Per-ingredient breakdown ─────────────────────────────────── */}
         <NutritionBreakdownTable />
 
-        {/* ── Add ingredient ─────────────────────────────────────────────── */}
+        {/* ── Add ingredient ───────────────────────────────────────────── */}
         <button
           onClick={() => setPickerOpen(true)}
+          className="pl-display"
           style={{
             marginTop: 18, background: "transparent", border: "none",
-            color: ACCENT, fontFamily: "'Instrument Serif', Georgia, serif",
-            fontStyle: "italic", fontSize: 22, cursor: "pointer", padding: 0,
+            color: "var(--accent)",
+            fontSize: 20, cursor: "pointer", padding: 0,
           }}
         >
           + add an ingredient
@@ -195,19 +210,20 @@ export function RecipeBuilder() {
         <MethodSection />
 
         {/* ── Methodology footnote ──────────────────────────────────────── */}
-        <p style={{ marginTop: 56, maxWidth: 720, fontSize: 13, lineHeight: 1.55, color: "#888" }}>
+        <p style={{ marginTop: 56, maxWidth: 720, fontSize: 13, lineHeight: 1.55, color: "var(--ink-3)" }}>
           Macronutrient values are retrieved from the USDA FoodData Central database,
           summed across this batch, and divided by{" "}
           <ScrubNumber
             value={portionDivisor} min={1} max={96}
             onChange={setPortionDivisor}
-            style={{ fontWeight: 700, color: ACCENT, cursor: "ew-resize" }}
+            className="pl-scrub"
+            style={{ fontWeight: 700 }}
           />
           {" "}servings. The label rounds per 21 CFR 101.9(c) — what you see is what would print.
         </p>
       </main>
 
-      {/* ── Ingredient picker modal ───────────────────────────────────────── */}
+      {/* ── Ingredient picker modal ──────────────────────────────────────── */}
       <IngredientSearch open={pickerOpen} onClose={() => setPickerOpen(false)} />
     </>
   );

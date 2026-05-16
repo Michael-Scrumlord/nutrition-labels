@@ -9,7 +9,6 @@ import type { RecipeVariable } from "../../types";
 import { useRecipeActions } from "../../hooks/useRecipeActions";
 import { VariablePopover } from "./VariablePopover";
 import { insertVariableAt } from "../../utils/stepText";
-import { ACCENT, INK } from "../../constants/theme";
 
 interface StepEditorProps {
   stepId: string;
@@ -75,29 +74,33 @@ export function StepEditor({ stepId, initialText, onCommit, onRemove }: StepEdit
           onClick={() => setPopoverOpen(true)}
           style={{
             background: "transparent",
-            border: `1px solid ${INK}`,
+            border: "1px solid var(--hair-strong)",
             padding: "4px 10px",
             cursor: "pointer",
-            fontFamily: "'Inter Tight', sans-serif",
+            fontFamily: "var(--f-body)",
             fontWeight: 700,
             fontSize: 10,
             letterSpacing: "0.12em",
-            color: INK,
+            color: "var(--ink-2)",
             display: "inline-flex",
             alignItems: "center",
             gap: 6,
           }}
-          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "var(--color-accent-blush)"; }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "color-mix(in srgb, var(--accent) 6%, transparent)"; }}
           onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}
         >
           + INSERT VARIABLE
-          <span style={{ color: "#bbb", fontWeight: 500, letterSpacing: "0.04em" }}>⌘K</span>
+          <span style={{ color: "var(--ink-3)", fontWeight: 500, letterSpacing: "0.04em" }}>⌘K</span>
         </button>
 
-        <span style={{
-          fontFamily: "'JetBrains Mono', monospace",
-          fontSize: 10, letterSpacing: "0.14em", color: "#bbb",
-        }}>
+        <span
+          style={{
+            fontFamily: "var(--f-mono)",
+            fontSize: 10,
+            letterSpacing: "0.14em",
+            color: "var(--ink-3)",
+          }}
+        >
           ⏎ to commit · ESC to cancel
         </span>
 
@@ -110,14 +113,14 @@ export function StepEditor({ stepId, initialText, onCommit, onRemove }: StepEdit
             background: "transparent",
             border: "none",
             cursor: "pointer",
-            fontFamily: "'Inter Tight', sans-serif",
+            fontFamily: "var(--f-body)",
             fontSize: 10,
             letterSpacing: "0.12em",
-            color: "#bbb",
+            color: "var(--ink-3)",
             padding: "4px 6px",
           }}
           onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "var(--color-danger)"; }}
-          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#bbb"; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "var(--ink-3)"; }}
         >
           DELETE STEP
         </button>
@@ -127,7 +130,14 @@ export function StepEditor({ stepId, initialText, onCommit, onRemove }: StepEdit
         ref={taRef}
         value={text}
         onChange={(e) => setText(e.target.value)}
-        onBlur={commit}
+        onBlur={() => {
+          // The variable popover steals focus when it opens. If we exit
+          // edit mode here, the popover unmounts before the user can use
+          // it. The popover refocuses the textarea on close, so blurs
+          // while it's open are spurious.
+          if (popoverOpen) return;
+          commit();
+        }}
         onKeyDown={(e) => {
           if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
             e.preventDefault();
@@ -149,14 +159,14 @@ export function StepEditor({ stepId, initialText, onCommit, onRemove }: StepEdit
           width: "100%",
           minHeight: 56,
           resize: "none",
-          background: "var(--color-bg-surface)",
-          border: `1px solid ${ACCENT}`,
+          background: "color-mix(in srgb, var(--accent) 6%, transparent)",
+          border: "1px solid var(--accent)",
           padding: "10px 12px",
           outline: "none",
-          fontFamily: "'Inter Tight', system-ui, sans-serif",
+          fontFamily: "var(--f-body)",
           fontSize: 16,
-          lineHeight: 1.5,
-          color: INK,
+          lineHeight: 1.55,
+          color: "var(--ink)",
         }}
       />
 

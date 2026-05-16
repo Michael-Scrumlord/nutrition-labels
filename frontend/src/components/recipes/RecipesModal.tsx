@@ -6,7 +6,6 @@
 import { useEffect } from "react";
 import { useSavedRecipesStore } from "../../store/savedRecipesStore";
 import { RecipeCard } from "./RecipeCard";
-import { INK } from "../../constants/theme";
 
 interface RecipesModalProps {
   open:    boolean;
@@ -30,7 +29,7 @@ export function RecipesModal({ open, onClose }: RecipesModalProps) {
       onClick={onClose}
       style={{
         position: "fixed", inset: 0,
-        background: "rgba(10,10,10,0.18)",
+        background: "rgba(10,10,10,0.45)",
         zIndex: 40,
         display: "flex", alignItems: "flex-start", justifyContent: "center",
         paddingTop: 80,
@@ -40,10 +39,11 @@ export function RecipesModal({ open, onClose }: RecipesModalProps) {
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: "#ffffff",
-          border: `1px solid ${INK}`,
+          background: "var(--bg)",
+          color: "var(--ink)",
+          border: "1px solid var(--ink)",
           width: "min(680px, calc(100vw - 60px))",
-          boxShadow: "12px 12px 0 var(--color-accent)",
+          boxShadow: "12px 12px 0 var(--accent)",
           maxHeight: "70vh",
           display: "flex",
           flexDirection: "column",
@@ -53,22 +53,10 @@ export function RecipesModal({ open, onClose }: RecipesModalProps) {
         {/* Modal header */}
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", padding: "18px 24px 14px" }}>
           <div>
-            <div style={{
-              fontFamily: "'Instrument Serif', Georgia, serif",
-              fontStyle: "italic",
-              fontSize: 28,
-              letterSpacing: "-0.02em",
-              lineHeight: 1,
-            }}>
+            <div className="pl-display" style={{ fontSize: 28, lineHeight: 1 }}>
               my recipes
             </div>
-            <div style={{
-              fontFamily: "'JetBrains Mono', monospace",
-              fontSize: 10,
-              color: "#999",
-              letterSpacing: "0.18em",
-              marginTop: 6,
-            }}>
+            <div className="pl-meta" style={{ marginTop: 6, letterSpacing: "0.18em" }}>
               {recipes.length} SAVED RECIPE{recipes.length !== 1 ? "S" : ""}
             </div>
           </div>
@@ -77,35 +65,31 @@ export function RecipesModal({ open, onClose }: RecipesModalProps) {
             style={{
               background: "transparent", border: "none",
               fontSize: 20, cursor: "pointer",
-              color: "#bbb", lineHeight: 1, padding: "0 0 0 12px",
+              color: "var(--ink-3)", lineHeight: 1, padding: "0 0 0 12px",
             }}
           >
             ×
           </button>
         </div>
 
-        <div style={{ borderTop: "1px solid #ebebeb" }} />
+        <div style={{ borderTop: "1px solid var(--hair)" }} />
 
         {/* Recipe list */}
         <div style={{ overflowY: "auto", flex: 1 }}>
           {recipes.length === 0 ? (
             <div style={{ padding: "52px 24px", textAlign: "center" }}>
-              <p style={{
-                fontFamily: "'Instrument Serif', Georgia, serif",
-                fontStyle: "italic",
-                fontSize: 22,
-                color: "#bbb",
-                margin: "0 0 10px",
-              }}>
+              <p className="pl-display" style={{ fontSize: 22, color: "var(--ink-3)", margin: "0 0 10px" }}>
                 No saved recipes yet.
               </p>
-              <p style={{
-                fontFamily: "'Inter Tight', sans-serif",
-                fontSize: 12,
-                color: "#ccc",
-                margin: 0,
-                letterSpacing: "0.04em",
-              }}>
+              <p
+                style={{
+                  fontFamily: "var(--f-body)",
+                  fontSize: 12,
+                  color: "var(--ink-3)",
+                  margin: 0,
+                  letterSpacing: "0.04em",
+                }}
+              >
                 Build something delicious and save it here.
               </p>
             </div>
