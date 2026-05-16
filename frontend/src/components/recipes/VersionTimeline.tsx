@@ -7,7 +7,6 @@ import type { SavedRecipe, RecipeVersion } from "../../types";
 import { useRecipeStore } from "../../store/recipeStore";
 import { useSavedRecipesStore } from "../../store/savedRecipesStore";
 import { useRecipeActions } from "../../hooks/useRecipeActions";
-import { ACCENT, INK } from "../../constants/theme";
 
 interface VersionTimelineProps {
   recipe: SavedRecipe;
@@ -33,12 +32,14 @@ export function VersionTimeline({ recipe, onView }: VersionTimelineProps) {
   }
 
   return (
-    <div style={{
-      marginTop: 10,
-      padding: "10px 0 4px 4px",
-      borderLeft: `2px solid var(--color-accent-blush)`,
-      animation: "popfade 0.18s ease",
-    }}>
+    <div
+      style={{
+        marginTop: 10,
+        padding: "10px 0 4px 4px",
+        borderLeft: "2px solid color-mix(in srgb, var(--accent) 18%, transparent)",
+        animation: "popfade 0.18s ease",
+      }}
+    >
       {versionsDesc.map((v, i) => {
         const isLatest = v.id === latestId;
         const isCurrent = isLoadedRecipe && (
@@ -62,40 +63,45 @@ export function VersionTimeline({ recipe, onView }: VersionTimelineProps) {
             }}
           >
             {/* Dot */}
-            <span style={{
-              display: "inline-block",
-              width: 9, height: 9, borderRadius: "50%",
-              marginTop: 4, marginLeft: -5,
-              background: isCurrent ? ACCENT : "#fff",
-              border: `2px solid ${isCurrent ? ACCENT : "#ccc"}`,
-            }} />
+            <span
+              style={{
+                display: "inline-block",
+                width: 9, height: 9, borderRadius: "50%",
+                marginTop: 4, marginLeft: -5,
+                background: isCurrent ? "var(--accent)" : "var(--bg)",
+                border: `2px solid ${isCurrent ? "var(--accent)" : "var(--hair-strong)"}`,
+              }}
+            />
 
             {/* Label + date + note */}
             <div style={{ minWidth: 0 }}>
-              <div style={{
-                display: "flex",
-                gap: 8,
-                alignItems: "baseline",
-                fontFamily: "'JetBrains Mono', monospace",
-                fontSize: 10,
-                letterSpacing: "0.1em",
-                color: "#666",
-              }}>
-                <span style={{ fontWeight: 700, color: INK }}>v{vNum}</span>
+              <div
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  alignItems: "baseline",
+                  fontFamily: "var(--f-mono)",
+                  fontSize: 10,
+                  letterSpacing: "0.1em",
+                  color: "var(--ink-2)",
+                }}
+              >
+                <span style={{ fontWeight: 700, color: "var(--ink)" }}>v{vNum}</span>
                 {isLatest && (
-                  <span style={{ color: ACCENT, letterSpacing: "0.16em" }}>LATEST</span>
+                  <span style={{ color: "var(--accent)", letterSpacing: "0.16em" }}>LATEST</span>
                 )}
                 <span>· {date}</span>
               </div>
               {v.note && (
-                <div style={{
-                  fontFamily: "'Instrument Serif', Georgia, serif",
-                  fontStyle: "italic",
-                  fontSize: 14,
-                  color: "#666",
-                  marginTop: 2,
-                  lineHeight: 1.3,
-                }}>
+                <div
+                  className="pl-display"
+                  style={{
+                    fontSize: 14,
+                    color: "var(--ink-2)",
+                    marginTop: 2,
+                    lineHeight: 1.3,
+                  }}
+                >
                   &ldquo;{v.note}&rdquo;
                 </div>
               )}
@@ -108,16 +114,16 @@ export function VersionTimeline({ recipe, onView }: VersionTimelineProps) {
                   onClick={() => handleView(v)}
                   style={{
                     background: "transparent",
-                    border: `1px solid ${INK}`,
+                    border: "1px solid var(--ink)",
                     padding: "3px 9px",
                     cursor: "pointer",
-                    fontFamily: "'Inter Tight', sans-serif",
+                    fontFamily: "var(--f-body)",
                     fontWeight: 700,
                     fontSize: 9,
                     letterSpacing: "0.12em",
-                    color: INK,
+                    color: "var(--ink)",
                   }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "var(--color-accent-blush)"; }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "color-mix(in srgb, var(--accent) 6%, transparent)"; }}
                   onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}
                 >
                   VIEW
@@ -130,14 +136,14 @@ export function VersionTimeline({ recipe, onView }: VersionTimelineProps) {
                   style={{
                     background: "transparent",
                     border: "none",
-                    color: "#ccc",
+                    color: "var(--ink-3)",
                     fontSize: 14,
                     cursor: "pointer",
                     lineHeight: 1,
                     padding: "2px 4px",
                   }}
                   onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "var(--color-danger)"; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#ccc"; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "var(--ink-3)"; }}
                 >
                   ×
                 </button>

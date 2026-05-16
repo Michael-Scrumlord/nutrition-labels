@@ -8,7 +8,6 @@ import type { RecipeStep } from "../../types";
 import { useRecipeActions } from "../../hooks/useRecipeActions";
 import { StepText } from "./StepText";
 import { StepEditor } from "./StepEditor";
-import { INK } from "../../constants/theme";
 
 interface StepRowProps {
   step:    RecipeStep;
@@ -32,20 +31,19 @@ export function StepRow({ step, index, total }: StepRowProps) {
         display: "flex",
         gap: 18,
         padding: "16px 0",
-        borderBottom: "1px solid var(--color-border-subtle)",
+        borderBottom: "1px solid var(--hair)",
         alignItems: "flex-start",
         animation: "popInRow 0.32s cubic-bezier(.2,.7,.1,1) both",
       }}
     >
-      {/* Big italic numeral */}
+      {/* Step numeral — display face */}
       <span
+        className="pl-display"
         style={{
-          fontFamily: "'Instrument Serif', Georgia, serif",
-          fontStyle: "italic",
-          fontSize: 40,
-          color: "var(--color-text-tertiary)",
+          fontSize: 38,
+          color: "var(--ink-3)",
           lineHeight: 1,
-          minWidth: 56,
+          minWidth: 50,
           userSelect: "none",
         }}
       >
@@ -66,9 +64,11 @@ export function StepRow({ step, index, total }: StepRowProps) {
             onClick={() => setEditing(true)}
             style={{
               cursor: "text",
-              fontFamily: "'Inter Tight', system-ui, sans-serif",
-              color: INK,
-              padding: "4px 0",
+              fontFamily: "var(--f-body)",
+              color: "var(--ink)",
+              fontSize: 16,
+              lineHeight: 1.6,
+              padding: "2px 0",
             }}
           >
             <StepText text={step.text} />
@@ -102,18 +102,18 @@ function CtrlBtn({ label, onClick, disabled, danger }: { label: string; onClick:
         background: "transparent",
         border: "none",
         cursor: disabled ? "default" : "pointer",
-        color: disabled ? "#ddd" : danger ? "#999" : "#999",
+        color: disabled ? "var(--hair-strong)" : "var(--ink-3)",
         fontSize: 14,
         padding: "2px 6px",
         lineHeight: 1,
       }}
       onMouseEnter={(e) => {
         if (disabled) return;
-        (e.currentTarget as HTMLButtonElement).style.color = danger ? "var(--color-danger)" : INK;
+        (e.currentTarget as HTMLButtonElement).style.color = danger ? "var(--color-danger)" : "var(--ink)";
       }}
       onMouseLeave={(e) => {
         if (disabled) return;
-        (e.currentTarget as HTMLButtonElement).style.color = "#999";
+        (e.currentTarget as HTMLButtonElement).style.color = "var(--ink-3)";
       }}
     >
       {label}

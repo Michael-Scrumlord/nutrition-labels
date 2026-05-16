@@ -1,15 +1,16 @@
-// label/GenerateButton.tsx — Pop CTA style.
+// label/GenerateButton.tsx — primary CTA, themed.
 
 import { useState } from "react";
 import { useRecipeStore } from "../../store/recipeStore";
+import { useActiveTheme } from "../../store/themeStore";
 import { generateLabel, downloadBlob } from "../../api/client";
-import { ACCENT } from "../../constants/theme";
 
 export function GenerateButton() {
   const ingredients    = useRecipeStore((s) => s.ingredients);
   const portionDivisor = useRecipeStore((s) => s.portionDivisor);
   const labelName      = useRecipeStore((s) => s.labelName);
   const dimensions     = useRecipeStore((s) => s.dimensions);
+  const { def }        = useActiveTheme();
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError]         = useState<string | null>(null);
@@ -31,25 +32,32 @@ export function GenerateButton() {
   const disabled = ingredients.length === 0;
 
   return (
-    <div style={{ marginTop: 4 }}>
+    <div style={{ marginTop: 4, width: "100%" }}>
       <button
         onClick={handleGenerate}
         disabled={disabled || isLoading}
         style={{
-          background: disabled ? "#e5e5e5" : ACCENT,
-          color: disabled ? "#bbb" : "#fff",
+          background: disabled
+            ? "color-mix(in srgb, var(--ink) 8%, transparent)"
+            : "var(--accent)",
+          color: disabled ? "var(--ink-3)" : def.oled ? "#000" : "#fff",
           border: "none",
-          padding: "16px 18px",
-          fontFamily: "'Inter Tight', sans-serif",
+          padding: "16px 22px",
+          fontFamily: "var(--f-body)",
           fontWeight: 800,
-          letterSpacing: "0.2em",
-          fontSize: 12,
+          letterSpacing: "0.22em",
+          fontSize: 11,
           cursor: disabled ? "default" : "pointer",
           width: "100%",
           transition: "filter 0.15s",
+          boxShadow: disabled ? "none" : "var(--accent-glow)",
         }}
-        onMouseEnter={(e) => { if (!disabled) (e.currentTarget as HTMLButtonElement).style.filter = "brightness(1.08)"; }}
-        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.filter = ""; }}
+        onMouseEnter={(e) => {
+          if (!disabled) (e.currentTarget as HTMLButtonElement).style.filter = "brightness(1.08)";
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.filter = "";
+        }}
       >
         {isLoading ? "GENERATING…" : "↓ GENERATE PDF"}
       </button>

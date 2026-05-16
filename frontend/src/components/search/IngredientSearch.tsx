@@ -1,6 +1,6 @@
 // search/IngredientSearch.tsx
 //
-// Pop ingredient picker — modal drawer that overlays the page.
+// Ingredient picker — modal drawer that overlays the page.
 // Tabs: Search (USDA) / Common / Recent / Favorites.
 // Selecting a food drops into an inline add-form inside the modal.
 
@@ -10,9 +10,9 @@ import { useIngredientSearch } from "../../hooks/useIngredientSearch";
 import { useQuery } from "@tanstack/react-query";
 import { getFoodDetail } from "../../api/client";
 import { useRecipeStore } from "../../store/recipeStore";
+import { useActiveTheme } from "../../store/themeStore";
 import { Spinner } from "../ui/Spinner";
 import { COMMON_FOODS } from "../../constants/commonFoods";
-import { ACCENT, INK } from "../../constants/theme";
 import type { FoodSearchResult, SavedFood } from "../../types";
 
 type TabId = "search" | "common" | "recent" | "favorites";
@@ -23,6 +23,7 @@ function AddForm({ food, onClose }: { food: FoodSearchResult; onClose: () => voi
   const [grams, setGrams] = useState("100");
   const addIngredient = useRecipeStore((s) => s.addIngredient);
   const addRecent     = usePreferencesStore((s) => s.addRecent);
+  const { def: themeDef } = useActiveTheme();
 
   const { data: detail, isLoading, isError } = useQuery({
     queryKey: ["food", food.fdc_id],
@@ -40,23 +41,29 @@ function AddForm({ food, onClose }: { food: FoodSearchResult; onClose: () => voi
   }
 
   return (
-    <div style={{ padding: "16px 22px", borderTop: "1px solid #ebebeb", background: "#fafafa" }}>
-      <p style={{ margin: "0 0 10px", fontFamily: "'Instrument Serif', Georgia, serif", fontStyle: "italic", fontSize: 20 }}>
+    <div style={{ padding: "16px 22px", borderTop: "1px solid var(--hair)", background: "var(--surface)" }}>
+      <p className="pl-display" style={{ margin: "0 0 10px", fontSize: 20, color: "var(--ink)" }}>
         {food.name}
       </p>
 
       <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
         <label style={{ display: "grid", gap: 4 }}>
-          <span style={{ fontSize: 10, letterSpacing: "0.14em", color: "#999", fontFamily: "'JetBrains Mono', monospace" }}>GRAMS</span>
+          <span style={{ fontSize: 10, letterSpacing: "0.14em", color: "var(--ink-3)", fontFamily: "var(--f-mono)" }}>GRAMS</span>
           <input
             type="number" min="0.1" step="any"
             value={grams}
             onChange={(e) => setGrams(e.target.value)}
             autoFocus
             style={{
-              width: 90, padding: "8px 10px", border: `1px solid ${INK}`,
-              fontFamily: "'JetBrains Mono', monospace", fontSize: 18, fontWeight: 700,
-              background: "#fff", outline: "none",
+              width: 90,
+              padding: "8px 10px",
+              border: "1px solid var(--ink)",
+              background: "var(--bg)",
+              color: "var(--ink)",
+              fontFamily: "var(--f-mono)",
+              fontSize: 18,
+              fontWeight: 700,
+              outline: "none",
             }}
           />
         </label>
@@ -68,11 +75,15 @@ function AddForm({ food, onClose }: { food: FoodSearchResult; onClose: () => voi
           onClick={handleAdd}
           disabled={!detail || isLoading}
           style={{
-            background: detail && !isLoading ? ACCENT : "#e5e5e5",
-            color: detail && !isLoading ? "#fff" : "#bbb",
-            border: "none", padding: "10px 20px", cursor: detail ? "pointer" : "default",
-            fontFamily: "'Inter Tight', sans-serif", fontWeight: 700,
-            letterSpacing: "0.12em", fontSize: 12,
+            background: detail && !isLoading ? "var(--accent)" : "color-mix(in srgb, var(--ink) 8%, transparent)",
+            color: detail && !isLoading ? (themeDef.oled ? "#000" : "#fff") : "var(--ink-3)",
+            border: "none",
+            padding: "10px 20px",
+            cursor: detail ? "pointer" : "default",
+            fontFamily: "var(--f-body)",
+            fontWeight: 700,
+            letterSpacing: "0.12em",
+            fontSize: 12,
           }}
         >
           ADD TO RECIPE
@@ -80,10 +91,15 @@ function AddForm({ food, onClose }: { food: FoodSearchResult; onClose: () => voi
         <button
           onClick={onClose}
           style={{
-            background: "transparent", border: `1px solid ${INK}`,
-            padding: "10px 14px", cursor: "pointer",
-            fontFamily: "'Inter Tight', sans-serif", fontWeight: 600,
-            fontSize: 11, letterSpacing: "0.08em",
+            background: "transparent",
+            border: "1px solid var(--ink)",
+            color: "var(--ink)",
+            padding: "10px 14px",
+            cursor: "pointer",
+            fontFamily: "var(--f-body)",
+            fontWeight: 600,
+            fontSize: 11,
+            letterSpacing: "0.08em",
           }}
         >
           CANCEL
@@ -148,7 +164,7 @@ export function IngredientSearch({ open, onClose }: IngredientSearchProps) {
       onClick={onClose}
       style={{
         position: "fixed", inset: 0,
-        background: "rgba(10,10,10,0.18)",
+        background: "rgba(10,10,10,0.45)",
         zIndex: 40,
         display: "flex", alignItems: "flex-start", justifyContent: "center",
         paddingTop: 80,
@@ -158,10 +174,11 @@ export function IngredientSearch({ open, onClose }: IngredientSearchProps) {
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: "#ffffff",
-          border: `1px solid ${INK}`,
+          background: "var(--bg)",
+          color: "var(--ink)",
+          border: "1px solid var(--ink)",
           width: "min(720px, calc(100vw - 60px))",
-          boxShadow: `12px 12px 0 var(--color-accent)`,
+          boxShadow: "12px 12px 0 var(--accent)",
           maxHeight: "70vh",
           display: "flex", flexDirection: "column",
           animation: "popslide 0.26s cubic-bezier(.2,.7,.1,1)",
@@ -169,19 +186,19 @@ export function IngredientSearch({ open, onClose }: IngredientSearchProps) {
       >
         {/* Modal header */}
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", padding: "18px 22px 8px" }}>
-          <div style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontStyle: "italic", fontSize: 28, letterSpacing: "-0.02em" }}>
+          <div className="pl-display" style={{ fontSize: 28 }}>
             add an ingredient
           </div>
           <button
             onClick={onClose}
-            style={{ background: "transparent", border: "none", fontSize: 20, cursor: "pointer", color: "#bbb", lineHeight: 1 }}
+            style={{ background: "transparent", border: "none", fontSize: 20, cursor: "pointer", color: "var(--ink-3)", lineHeight: 1 }}
           >
             ×
           </button>
         </div>
 
         {/* Tabs + search */}
-        <div style={{ display: "flex", gap: 18, padding: "0 22px", borderBottom: "1px solid #ebebeb", alignItems: "flex-end" }}>
+        <div style={{ display: "flex", gap: 18, padding: "0 22px", borderBottom: "1px solid var(--hair)", alignItems: "flex-end" }}>
           {TABS.map(({ id, label }) => (
             <button
               key={id}
@@ -189,10 +206,10 @@ export function IngredientSearch({ open, onClose }: IngredientSearchProps) {
               style={{
                 background: "transparent", border: "none",
                 padding: "10px 0", cursor: "pointer",
-                fontFamily: "'Inter Tight', sans-serif",
+                fontFamily: "var(--f-body)",
                 fontSize: 13, fontWeight: tab === id ? 700 : 500,
-                borderBottom: tab === id ? `3px solid ${ACCENT}` : "3px solid transparent",
-                color: tab === id ? INK : "#999",
+                borderBottom: tab === id ? "3px solid var(--accent)" : "3px solid transparent",
+                color: tab === id ? "var(--ink)" : "var(--ink-3)",
                 letterSpacing: "0.02em",
               }}
             >
@@ -200,7 +217,6 @@ export function IngredientSearch({ open, onClose }: IngredientSearchProps) {
             </button>
           ))}
 
-          {/* Search input — always visible */}
           <input
             ref={inputRef}
             value={query}
@@ -209,10 +225,11 @@ export function IngredientSearch({ open, onClose }: IngredientSearchProps) {
             style={{
               marginLeft: "auto", marginBottom: 6,
               background: "transparent", border: "none", outline: "none",
-              fontFamily: "'Inter Tight', sans-serif", fontSize: 14,
+              fontFamily: "var(--f-body)", fontSize: 14,
               padding: "8px 0", width: 260,
-              borderBottom: "1px solid #d0d0d0",
+              borderBottom: "1px solid var(--hair-strong)",
               fontStyle: "italic",
+              color: "var(--ink)",
             }}
           />
         </div>
@@ -220,13 +237,13 @@ export function IngredientSearch({ open, onClose }: IngredientSearchProps) {
         {/* List */}
         <div style={{ overflowY: "auto", flex: 1 }}>
           {tab === "search" && searchLoading && (
-            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "16px 22px", color: "#999" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "16px 22px", color: "var(--ink-3)" }}>
               <Spinner size={14} /> Searching…
             </div>
           )}
 
           {activeList.length === 0 && !searchLoading && (
-            <p style={{ padding: "16px 22px", color: "#bbb", fontStyle: "italic", fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 16 }}>
+            <p className="pl-display" style={{ padding: "16px 22px", color: "var(--ink-3)", fontSize: 16 }}>
               {tab === "recent"    ? "No recents yet." :
                tab === "favorites" ? "No favorites yet — star an ingredient to save it." :
                tab === "search"    ? (query.length >= 2 ? `No results for "${query}".` : "Type to search the USDA database.") :
@@ -242,21 +259,21 @@ export function IngredientSearch({ open, onClose }: IngredientSearchProps) {
                   key={food.fdc_id}
                   style={{
                     display: "flex", justifyContent: "space-between", alignItems: "center",
-                    padding: "10px 22px", borderBottom: "1px solid #f0f0f0",
+                    padding: "10px 22px", borderBottom: "1px solid var(--hair)",
                     cursor: "pointer",
                   }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLLIElement).style.background = "var(--color-accent-blush)"; }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLLIElement).style.background = "color-mix(in srgb, var(--accent) 6%, transparent)"; }}
                   onMouseLeave={(e) => { (e.currentTarget as HTMLLIElement).style.background = ""; }}
                   onClick={() => setSelected(food)}
                 >
-                  <span style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontStyle: "italic", fontSize: 20 }}>
+                  <span className="pl-display" style={{ fontSize: 20, color: "var(--ink)" }}>
                     {food.name}
                   </span>
                   <button
                     onClick={(e) => { e.stopPropagation(); toggleFavorite(food); }}
                     style={{
                       background: "transparent", border: "none", cursor: "pointer",
-                      color: fav ? ACCENT : "#ddd", fontSize: 18, padding: "0 4px",
+                      color: fav ? "var(--accent)" : "var(--ink-3)", fontSize: 18, padding: "0 4px",
                     }}
                     aria-label={fav ? "Unfavorite" : "Favorite"}
                   >
@@ -268,7 +285,6 @@ export function IngredientSearch({ open, onClose }: IngredientSearchProps) {
           </ul>
         </div>
 
-        {/* Add form (when a food is selected) */}
         {selected && (
           <AddForm food={selected} onClose={() => { setSelected(null); onClose(); }} />
         )}
