@@ -1,17 +1,18 @@
 # main.py
 #
-# Creates the FastAPI app and registers the three routes.
-# Each route does: validate → fetch → calculate → return.
-# No business logic lives here.
+# Creates the FastAPI app and registers routes.
+# Wires CORS, rate limiting, body-size enforcement, and a /api/health probe.
 
+import asyncio
 import logging
 
-from fastapi import FastAPI, HTTPException, Response, Request
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from app import database, search as search_module, nutrition, pdf
 from app.config import settings
@@ -24,17 +25,55 @@ from app.models import (
 )
 from app.constants import NUTRIENT_FIELDS
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("nutritionlabels")
 
-app = FastAPI(title="NutritionLabels API")
+limiter = Limiter(key_func=get_remote_address, default_limits=[])
 
-# Initialize the rate limiter
-limiter = Limiter(key_func=get_remote_address)
+# Bounds concurrent WeasyPrint renders so a burst of /generate_label requests
+# can't exhaust memory or pin every worker.
+_pdf_semaphore = asyncio.Semaphore(settings.pdf_max_concurrency)
+
+
+class BodySizeLimitMiddleware(BaseHTTPMiddleware):
+    """Reject oversized bodies before FastAPI parses them."""
+
+    def __init__(self, app, max_bytes: int):
+        super().__init__(app)
+        self.max_bytes = max_bytes
+
+    async def dispatch(self, request: Request, call_next):
+        content_length = request.headers.get("content-length")
+        if content_length is not None:
+            try:
+                if int(content_length) > self.max_bytes:
+                    return JSONResponse(
+                        status_code=413,
+                        content={"detail": "Request body too large"},
+                    )
+            except ValueError:
+                return JSONResponse(status_code=400, content={"detail": "Invalid Content-Length"})
+        return await call_next(request)
+
+
+app = FastAPI(title="NutritionLabels API", docs_url=None, redoc_url=None, openapi_url=None)
 app.state.limiter = limiter
+
+app.add_middleware(BodySizeLimitMiddleware, max_bytes=settings.max_body_bytes)
+
+# CORS is only needed when the frontend is served from a different origin
+# (typical only in local dev). In prod, nginx/Caddy proxies /api/ same-origin.
+if settings.cors_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origins,
+        allow_credentials=False,
+        allow_methods=["GET", "POST"],
+        allow_headers=["Content-Type"],
+    )
 
 
 @app.exception_handler(RateLimitExceeded)
-async def rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
+async def rate_limit_handler(_request: Request, exc: RateLimitExceeded) -> JSONResponse:
     retry_after = getattr(exc, "retry_after", None)
     headers = {"Retry-After": str(retry_after)} if retry_after else {}
     return JSONResponse(
@@ -53,17 +92,14 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     )
 
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.cors_origins,
-    allow_credentials=False,
-    allow_methods=["GET", "POST"],
-    allow_headers=["Content-Type"],
-)
+@app.get("/api/health")
+def health() -> dict:
+    return {"status": "ok", "release": settings.release_sha}
 
 
 @app.get("/api/search", response_model=list[FoodSearchResult])
-def search(query: str = "") -> list[dict]:
+@limiter.limit(settings.rate_limit_search)
+def search(request: Request, query: str = "") -> list[dict]:
     """
     Search foods by name. Returns up to 40 results ranked by relevance:
     prefix matches first (alphabetically), then contains matches (alphabetically).
@@ -71,12 +107,15 @@ def search(query: str = "") -> list[dict]:
     """
     if len(query) < 2:
         return []
+    if len(query) > 100:
+        raise HTTPException(status_code=400, detail="query too long")
     rows = database.search_foods(query)
     return search_module.ranked_search(query, rows)
 
 
 @app.get("/api/food/{fdc_id}", response_model=FoodDetail)
-def get_food(fdc_id: int) -> FoodDetail:
+@limiter.limit(settings.rate_limit_food)
+def get_food(request: Request, fdc_id: int) -> FoodDetail:
     """
     Return full macro data and portion sizes for one food.
     Returns 404 if the fdc_id is not in the database.
@@ -103,8 +142,8 @@ def get_food(fdc_id: int) -> FoodDetail:
 
 
 @app.post("/api/generate_label")
-@limiter.limit("10/minute")
-def generate_label(request: Request, payload: GenerateLabelRequest) -> Response:
+@limiter.limit(settings.rate_limit_generate)
+async def generate_label(request: Request, payload: GenerateLabelRequest) -> Response:
     """
     Calculate macros for the recipe, render the FDA label as HTML,
     convert to PDF, and return the binary PDF as a download.
@@ -112,11 +151,9 @@ def generate_label(request: Request, payload: GenerateLabelRequest) -> Response:
     The backend recalculates macros independently — this is intentional.
     It catches any drift between frontend and backend constants.
     """
-    # Fetch all food rows in one query
     fdc_ids = [ing.fdc_id for ing in payload.ingredients]
     food_rows = database.get_foods_by_ids(fdc_ids)
 
-    # Make sure every fdc_id was found
     found_ids = {row["fdc_id"] for row in food_rows}
     missing = [fid for fid in fdc_ids if fid not in found_ids]
     if missing:
@@ -125,7 +162,6 @@ def generate_label(request: Request, payload: GenerateLabelRequest) -> Response:
             detail=f"Unknown ingredient fdc_id(s): {missing}",
         )
 
-    # Calculate per-serving macros
     try:
         unrounded_macros, macros = nutrition.calculate_recipe_macros(
             payload.ingredients, food_rows, payload.portion_divisor
@@ -133,12 +169,25 @@ def generate_label(request: Request, payload: GenerateLabelRequest) -> Response:
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    # Render the label and generate the PDF
     html = pdf.render_label_html(macros, payload, unrounded_macros)
-    pdf_bytes = pdf.generate_pdf(html)
+
+    # Cap concurrent renders and time each one out so a slow/heavy render
+    # can't tie up the worker indefinitely.
+    try:
+        async with _pdf_semaphore:
+            pdf_bytes = await asyncio.wait_for(
+                asyncio.to_thread(pdf.generate_pdf, html),
+                timeout=settings.pdf_timeout_seconds,
+            )
+    except asyncio.TimeoutError:
+        logger.warning("PDF generation timed out after %.1fs", settings.pdf_timeout_seconds)
+        raise HTTPException(status_code=504, detail="PDF generation timed out")
 
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": 'attachment; filename="nutrition_label.pdf"'},
+        headers={
+            "Content-Disposition": 'attachment; filename="nutrition_label.pdf"',
+            "Cache-Control": "no-store",
+        },
     )

@@ -7,6 +7,7 @@ import { useSavedRecipesStore } from "../../store/savedRecipesStore";
 import { useActiveTheme } from "../../store/themeStore";
 import { RecipesModal } from "../recipes/RecipesModal";
 import { ThemeSwitcher } from "../theme/ThemeSwitcher";
+import { DonateButton } from "../donate/DonateButton";
 
 export function Header() {
   const [recipesOpen, setRecipesOpen] = useState(false);
@@ -74,6 +75,7 @@ export function Header() {
               <span style={{ color: "var(--accent)", fontWeight: 700 }}>·{recipeCount}</span>
             )}
           </button>
+          <DonateButton />
           <ThemeSwitcher />
         </div>
       </header>

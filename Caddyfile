@@ -1,0 +1,29 @@
+# Caddyfile — production edge.
+#
+# Caddy handles TLS termination (auto Let's Encrypt), HSTS, gzip, and proxies
+# everything to the internal `frontend` container which serves the SPA and
+# proxies /api/ to the backend.
+#
+# Set DOMAIN in your .env (e.g. DOMAIN=nutritionlabels.example.com).
+# For local testing, swap {$DOMAIN} for `:80` and remove the tls block.
+
+{$DOMAIN} {
+    encode zstd gzip
+
+    # HSTS — only enable once you're certain TLS works for your apex + www.
+    # 1 year, include subdomains, eligible for preload.
+    header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+    header -Server
+
+    # Per-IP request shaping at the edge. Pairs with slowapi inside FastAPI.
+    # (Requires Caddy v2.8+; comment out if you're on an older version.)
+    # rate_limit {
+    #     zone donate { key {remote_host}  events 60  window 1m }
+    # }
+
+    reverse_proxy frontend:80 {
+        header_up X-Forwarded-Proto {scheme}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Real-IP {remote_host}
+    }
+}

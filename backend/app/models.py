@@ -8,6 +8,15 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.constants import UNIT_CONVERSIONS
 
 
+# Control chars (including newlines, tabs, RTL overrides) that would corrupt
+# the rendered PDF if smuggled into a user-supplied string field.
+_CONTROL_CHARS = set(chr(c) for c in range(0, 32)) | {chr(0x7F), "‮", "‭", "‎", "‏"}
+
+
+def _strip_control(value: str) -> str:
+    return "".join(ch for ch in value if ch not in _CONTROL_CHARS)
+
+
 # ---------------------------------------------------------------------------
 # Validation constants
 # ---------------------------------------------------------------------------
@@ -32,9 +41,17 @@ class IngredientItem(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     fdc_id: int
-    name: str = Field(..., min_length=1, max_length=MAX_NAME_LENGTH)  # Display name on the label (user can edit this)
+    name: str = Field(..., min_length=1, max_length=MAX_NAME_LENGTH)
     amount: float = Field(..., gt=0, le=MAX_INGREDIENT_AMOUNT)
-    unit: str        # Must be a key in UNIT_CONVERSIONS: g, ml, oz, lb, kg
+    unit: str
+
+    @field_validator("name")
+    @classmethod
+    def name_no_control_chars(cls, v: str) -> str:
+        cleaned = _strip_control(v).strip()
+        if not cleaned:
+            raise ValueError("name must not be empty after stripping control characters")
+        return cleaned
 
     @field_validator("unit")
     @classmethod
@@ -49,11 +66,16 @@ class GenerateLabelRequest(BaseModel):
     """The full payload sent when the user clicks Generate PDF."""
     model_config = ConfigDict(extra="forbid")
 
-    portion_divisor: int = Field(8, ge=MIN_PORTION_DIVISOR, le=MAX_PORTION_DIVISOR)       # How many servings are in the batch
-    label_name: str = Field("", max_length=MAX_NAME_LENGTH)           # Optional recipe name printed above the label
-    width_inches: float = Field(2.75, gt=MIN_WIDTH, le=MAX_WIDTH)        # Label width for the PDF page
-    height_inches: float | None = Field(None, gt=0, le=MAX_HEIGHT)  # None = WeasyPrint auto-sizes height
+    portion_divisor: int = Field(8, ge=MIN_PORTION_DIVISOR, le=MAX_PORTION_DIVISOR)
+    label_name: str = Field("", max_length=MAX_NAME_LENGTH)
+    width_inches: float = Field(2.75, gt=MIN_WIDTH, le=MAX_WIDTH)
+    height_inches: float | None = Field(None, gt=0, le=MAX_HEIGHT)
     ingredients: list[IngredientItem] = Field(..., min_length=MIN_INGREDIENTS, max_length=MAX_INGREDIENTS)
+
+    @field_validator("label_name")
+    @classmethod
+    def label_name_no_control_chars(cls, v: str) -> str:
+        return _strip_control(v).strip()
 
 
 # ---------------------------------------------------------------------------
@@ -86,7 +108,7 @@ class FoodSearchResult(BaseModel):
 class PortionSize(BaseModel):
     """A known portion size for a food (e.g. 1 tablespoon = 14.2g)."""
     amount: float
-    modifier: str    # e.g. "tablespoon", "cup", "slice"
+    modifier: str
     gram_weight: float
 
 
