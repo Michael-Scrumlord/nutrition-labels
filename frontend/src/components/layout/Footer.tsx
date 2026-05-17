@@ -198,7 +198,7 @@ export function Footer() {
           textTransform: "uppercase",
         }}
       >
-        inquiries@nutritionlabels.app
+        inquiries@nutrition-label-generator.org
       </span>
     </div>
   );

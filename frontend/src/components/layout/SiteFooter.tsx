@@ -11,7 +11,7 @@
 import { Link } from "react-router-dom";
 
 const CONTACT_EMAIL =
-  (import.meta.env.VITE_CONTACT_EMAIL as string | undefined) ?? "inquiries@nutritionlabels.app";
+  (import.meta.env.VITE_CONTACT_EMAIL as string | undefined) ?? "inquiries@nutrition-label-generator.org";
 
 const linkStyle = {
   color: "var(--ink-2)",
@@ -67,6 +67,8 @@ export function SiteFooter() {
       >
         <FootLink to="/">Generator</FootLink>
         <span aria-hidden="true" style={{ color: "var(--hair-strong)" }}>·</span>
+        <FootLink to="/guides">Guides</FootLink>
+        <span aria-hidden="true" style={{ color: "var(--hair-strong)" }}>·</span>
         <FootLink to="/about">About</FootLink>
         <span aria-hidden="true" style={{ color: "var(--hair-strong)" }}>·</span>
         <FootLink to="/privacy">Privacy</FootLink>
@@ -89,7 +91,7 @@ export function SiteFooter() {
         </a>
       </nav>
 
-      <span>© {year} Nutrition Label</span>
+      <span>© {year} Nutrition Label Generator</span>
     </div>
   );
 }

@@ -22,8 +22,16 @@ import { SiteFooter } from "./SiteFooter";
 import { RecipeBuilder } from "../recipe/RecipeBuilder";
 import { LabelColumn } from "../label/LabelColumn";
 import { ThemedFrame } from "../theme/ThemedFrame";
+import { usePageMeta } from "../../hooks/usePageMeta";
 
 export function AppShell() {
+  usePageMeta({
+    title: "Nutrition Label Generator — FDA Nutrition Label Builder",
+    description:
+      "Design FDA-style Nutrition Facts labels for your recipes — pull ingredient data from USDA FoodData Central, set portions, and export a print-ready PDF in the dimensions you need. Free, browser-based, no account required.",
+    canonical: "/",
+  });
+
   return (
     <ThemedFrame>
       <div

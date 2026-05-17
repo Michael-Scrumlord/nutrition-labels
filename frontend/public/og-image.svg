@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-label="Nutrition Label Generator — FDA Nutrition Label Builder">
+  <rect width="1200" height="630" fill="#ffffff"/>
+  <!-- editorial rule top -->
+  <rect x="0" y="0" width="1200" height="8" fill="#ff2e88"/>
+  <!-- kicker -->
+  <text x="80" y="180"
+        font-family="'IBM Plex Mono', ui-monospace, monospace"
+        font-weight="700" font-size="22" letter-spacing="6"
+        fill="#ff2e88">▸ GENERATOR · v · 04</text>
+  <!-- wordmark -->
+  <text x="80" y="350"
+        font-family="'IBM Plex Serif', Georgia, serif"
+        font-style="italic" font-weight="500"
+        font-size="140" fill="#0a0a0a">Nutrition Label Generator</text>
+  <rect x="80" y="370" width="1040" height="6" fill="#ff2e88"/>
+  <!-- subtitle -->
+  <text x="80" y="450"
+        font-family="'IBM Plex Sans', system-ui, sans-serif"
+        font-weight="400" font-size="34"
+        fill="#555555">FDA-style nutrition labels for the recipes you actually cook.</text>
+  <!-- footer mark -->
+  <text x="80" y="560"
+        font-family="'IBM Plex Mono', ui-monospace, monospace"
+        font-weight="700" font-size="20" letter-spacing="4"
+        fill="#9a9a9a">nutrition-label-generator.org</text>
+</svg>

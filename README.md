@@ -1,4 +1,4 @@
-# Nutrition Labels
+# Nutrition Label Generator
 
 A full-stack web application that lets you build custom recipes from USDA food data and generate FDA-compliant Nutrition Facts labels as downloadable PDFs.
 

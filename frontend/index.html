@@ -3,7 +3,53 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>NutritionLabels — FDA Nutrition Label Builder</title>
+    <meta name="theme-color" content="#0a0a0a" />
+
+    <!-- Default per-route title/description live in src/hooks/usePageMeta.ts.
+         The values below are what social crawlers (which don't run JS) see. -->
+    <title>Nutrition Label Generator — FDA Nutrition Label Builder</title>
+    <meta
+      name="description"
+      content="Design FDA-style Nutrition Facts labels for your recipes — pull ingredient data from USDA FoodData Central, set portions, and export a print-ready PDF. Free, browser-based, no account required."
+    />
+    <link rel="canonical" href="https://nutrition-label-generator.org/" />
+
+    <!-- ────────────────────────────────────────────────────────────────────
+         AdSense site verification — UNCOMMENT after applying.
+         Google will give you a snippet like this during application; paste
+         your real pub ID in the content attribute. The script-tag and
+         <ins> ad units are added in Phase 5 / Phase 6, NOT here.
+
+    <meta name="google-adsense-account" content="ca-pub-REPLACE_ME" />
+         ────────────────────────────────────────────────────────────────── -->
+
+    <!-- Favicon: SVG for modern browsers, PNG fallback to be added in Phase 2 follow-up. -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+
+    <!-- Open Graph (Facebook, LinkedIn, iMessage, Slack, Discord…) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Nutrition Label Generator" />
+    <meta property="og:title" content="Nutrition Label Generator — FDA Nutrition Label Builder" />
+    <meta
+      property="og:description"
+      content="Design FDA-style Nutrition Facts labels from USDA ingredient data and export print-ready PDFs. Free, browser-based, no account required."
+    />
+    <meta property="og:url" content="https://nutrition-label-generator.org/" />
+    <meta property="og:image" content="https://nutrition-label-generator.org/og-image.svg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Nutrition Label Generator — FDA Nutrition Label Builder" />
+
+    <!-- Twitter / X -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Nutrition Label Generator — FDA Nutrition Label Builder" />
+    <meta
+      name="twitter:description"
+      content="Design FDA-style Nutrition Facts labels from USDA ingredient data and export print-ready PDFs."
+    />
+    <meta name="twitter:image" content="https://nutrition-label-generator.org/og-image.svg" />
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

@@ -1,0 +1,11 @@
+# Allow general crawlers + Google's AdSense crawler.
+# Sitemap is below; update the host if you deploy under a different domain.
+
+User-agent: *
+Allow: /
+
+# AdSense crawler — needed for ad targeting + policy review.
+User-agent: Mediapartners-Google
+Allow: /
+
+Sitemap: https://nutrition-label-generator.org/sitemap.xml

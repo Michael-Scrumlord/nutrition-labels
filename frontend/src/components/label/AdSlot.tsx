@@ -13,7 +13,6 @@ export function AdSlot() {
       style={{
         width: "100%",
         maxWidth: 380,
-        marginTop: "auto", // push to the bottom of the flex column
         paddingTop: 12,
         display: "flex",
         flexDirection: "column",
@@ -93,7 +92,7 @@ export function AdSlot() {
         }}
       >
         <span>300 × 250 · medium rectangle</span>
-        <span>inquiries@nutritionlabels.app</span>
+        <span>inquiries@nutrition-label-generator.org</span>
       </div>
     </section>
   );
