@@ -52,10 +52,11 @@ interface RecipeState {
   removeVariable:    (name: string) => void;
 
   // ── Recipe lifecycle ──────────────────────────────────────────────────
-  clearRecipe:  () => void;
-  loadRecipe:   (recipe: SavedRecipe)  => void;   // loads latest version
-  loadVersion:  (recipe: SavedRecipe, version: RecipeVersion) => void;
-  exitVersionView: () => void;
+  clearRecipe:        () => void;
+  loadRecipe:         (recipe: SavedRecipe)  => void;   // loads latest version
+  loadVersion:        (recipe: SavedRecipe, version: RecipeVersion) => void;
+  exitVersionView:    () => void;
+  setCurrentRecipeId: (id: string) => void;
 }
 
 const DEFAULTS = {
@@ -207,4 +208,6 @@ export const useRecipeStore = create<RecipeState>((set) => ({
   }),
 
   exitVersionView: () => set({ viewingVersionId: null }),
+
+  setCurrentRecipeId: (id) => set({ currentRecipeId: id, viewingVersionId: null }),
 }));

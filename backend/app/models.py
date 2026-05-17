@@ -4,7 +4,7 @@
 # Request models describe what comes in from the client.
 # Response models describe what goes back out.
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.constants import UNIT_CONVERSIONS
 
 
@@ -18,14 +18,31 @@ def _strip_control(value: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Validation constants
+# ---------------------------------------------------------------------------
+
+MAX_NAME_LENGTH = 120         # Max length for ingredient/label names
+MAX_INGREDIENT_AMOUNT = 1_000_000  # Max amount in any unit conversion
+MIN_INGREDIENTS = 1           # Minimum ingredients required
+MAX_INGREDIENTS = 100         # Maximum ingredients allowed
+MIN_PORTION_DIVISOR = 1       # Minimum servings
+MAX_PORTION_DIVISOR = 999     # Maximum servings
+MIN_WIDTH = 0.1               # Minimum label width in inches
+MAX_WIDTH = 12                # Maximum label width in inches
+MAX_HEIGHT = 20               # Maximum label height in inches
+
+
+# ---------------------------------------------------------------------------
 # Request models
 # ---------------------------------------------------------------------------
 
 class IngredientItem(BaseModel):
     """One ingredient in a recipe: which food, how much, and what unit."""
+    model_config = ConfigDict(extra="forbid")
+
     fdc_id: int
-    name: str = Field(min_length=1, max_length=120)
-    amount: float
+    name: str = Field(..., min_length=1, max_length=MAX_NAME_LENGTH)
+    amount: float = Field(..., gt=0, le=MAX_INGREDIENT_AMOUNT)
     unit: str
 
     @field_validator("name")
@@ -35,15 +52,6 @@ class IngredientItem(BaseModel):
         if not cleaned:
             raise ValueError("name must not be empty after stripping control characters")
         return cleaned
-
-    @field_validator("amount")
-    @classmethod
-    def amount_in_range(cls, v: float) -> float:
-        if v <= 0:
-            raise ValueError("amount must be greater than 0")
-        if v > 1_000_000:
-            raise ValueError("amount is unreasonably large")
-        return v
 
     @field_validator("unit")
     @classmethod
@@ -56,37 +64,18 @@ class IngredientItem(BaseModel):
 
 class GenerateLabelRequest(BaseModel):
     """The full payload sent when the user clicks Generate PDF."""
-    portion_divisor: int = 8
-    label_name: str = Field(default="", max_length=120)
-    width_inches: float = 2.75
-    height_inches: float | None = None
-    ingredients: list[IngredientItem] = Field(min_length=1, max_length=50)
+    model_config = ConfigDict(extra="forbid")
+
+    portion_divisor: int = Field(8, ge=MIN_PORTION_DIVISOR, le=MAX_PORTION_DIVISOR)
+    label_name: str = Field("", max_length=MAX_NAME_LENGTH)
+    width_inches: float = Field(2.75, gt=MIN_WIDTH, le=MAX_WIDTH)
+    height_inches: float | None = Field(None, gt=0, le=MAX_HEIGHT)
+    ingredients: list[IngredientItem] = Field(..., min_length=MIN_INGREDIENTS, max_length=MAX_INGREDIENTS)
 
     @field_validator("label_name")
     @classmethod
     def label_name_no_control_chars(cls, v: str) -> str:
         return _strip_control(v).strip()
-
-    @field_validator("portion_divisor")
-    @classmethod
-    def divisor_in_range(cls, v: int) -> int:
-        if v < 1 or v > 999:
-            raise ValueError("portion_divisor must be between 1 and 999")
-        return v
-
-    @field_validator("width_inches")
-    @classmethod
-    def width_in_range(cls, v: float) -> float:
-        if v <= 0 or v > 20:
-            raise ValueError("width_inches must be between 0 and 20")
-        return v
-
-    @field_validator("height_inches")
-    @classmethod
-    def height_in_range(cls, v: float | None) -> float | None:
-        if v is not None and (v <= 0 or v > 20):
-            raise ValueError("height_inches must be between 0 and 20")
-        return v
 
 
 # ---------------------------------------------------------------------------

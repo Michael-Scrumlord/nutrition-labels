@@ -17,6 +17,9 @@ node_modules/
 # Build output
 frontend/dist/
 
+# Vite cache files
+frontend/vite.config.ts.timestamp-*.mjs
+
 # OS / editor
 .DS_Store
 Thumbs.db

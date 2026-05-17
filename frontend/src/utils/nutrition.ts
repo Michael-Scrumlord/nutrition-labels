@@ -30,6 +30,18 @@ export const NUTRIENT_FIELDS: (keyof MacroProfile)[] = [
 ];
 
 /**
+ * Round to the specified number of digits using round-half-away-from-zero.
+ * This ensures consistent rounding behavior between frontend and backend.
+ * Note: For very high precision (ndigits > 15), floating-point precision limits apply.
+ */
+function roundHalfUp(x: number, ndigits: number = 0): number {
+  const factor = Math.pow(10, ndigits);
+  // Add tiny epsilon to handle floating-point representation issues
+  // (e.g., 1.005 * 10 = 10.050000000001)
+  return Math.round(x * factor + Number.EPSILON) / factor;
+}
+
+/**
  * Calculate per-serving nutrient totals for a recipe.
  *
  * Step by step:
@@ -43,6 +55,11 @@ export function calculateRecipeMacros(
   ingredients: IngredientItem[],
   portionDivisor: number,
 ): MacroProfile {
+  // Validate portionDivisor matches backend constraints
+  if (portionDivisor < 1 || portionDivisor > 999) {
+    throw new RangeError("portionDivisor must be between 1 and 999");
+  }
+
   // Start at zero
   const totals: MacroProfile = {
     calories: 0, fat_total_g: 0, fat_saturated_g: 0, cholesterol_mg: 0,
@@ -59,28 +76,26 @@ export function calculateRecipeMacros(
     }
   }
 
-  const divisor = portionDivisor > 0 ? portionDivisor : 1;
-
   return {
-    calories:               Math.round(totals.calories / divisor),
-    fat_total_g:            round1(totals.fat_total_g / divisor),
-    fat_saturated_g:        round1(totals.fat_saturated_g / divisor),
-    cholesterol_mg:         round1(totals.cholesterol_mg / divisor),
-    sodium_mg:              round1(totals.sodium_mg / divisor),
-    carbohydrates_total_g:  round1(totals.carbohydrates_total_g / divisor),
-    fiber_g:                round1(totals.fiber_g / divisor),
-    sugar_g:                round1(totals.sugar_g / divisor),
-    protein_g:              round1(totals.protein_g / divisor),
-    vitamin_d_mcg:          round1(totals.vitamin_d_mcg / divisor),
-    calcium_mg:             round1(totals.calcium_mg / divisor),
-    iron_mg:                round1(totals.iron_mg / divisor),
-    potassium_mg:           round1(totals.potassium_mg / divisor),
+    calories:               roundHalfUp(totals.calories / portionDivisor),
+    fat_total_g:            roundHalfUp(totals.fat_total_g / portionDivisor, 1),
+    fat_saturated_g:        roundHalfUp(totals.fat_saturated_g / portionDivisor, 1),
+    cholesterol_mg:         roundHalfUp(totals.cholesterol_mg / portionDivisor, 1),
+    sodium_mg:              roundHalfUp(totals.sodium_mg / portionDivisor, 1),
+    carbohydrates_total_g:  roundHalfUp(totals.carbohydrates_total_g / portionDivisor, 1),
+    fiber_g:                roundHalfUp(totals.fiber_g / portionDivisor, 1),
+    sugar_g:                roundHalfUp(totals.sugar_g / portionDivisor, 1),
+    protein_g:              roundHalfUp(totals.protein_g / portionDivisor, 1),
+    vitamin_d_mcg:          roundHalfUp(totals.vitamin_d_mcg / portionDivisor, 1),
+    calcium_mg:             roundHalfUp(totals.calcium_mg / portionDivisor, 1),
+    iron_mg:                roundHalfUp(totals.iron_mg / portionDivisor, 1),
+    potassium_mg:           roundHalfUp(totals.potassium_mg / portionDivisor, 1),
   };
 }
 
-/** Round to 1 decimal place. */
+/** Round to 1 decimal place using consistent ROUND_HALF_UP. */
 export function round1(n: number): number {
-  return Math.round(n * 10) / 10;
+  return roundHalfUp(n, 1);
 }
 
 /**
@@ -107,7 +122,7 @@ export function computeDailyValues(
 ): Partial<Record<keyof MacroProfile, number>> {
   const result: Partial<Record<keyof MacroProfile, number>> = {};
   for (const [nutrient, dv] of Object.entries(FDA_DAILY_VALUES) as [keyof MacroProfile, number][]) {
-    result[nutrient] = Math.round((profile[nutrient] / dv) * 100);
+    result[nutrient] = roundHalfUp((profile[nutrient] / dv) * 100);
   }
   return result;
 }
@@ -124,7 +139,7 @@ export function formatDV(
 ): string {
   const dv = FDA_DAILY_VALUES[nutrient];
   if (dv === undefined) return "—";
-  const pct = Math.round((profile[nutrient] / dv) * 100);
+  const pct = roundHalfUp((profile[nutrient] / dv) * 100);
   if (pct === 0 && profile[nutrient] > 0) return "<1%";
   return `${pct}%`;
 }

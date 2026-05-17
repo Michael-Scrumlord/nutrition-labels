@@ -80,8 +80,7 @@ async def test_generate_label_returns_pdf(client):
 
 
 async def test_generate_label_empty_ingredients(client):
-    """POST /api/generate_label with no ingredients is rejected at the schema
-    layer (min_length=1) → 422."""
+    """POST /api/generate_label with no ingredients should return 422 (Pydantic validation)."""
     payload = {
         "portion_divisor": 8,
         "label_name": "",

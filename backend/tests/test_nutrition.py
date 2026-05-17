@@ -44,7 +44,7 @@ def make_ingredient(fdc_id: int, amount: float, unit: str = "g") -> IngredientIt
 def test_single_ingredient_100g():
     """100g of butter with divisor=1 should return butter's raw macros."""
     ingredient = make_ingredient(1097512, 100, "g")
-    result = calculate_recipe_macros([ingredient], [butter_row()], portion_divisor=1)
+    _, result = calculate_recipe_macros([ingredient], [butter_row()], portion_divisor=1)
 
     assert result.calories == 717          # Integer
     assert result.fat_total_g == 81.1      # 1 decimal place
@@ -55,7 +55,7 @@ def test_single_ingredient_100g():
 def test_unit_conversion_oz():
     """1 oz = 28.3495g. 1 oz of butter should give macros for 28.3495g."""
     ingredient = make_ingredient(1097512, 1, "oz")  # 28.3495g
-    result = calculate_recipe_macros([ingredient], [butter_row()], portion_divisor=1)
+    _, result = calculate_recipe_macros([ingredient], [butter_row()], portion_divisor=1)
 
     expected_calories = round(717 * 28.3495 / 100)
     assert result.calories == expected_calories  # ~203 kcal
@@ -64,8 +64,8 @@ def test_unit_conversion_oz():
 def test_portion_divisor_halves_values():
     """Divisor=2 should give exactly half the macros of divisor=1."""
     ingredient = make_ingredient(1097512, 100, "g")
-    full = calculate_recipe_macros([ingredient], [butter_row()], portion_divisor=1)
-    half = calculate_recipe_macros([ingredient], [butter_row()], portion_divisor=2)
+    _, full = calculate_recipe_macros([ingredient], [butter_row()], portion_divisor=1)
+    _, half = calculate_recipe_macros([ingredient], [butter_row()], portion_divisor=2)
 
     # Calories are integers; they might not be exactly half due to rounding
     # But fat (1 decimal) should be half within 0.1g
@@ -85,7 +85,7 @@ def test_zero_divisor_raises():
 
 def test_empty_ingredients_returns_zeros():
     """An empty ingredient list should return a MacroProfile with all zeros."""
-    result = calculate_recipe_macros([], [], portion_divisor=8)
+    _, result = calculate_recipe_macros([], [], portion_divisor=8)
 
     assert result.calories == 0
     assert result.fat_total_g == 0.0
@@ -98,7 +98,7 @@ def test_multiple_ingredients_accumulate():
     butter = make_ingredient(1097512, 100, "g")
     flour = make_ingredient(1100209, 100, "g")
 
-    combined = calculate_recipe_macros([butter, flour], [butter_row(), flour_row()], portion_divisor=1)
+    _, combined = calculate_recipe_macros([butter, flour], [butter_row(), flour_row()], portion_divisor=1)
 
     expected_calories = round(717 + 364)     # 100g each, divisor=1
     assert combined.calories == expected_calories

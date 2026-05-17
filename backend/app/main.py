@@ -8,11 +8,11 @@ import logging
 
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import JSONResponse
 
 from app import database, search as search_module, nutrition, pdf
 from app.config import settings
@@ -73,10 +73,22 @@ if settings.cors_origins:
 
 
 @app.exception_handler(RateLimitExceeded)
-async def rate_limit_handler(_request: Request, exc: RateLimitExceeded):
+async def rate_limit_handler(_request: Request, exc: RateLimitExceeded) -> JSONResponse:
+    retry_after = getattr(exc, "retry_after", None)
+    headers = {"Retry-After": str(retry_after)} if retry_after else {}
     return JSONResponse(
         status_code=429,
-        content={"detail": f"Rate limit exceeded: {exc.detail}"},
+        content={"detail": "Too many requests — please wait before generating another label."},
+        headers=headers,
+    )
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    logger.exception("Unhandled error on %s %s", request.method, request.url.path)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "An unexpected server error occurred. Please try again."},
     )
 
 
@@ -151,13 +163,13 @@ async def generate_label(request: Request, payload: GenerateLabelRequest) -> Res
         )
 
     try:
-        macros = nutrition.calculate_recipe_macros(
+        unrounded_macros, macros = nutrition.calculate_recipe_macros(
             payload.ingredients, food_rows, payload.portion_divisor
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    html = pdf.render_label_html(macros, payload)
+    html = pdf.render_label_html(macros, payload, unrounded_macros)
 
     # Cap concurrent renders and time each one out so a slow/heavy render
     # can't tie up the worker indefinitely.
