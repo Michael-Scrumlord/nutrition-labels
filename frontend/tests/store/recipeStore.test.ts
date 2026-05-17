@@ -16,13 +16,6 @@ const BUTTER_MACROS: MacroProfile = {
   vitamin_d_mcg: 1.5, calcium_mg: 24, iron_mg: 0.02, potassium_mg: 24,
 };
 
-const FLOUR_MACROS: MacroProfile = {
-  calories: 364, fat_total_g: 1.0, fat_saturated_g: 0.2,
-  cholesterol_mg: 0, sodium_mg: 2, carbohydrates_total_g: 76.3,
-  fiber_g: 2.7, sugar_g: 0.3, protein_g: 10.3,
-  vitamin_d_mcg: 0, calcium_mg: 15, iron_mg: 4.64, potassium_mg: 107,
-};
-
 function makeIngredient(fdc_id: number, name: string, amount = 100, unit: "g" | "oz" | "lb" | "kg" | "ml" = "g", macros = BUTTER_MACROS): IngredientItem {
   return { fdc_id, name, amount, unit, baseMacros: macros };
 }
@@ -31,7 +24,7 @@ const STORE_DEFAULTS = {
   ingredients: [],
   portionDivisor: 8,
   labelName: "",
-  highlightedNutrients: new Set(),
+  highlightedNutrients: new Set<keyof MacroProfile>(),
   instructions: [],
   variables: [],
   currentRecipeId: null,
@@ -219,7 +212,7 @@ describe("clearRecipe", () => {
   });
 
   it("clears instructions and variables", () => {
-    const stepId = useRecipeStore.getState().addStep();
+    useRecipeStore.getState().addStep();
     useRecipeStore.getState().clearRecipe();
     expect(useRecipeStore.getState().instructions).toHaveLength(0);
     expect(useRecipeStore.getState().variables).toHaveLength(0);
@@ -353,7 +346,6 @@ describe("loadRecipe", () => {
       id: "recipe-1",
       name: "Cookie Dough",
       createdAt: Date.now(),
-      updatedAt: Date.now(),
       versions: [
         {
           id: "v1",
@@ -382,7 +374,6 @@ describe("loadRecipe", () => {
       id: "empty",
       name: "Empty",
       createdAt: Date.now(),
-      updatedAt: Date.now(),
       versions: [],
     };
     useRecipeStore.getState().setLabelName("Existing");

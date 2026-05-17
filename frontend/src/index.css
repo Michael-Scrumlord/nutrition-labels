@@ -30,6 +30,30 @@
   --f-body:              'IBM Plex Sans', system-ui, sans-serif;
   --f-mono:              'IBM Plex Mono', 'JetBrains Mono', ui-monospace, monospace;
 
+  /* Fluid type ramp — container-query driven so the shell reads correctly at
+     1080p, 1440p, and 4K. The outer AppShell sets `container-type: inline-size`
+     and `container-name: app`, which is what makes `cqw` resolve to that
+     container's width. Clamp floors keep things legible at small widths; clamp
+     ceilings prevent hero type from getting absurd on a 4K display. */
+  --ms-mono-micro:  clamp( 9px, 0.50cqw, 18px);
+  --ms-mono-small:  clamp(10px, 0.58cqw, 22px);
+  --ms-meta:        clamp(11px, 0.62cqw, 24px);
+  --ms-body:        clamp(14px, 0.86cqw, 32px);
+  --ms-body-lg:     clamp(16px, 1.00cqw, 36px);
+  --ms-stat:        clamp(18px, 1.20cqw, 44px);
+  --ms-row:         clamp(20px, 1.24cqw, 48px);
+  --ms-heading:     clamp(28px, 1.80cqw, 64px);
+  --ms-hero:        clamp(48px, 3.10cqw, 110px);
+  --ms-mark-hero:   clamp(28px, 1.85cqw, 64px);
+  --ms-mark-kicker: clamp(10px, 0.55cqw, 20px);
+
+  /* Geometry that also needs to scale */
+  --ms-pad-x:       clamp(20px, 2.50cqw, 96px);
+  --ms-pad-y:       clamp(16px, 1.10cqw, 40px);
+  --ms-rule-h:      clamp( 3px, 0.21cqw,  8px);
+  --ms-gap:         clamp(12px, 1.10cqw, 40px);
+  --ms-label-w:     clamp(360px, 24cqw, 700px);
+
   /* Back-compat aliases used by some pre-redesign components */
   --color-bg-base:        var(--bg);
   --color-bg-surface:     var(--surface);
@@ -140,6 +164,98 @@ html, body {
   background: color-mix(in srgb, var(--accent) 12%, transparent);
   margin: 0 1px;
 }
+
+/* ── Donate pill ─────────────────────────────────────────────────────────── */
+/* Filled accent CTA promoted from a tertiary text link. Editorial vocabulary:
+   top accent rail echoes the FDA-rule motif in the wordmark, tracked caps +
+   arrow read as "action", small mono caption gives it character. */
+.donate-pill {
+  --donate-bg: color-mix(in srgb, var(--accent) 88%, var(--bg));
+  --donate-fg: #0a0a0a;
+  position: relative;
+  display: inline-flex; align-items: center; gap: 0;
+  padding: calc(var(--ms-pad-y) * 0.5) calc(var(--ms-pad-x) * 0.4);
+  background: var(--donate-bg); color: var(--donate-fg);
+  text-decoration: none; cursor: pointer; border: 0;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.18) inset,
+    0 -1px 0 rgba(0,0,0,0.18) inset,
+    0 1px 2px rgba(0,0,0,0.18),
+    0 2px 6px rgba(0,0,0,0.12);
+  transition: transform 120ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+.donate-pill:hover {
+  transform: translateY(-1px);
+  background: var(--accent);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.22) inset,
+    0 -1px 0 rgba(0,0,0,0.2) inset,
+    0 2px 4px rgba(0,0,0,0.2),
+    0 4px 10px rgba(0,0,0,0.14);
+}
+.donate-pill:active {
+  transform: translateY(1px);
+  box-shadow:
+    0 1px 0 rgba(0,0,0,0.18) inset,
+    0 1px 1px rgba(0,0,0,0.16);
+}
+.donate-pill__rail {
+  position: absolute; left: 0; right: 0; top: 0;
+  height: calc(var(--ms-rule-h) * 0.55);
+  background: rgba(0,0,0,0.6);
+}
+.donate-pill__label {
+  display: inline-flex; flex-direction: column;
+  line-height: 1; align-items: flex-start; gap: 4px;
+}
+.donate-pill__cta {
+  display: inline-flex; align-items: baseline; gap: 0.55em;
+  font-family: var(--f-body);
+  font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase;
+  font-size: var(--ms-mono-small);
+}
+.donate-pill__arrow { display: inline-block; transition: transform 200ms ease; }
+.donate-pill:hover .donate-pill__arrow { transform: translateX(4px); }
+.donate-pill__sub {
+  font-family: var(--f-mono);
+  font-size: var(--ms-mono-micro);
+  letter-spacing: 0.30em;
+  text-transform: uppercase;
+  color: rgba(0,0,0,0.65);
+}
+
+/* ── Info-page prose (/about, /privacy, /terms) ──────────────────────────── */
+/* Plain editorial rhythm — body serif/sans hybrid, generous leading, hairline
+   rules between sections. Scoped via .info-prose so it can't leak into the
+   editor surfaces. */
+.info-prose { font-family: var(--f-body); font-size: var(--ms-body); line-height: 1.65; }
+.info-prose h2 {
+  font-family: var(--f-display);
+  font-style: var(--f-display-style);
+  font-weight: 600;
+  font-size: calc(var(--ms-body-lg) * 1.05);
+  line-height: 1.2;
+  color: var(--ink);
+  margin: 2.4em 0 0.6em;
+  padding-top: 1.4em;
+  border-top: 1px solid var(--hair);
+  letter-spacing: -0.005em;
+}
+.info-prose h2:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+.info-prose p { margin: 0 0 1.1em; }
+.info-prose ul { margin: 0 0 1.2em; padding-left: 1.2em; }
+.info-prose li { margin: 0.35em 0; }
+.info-prose a { color: var(--accent); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); transition: border-color 160ms ease; }
+.info-prose a:hover { border-bottom-color: var(--accent); }
+.info-prose code {
+  font-family: var(--f-mono);
+  font-size: 0.92em;
+  padding: 1px 6px;
+  background: var(--surface);
+  border: 1px solid var(--hair);
+  border-radius: 3px;
+}
+.info-prose strong { color: var(--ink); font-weight: 600; }
 
 /* ── Animations ──────────────────────────────────────────────────────────── */
 @keyframes popfade  { from { opacity: 0 }              to { opacity: 1 } }
