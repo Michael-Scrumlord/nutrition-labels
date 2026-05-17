@@ -3,6 +3,12 @@ import { AppShell } from "./components/layout/AppShell";
 import { AboutPage } from "./pages/AboutPage";
 import { PrivacyPage } from "./pages/PrivacyPage";
 import { TermsPage } from "./pages/TermsPage";
+import { GuidesIndexPage } from "./pages/guides/GuidesIndexPage";
+import { HowToReadANutritionFactsLabel } from "./pages/guides/HowToReadANutritionFactsLabel";
+import { FdaLabelRequirementsForHomeBakers } from "./pages/guides/FdaLabelRequirementsForHomeBakers";
+import { WhatPercentDailyValueActuallyMeans } from "./pages/guides/WhatPercentDailyValueActuallyMeans";
+import { ServingSizeRulesRACCExplained } from "./pages/guides/ServingSizeRulesRACCExplained";
+import { LabelingAllergensCorrectly } from "./pages/guides/LabelingAllergensCorrectly";
 
 export function App() {
   return (
@@ -12,6 +18,29 @@ export function App() {
         <Route path="/about" element={<AboutPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/terms" element={<TermsPage />} />
+
+        <Route path="/guides" element={<GuidesIndexPage />} />
+        <Route
+          path="/guides/how-to-read-a-nutrition-facts-label"
+          element={<HowToReadANutritionFactsLabel />}
+        />
+        <Route
+          path="/guides/fda-label-requirements-for-home-bakers"
+          element={<FdaLabelRequirementsForHomeBakers />}
+        />
+        <Route
+          path="/guides/what-percent-daily-value-actually-means"
+          element={<WhatPercentDailyValueActuallyMeans />}
+        />
+        <Route
+          path="/guides/serving-size-rules-racc-explained"
+          element={<ServingSizeRulesRACCExplained />}
+        />
+        <Route
+          path="/guides/labeling-allergens-correctly"
+          element={<LabelingAllergensCorrectly />}
+        />
+
         <Route path="*" element={<AppShell />} />
       </Routes>
     </BrowserRouter>

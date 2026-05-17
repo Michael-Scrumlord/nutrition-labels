@@ -10,14 +10,22 @@
 // someone qualified to confirm it matches what the site actually does.
 
 import { InfoPageShell } from "../components/layout/InfoPageShell";
+import { usePageMeta } from "../hooks/usePageMeta";
 
 const LAST_UPDATED = "2026-05-17";
 
 export function PrivacyPage() {
+  usePageMeta({
+    title: "Privacy Policy",
+    description:
+      "How Nutrition Label Generator handles your data — what we collect, how cookies and Google AdSense work on this site, and the choices you have under GDPR, UK GDPR, and Swiss FADP.",
+    canonical: "/privacy",
+  });
+
   return (
     <InfoPageShell title="Privacy Policy" kicker={`Last updated · ${LAST_UPDATED}`}>
       <p>
-        This policy describes what information Nutrition Label
+        This policy describes what information Nutrition Label Generator
         ("the Site", "we") collects when you use it, what we do with that
         information, and the choices you have. By using the Site you agree
         to this policy.
@@ -136,8 +144,8 @@ export function PrivacyPage() {
       <h2>Contact</h2>
       <p>
         Questions about this policy can be sent to{" "}
-        <a href="mailto:inquiries@nutritionlabels.app">
-          inquiries@nutritionlabels.app
+        <a href="mailto:inquiries@nutrition-label-generator.org">
+          inquiries@nutrition-label-generator.org
         </a>.
       </p>
     </InfoPageShell>

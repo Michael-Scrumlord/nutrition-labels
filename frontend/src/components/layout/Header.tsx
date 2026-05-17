@@ -97,7 +97,7 @@ export function Header() {
       >
         <Link
           to="/"
-          aria-label="Nutrition Label — home"
+          aria-label="Nutrition Label Generator — home"
           style={{ textDecoration: "none", color: "inherit", display: "inline-flex" }}
         >
           <LedgerMark oled={oled} />

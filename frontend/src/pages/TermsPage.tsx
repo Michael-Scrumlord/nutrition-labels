@@ -5,14 +5,22 @@
 // reviewers expect it to be present.
 
 import { InfoPageShell } from "../components/layout/InfoPageShell";
+import { usePageMeta } from "../hooks/usePageMeta";
 
 const LAST_UPDATED = "2026-05-17";
 
 export function TermsPage() {
+  usePageMeta({
+    title: "Terms of Use",
+    description:
+      "Terms of Use for Nutrition Label Generator — the rules that govern access to and use of the free FDA-style label generator and the content it produces.",
+    canonical: "/terms",
+  });
+
   return (
     <InfoPageShell title="Terms of Use" kicker={`Last updated · ${LAST_UPDATED}`}>
       <p>
-        These terms govern your use of Nutrition Label ("the Site"). By
+        These terms govern your use of Nutrition Label Generator ("the Site"). By
         accessing or using the Site, you agree to be bound by them. If you
         do not agree, do not use the Site.
       </p>
@@ -58,7 +66,7 @@ export function TermsPage() {
       <h2>Intellectual property</h2>
       <p>
         The Site's design, layout, code, and content (excluding USDA data
-        and third-party advertisements) are © Nutrition Label and may not
+        and third-party advertisements) are © Nutrition Label Generator and may not
         be reproduced without permission. Recipes you create with the Site
         belong to you.
       </p>
@@ -83,7 +91,7 @@ export function TermsPage() {
 
       <h2>Limitation of liability</h2>
       <p>
-        To the maximum extent permitted by law, Nutrition Label and its
+        To the maximum extent permitted by law, Nutrition Label Generator and its
         operator shall not be liable for any indirect, incidental,
         consequential, special, or exemplary damages arising from your use
         of, or inability to use, the Site.
@@ -99,8 +107,8 @@ export function TermsPage() {
       <h2>Contact</h2>
       <p>
         Questions about these terms can be sent to{" "}
-        <a href="mailto:inquiries@nutritionlabels.app">
-          inquiries@nutritionlabels.app
+        <a href="mailto:inquiries@nutrition-label-generator.org">
+          inquiries@nutrition-label-generator.org
         </a>.
       </p>
     </InfoPageShell>

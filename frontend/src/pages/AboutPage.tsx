@@ -5,12 +5,20 @@
 // sites with no ownership info as a yellow flag.
 
 import { InfoPageShell } from "../components/layout/InfoPageShell";
+import { usePageMeta } from "../hooks/usePageMeta";
 
 export function AboutPage() {
+  usePageMeta({
+    title: "About",
+    description:
+      "About Nutrition Label Generator — a free, browser-based tool for designing FDA-style Nutrition Facts labels from USDA FoodData Central. Who built it and how it's funded.",
+    canonical: "/about",
+  });
+
   return (
-    <InfoPageShell title="About Nutrition Label" kicker="The Project">
+    <InfoPageShell title="About Nutrition Label Generator" kicker="The Project">
       <p>
-        Nutrition Label is a free, browser-based tool for designing
+        Nutrition Label Generator is a free, browser-based tool for designing
         FDA-style Nutrition Facts labels for the recipes you actually cook.
         Add ingredients, set portion sizes, and export a print-ready PDF in
         the dimensions you need.
@@ -35,7 +43,7 @@ export function AboutPage() {
 
       <h2>How it's funded</h2>
       <p>
-        Nutrition Label is free to use. Costs (domain, hosting, the time
+        Nutrition Label Generator is free to use. Costs (domain, hosting, the time
         spent shipping new features) are covered by a small number of
         advertisements served by Google AdSense and by readers who choose
         to support the project through the Donate link. We do not sell
@@ -46,9 +54,11 @@ export function AboutPage() {
 
       <h2>What's next</h2>
       <p>
-        On the near-term roadmap: a small library of original guides
-        ("How to read a Nutrition Facts label", "FDA label requirements for
-        home bakers"), additional unit and allergen support, and a
+        Start with the <a href="/guides">Guides section</a> if you want
+        background on how the label rules work — explainers on the
+        Nutrition Facts panel, FDA requirements for small producers, %DV
+        math, serving-size rules, and allergen disclosure. On the
+        near-term roadmap: additional unit and allergen support, and a
         downloadable print template pack.
       </p>
     </InfoPageShell>

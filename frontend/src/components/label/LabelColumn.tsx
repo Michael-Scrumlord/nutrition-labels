@@ -18,6 +18,7 @@ import { LabelPreview } from "./LabelPreview";
 import { LabelDimensions } from "./LabelDimensions";
 import { GenerateButton } from "./GenerateButton";
 import { AdSlot } from "./AdSlot";
+import { GuidesCard } from "./GuidesCard";
 import { AuroraGlow } from "../theme/AuroraGlow";
 
 // ── Sub-component: save/version controls ─────────────────────────────────────
@@ -343,8 +344,21 @@ export function LabelColumn() {
           feedback={feedback}
         />
 
-        {/* Sponsored slot — anchored to the bottom of the column. */}
-        <AdSlot />
+        {/* Sidebar tail — Guides card + sponsored slot, anchored to the bottom. */}
+        <div
+          style={{
+            marginTop: "auto",
+            width: "100%",
+            maxWidth: 380,
+            display: "flex",
+            flexDirection: "column",
+            gap: 14,
+            alignItems: "stretch",
+          }}
+        >
+          <GuidesCard />
+          <AdSlot />
+        </div>
       </div>
     </aside>
   );
