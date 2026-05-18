@@ -1,260 +1,416 @@
-# CLAUDE CONTEXT — nutrition-labels
-# React + FastAPI app: users build a recipe, get an FDA nutrition-label PDF.
+# .claude-context — nutrition-labels repository map
 
-## STACK
-- Backend: FastAPI + SQLite + WeasyPrint + Jinja2 + slowapi (port 8000)
-- Frontend: React + TypeScript + Vite + Zustand + TanStack Query (port 5173)
-- Infra: docker-compose (services: backend, frontend)
+## Stack
+React 18 + TypeScript (Vite, Zustand, React Query, Tailwind) / FastAPI + SQLite (WeasyPrint, Jinja2, slowapi)
+Infra: docker-compose — db-init → backend(:8000) + frontend(nginx) behind Caddy TLS.
 
 ---
 
-## DATA FLOW: Recipe Input → PDF Output
+## Primary Data Flow: Recipe Input → PDF Output
 
-1. User searches ingredient → GET /api/search?query=
-2. Selects result → GET /api/food/{fdc_id} (returns MacroProfile per 100g + portions)
-3. Adds ingredient (name, amount, unit) → stored in Zustand recipeStore (baseMacros cached)
-4. useNutritionCalc() derives per-serving MacroProfile in real-time (mirrors backend math)
-5. User clicks "Generate PDF" → POST /api/generate_label → PDF bytes → browser download
+1. User searches → GET /api/search?query= → ranked list
+2. Selects food → GET /api/food/{fdc_id} → MacroProfile (per 100g) + PortionSize[]
+3. Adds ingredient (name, amount, unit) → recipeStore (Zustand); baseMacros cached on item
+4. useNutritionCalc() → calculateRecipeMacros() → live MacroProfile for label preview
+5. "Generate Label" → POST /api/generate_label → backend re-fetches DB, recalculates, Jinja2 → WeasyPrint → PDF bytes → browser download
 
-Backend on POST:
-  a. Validates ≥1 ingredient, all fdc_ids exist in DB
-  b. Fetches all food rows (get_foods_by_ids)
-  c. Recalculates macros independently (returns unrounded + rounded tuple)
-  d. render_label_html(macros, request, unrounded_macros) → uses unrounded values for %DV
-  e. generate_pdf() → WeasyPrint → bytes; all external URLs blocked (SSRF guard)
+Backend POST sequence:
+  a. Validate body (≤64KB, 1–100 ingredients, valid fdc_ids)
+  b. get_foods_by_ids(fdc_ids) — batch DB fetch
+  c. calculate_recipe_macros() → (unrounded_dict, rounded_MacroProfile)
+  d. render_label_html(macros, request, unrounded_macros) — %DV uses unrounded to avoid rounding error
+  e. generate_pdf(html) → WeasyPrint with SSRF guard → bytes
 
 ---
 
-## ARCHITECTURAL RULES
+## Architectural Rules
 
-- **All DB values are per 100g.** Multiplier = (amount_in_grams / 100).
-- **Nutrition math is intentionally duplicated** (backend/app/nutrition.py ↔ frontend/src/utils/nutrition.ts). Change BOTH.
-- **calculate_recipe_macros returns a tuple**: (unrounded_per_serving: dict, rounded: MacroProfile). %DV uses unrounded values to avoid compounding rounding error.
-- **Rounding (21 CFR 101.9(c), ROUND_HALF_UP):** calories → int; all others → 1 decimal.
+- **All DB nutrient values are per 100g.** Scaling: `multiplier = grams / 100`.
+- **Nutrition math is duplicated** across `backend/app/nutrition.py` ↔ `frontend/src/utils/nutrition.ts`. Change BOTH.
+- **calculate_recipe_macros returns a tuple**: `(unrounded_per_serving: dict, rounded: MacroProfile)`. %DV always computed from unrounded values.
+- **Rounding (21 CFR 101.9(c), ROUND_HALF_UP):** calories → int; all other nutrients → 1 decimal.
 - **Ingredients string:** sorted by gram weight descending, ALL CAPS, period-terminated.
-- **Search ranking:** prefix matches first (alpha), then contains matches (alpha); top 40. DB query is case-insensitive LIKE.
-- **DB is read-only at runtime** (SQLite URI mode=ro); all writes in data/build_db.py.
-- **SQLite opened with nolock=1** for network-FS compatibility.
-- **Rate limit:** POST /api/generate_label → 10/minute per IP (slowapi). Returns 429 + Retry-After header.
-- **SSRF guard:** WeasyPrint uses _no_external_fetch; all file:// and http:// URLs raise ValueError.
+- **Search ranking:** data-type tier first (foundation > sr_legacy > branded), then prefix-before-contains, then alphabetical; top 40 returned.
+- **DB is read-only at runtime** — SQLite URI `mode=ro&nolock=1`; all writes are in `data/build_db.py`.
+- **SSRF guard:** `pdf._no_external_fetch` raises ValueError for all URLs; WeasyPrint cannot fetch external/file resources.
+- **PDF concurrency:** asyncio.Semaphore caps at 4 concurrent renders; 10s timeout per request.
+- **Rate limits:** enforced by slowapi per IP (configurable via env). Default: search 60/min, food 120/min, generate 10/min.
+- **savedRecipesStore:** max 50 recipes, max 20 versions each; `versions.at(-1)` = latest.
+- **RecipeStep.text** may contain `{Variable Label}` tokens parsed by `utils/stepText.ts`.
+- **Frontend `baseMacros`** on IngredientItem is the raw per-100g API response — never scaled.
 
 ---
 
-## CONSTANTS (must stay in sync: backend ↔ frontend)
+## Constants (must stay in sync: backend ↔ frontend)
 
-### UNIT_CONVERSIONS (→ grams)
-  g: 1.0 | ml: 1.0 (water density) | oz: 28.3495 | lb: 453.592 | kg: 1000.0
+### UNIT_CONVERSIONS → grams  (constants.py / utils/units.ts)
+```
+g: 1.0 | ml: 1.0 | oz: 28.3495 | lb: 453.592 | kg: 1000.0
+```
 
-### FDA_DAILY_VALUES (2020 reference)
-  fat_total_g: 78 | fat_saturated_g: 20 | cholesterol_mg: 300 | sodium_mg: 2300
-  carbohydrates_total_g: 275 | fiber_g: 28 | vitamin_d_mcg: 20 | calcium_mg: 1300
-  iron_mg: 18 | potassium_mg: 4700
-  (calories, sugar_g, protein_g have NO %DV)
+### FDA_DAILY_VALUES 2020  (constants.py / utils/nutrition.ts)
+```
+fat_total_g: 78      fat_saturated_g: 20   cholesterol_mg: 300    sodium_mg: 2300
+carbohydrates_total_g: 275   fiber_g: 28   vitamin_d_mcg: 20      calcium_mg: 1300
+iron_mg: 18   potassium_mg: 4700
+```
+calories, sugar_g, protein_g → NO %DV.
 
-### NUTRIENT_FIELDS (FDA label order, 13 total)
-  calories, fat_total_g, fat_saturated_g, cholesterol_mg, sodium_mg,
-  carbohydrates_total_g, fiber_g, sugar_g, protein_g,
-  vitamin_d_mcg, calcium_mg, iron_mg, potassium_mg
+### NUTRIENT_FIELDS — 13 keys, FDA label order  (constants.py / utils/nutrition.ts)
+```
+calories, fat_total_g, fat_saturated_g, cholesterol_mg, sodium_mg,
+carbohydrates_total_g, fiber_g, sugar_g, protein_g,
+vitamin_d_mcg, calcium_mg, iron_mg, potassium_mg
+```
 
-### Validation limits (models.py)
-  MAX_NAME_LENGTH: 120 | MAX_INGREDIENT_AMOUNT: 1_000_000
-  MIN_INGREDIENTS: 1 | MAX_INGREDIENTS: 100
-  MIN_PORTION_DIVISOR: 1 | MAX_PORTION_DIVISOR: 999
-  MIN_WIDTH: 0.1in | MAX_WIDTH: 12in | MAX_HEIGHT: 20in
+### Validation limits  (models.py / api/client.ts)
+```
+name length: 120 chars    ingredient amount: >0 ≤1,000,000
+ingredients per request: 1–100     portion_divisor: 1–999
+width: 0.1–12 in    height: 0–20 in (null = auto)
+```
 
 ### Label defaults
-  widthInches: 2.75 | heightInches: null (auto) | portionDivisor: 8
+```
+widthInches: 2.75  |  heightInches: null  |  portionDivisor: 8
+```
 
 ### localStorage keys
-  nl_preferences (recents+favorites) | nl_saved_recipes (v2, recipes catalog) | nl-theme
+```
+nl_preferences   nl_saved_recipes (schema v2)   nl-theme
+```
 
-### savedRecipesStore limits
-  MAX_RECIPES: 50 | MAX_VERSIONS_PER: 20
+### Search ranking tiers  (search.py)
+```
+0 (best): foundation_food, survey_fndds_food
+1:        sr_legacy_food
+2:        branded_food
+```
 
 ---
 
-## BACKEND SIGNATURE MAP — backend/app/
+## Signature Map — Backend  (backend/app/)
 
 ### config.py
-  Settings.db_path: str = "data/nutrition.db"
-  Settings.cors_origins: list[str] = ["http://localhost:5173", "http://localhost:80"]
-  settings = Settings()
+```python
+class Settings(BaseSettings):
+    db_path: str = "data/nutrition.db"
+    cors_origins: list[str]           # env: CORS_ORIGINS
+    forwarded_allow_ips: str = "127.0.0.1"
+    max_body_bytes: int = 65536
+    rate_limit_search: str = "60/minute"
+    rate_limit_food: str = "120/minute"
+    rate_limit_generate: str = "10/minute"
+    pdf_max_concurrency: int = 4
+    pdf_timeout_seconds: float = 10.0
+    release_sha: str = "dev"
+
+settings = Settings()
+```
 
 ### models.py
-  IngredientItem(fdc_id: int, name: str[1..120], amount: float>0, unit: UnitKey)
-  GenerateLabelRequest(portion_divisor: int[1-999]=8, label_name: str[..120]="",
-                       width_inches: float(0.1-12]=2.75, height_inches: float(0-20]|None,
-                       ingredients: list[IngredientItem][1..100])
-  MacroProfile(calories, fat_total_g, fat_saturated_g, cholesterol_mg, sodium_mg,
-               carbohydrates_total_g, fiber_g, sugar_g, protein_g,
-               vitamin_d_mcg, calcium_mg, iron_mg, potassium_mg)  # all float
-  FoodSearchResult(fdc_id: int, name: str)
-  PortionSize(amount: float, modifier: str, gram_weight: float)
-  FoodDetail(fdc_id: int, name: str, macros: MacroProfile, portions: list[PortionSize])
+```python
+IngredientItem(fdc_id: int, name: str[1..120], amount: float(0..1e6], unit: UnitKey)
+GenerateLabelRequest(portion_divisor: int[1-999]=8, label_name: str[0..120]="",
+                     width_inches: float(0.1-12]=2.75, height_inches: float(0-20]|None,
+                     ingredients: list[IngredientItem][1..100])
+MacroProfile(calories, fat_total_g, fat_saturated_g, cholesterol_mg, sodium_mg,
+             carbohydrates_total_g, fiber_g, sugar_g, protein_g,
+             vitamin_d_mcg, calcium_mg, iron_mg, potassium_mg)  # all float
+FoodSearchResult(fdc_id: int, name: str, brand_owner: str|None, data_type: str|None)
+PortionSize(amount: float, modifier: str, gram_weight: float)
+FoodDetail(fdc_id: int, name: str, macros: MacroProfile, portions: list[PortionSize])
+```
 
 ### database.py
-  get_connection(db_path=None) → sqlite3.Connection  # row_factory=Row, mode=ro, nolock=1
-  search_foods(query: str, limit=80, db_path=None) → list[Row]  # LOWER LIKE LOWER
-  get_food_by_id(fdc_id: int, db_path=None) → Row | None
-  get_portions_by_id(fdc_id: int, db_path=None) → list[Row]
-  get_foods_by_ids(fdc_ids: list[int], db_path=None) → list[Row]
+```python
+# DB schema:
+#   food_macros(fdc_id PK, description, data_type, brand_owner, <13 nutrient cols>)
+#   food_portions(id PK, fdc_id FK, amount, modifier, gram_weight)
+#   food_search(FTS5 virtual table over description)
 
-  DB SCHEMA:
-    food_macros(fdc_id PK, description, calories, fat_total_g, fat_saturated_g,
-                cholesterol_mg, sodium_mg, carbohydrates_total_g, fiber_g, sugar_g,
-                protein_g, vitamin_d_mcg, calcium_mg, iron_mg, potassium_mg)
-    food_portions(id PK, fdc_id FK, amount, modifier, gram_weight)
+get_connection(db_path=None) → sqlite3.Connection     # mode=ro, nolock=1, row_factory=Row
+search_foods(query: str, limit: int=200) → list[Row]  # FTS5 BM25; terms → prefix matches "tok"*
+get_food_by_id(fdc_id: int) → Row | None
+get_portions_by_id(fdc_id: int) → list[Row]
+get_foods_by_ids(fdc_ids: list[int]) → dict[int, Row]
+```
 
 ### nutrition.py
-  round_half_up(x: float, ndigits: int=0) → float  # Decimal ROUND_HALF_UP; matches JS Math.round
+```python
+round_half_up(x: float, ndigits: int=0) → float
+  # Decimal(str(x)).quantize(Decimal(10**-ndigits), rounding=ROUND_HALF_UP)
 
-  calculate_recipe_macros(ingredients: list[IngredientItem],
-                           food_rows: list,
-                           portion_divisor: int) → tuple[dict[str, float], MacroProfile]
-    # Returns (unrounded_per_serving, rounded_MacroProfile)
-    # grams = amount * UNIT_CONVERSIONS[unit]; total[f] += db_row[f] * (grams/100)
-    # per_serving = total[f] / portion_divisor; round calories→int, others→1dp
-    # raises ValueError if portion_divisor ≤ 0 or fdc_id missing from food_rows
+calculate_recipe_macros(
+    ingredients: list[IngredientItem],
+    food_rows: dict[int, Row],
+    portion_divisor: int
+) → tuple[dict[str, float], MacroProfile]
+  # Returns (unrounded_per_serving, rounded_MacroProfile)
+  # Per ingredient: grams = amount * UNIT_CONVERSIONS[unit]
+  #                 total[f] += food_rows[fdc_id][f] * (grams / 100)
+  # Per serving:    val = total[f] / portion_divisor
+  # Rounding:       calories → int, others → round_half_up(val, 1)
+  # Raises ValueError: portion_divisor ≤ 0, or fdc_id not in food_rows
 
-  compute_daily_value_pct(value: float, nutrient: str) → int | None
-    # None if no DV; else int(round_half_up((value/DV)*100))
-    # Caller should show "<1%" when result=0 but value>0
+compute_daily_value_pct(value: float, nutrient: str) → int | None
+  # None if nutrient not in FDA_DAILY_VALUES
+  # else int(round_half_up((value / DV) * 100, 0))
+  # Caller renders "<1%" when result==0 but value>0
+```
 
 ### search.py
-  ranked_search(query: str, food_rows: list) → list[{"fdc_id": int, "name": str}]
-    # Returns [] if len(query)<2; prefix matches first (alpha), contains next (alpha); top 40
+```python
+_DATA_TYPE_TIER: dict[str, int]  # foundation/survey→0, sr_legacy→1, branded→2
+
+ranked_search(query: str, food_rows: list[Row]) → list[dict]
+  # Returns [] if len(query) < 2
+  # Sort key: (tier, is_contains_not_prefix, name.lower())
+  # Returns top 40 as [{"fdc_id": int, "name": str, "brand_owner": str|None, "data_type": str|None}]
+```
 
 ### pdf.py
-  _no_external_fetch(url: str) → bytes  # raises ValueError; prevents SSRF/file disclosure
-  render_label_html(macros: MacroProfile, request: GenerateLabelRequest,
-                    unrounded_macros: dict[str, float] | None = None) → str
-    # unrounded_macros used for %DV calc (falls back to rounded if None)
-    # Jinja2 fills label.html; ingredients sorted by gram weight desc, ALL CAPS
-  generate_pdf(html: str) → bytes
-    # HTML(string=html, url_fetcher=_no_external_fetch).write_pdf()
+```python
+_jinja_env: jinja2.Environment   # loads backend/templates/label.html
+_no_external_fetch(url: str) → bytes   # raises ValueError; blocks all URLs (SSRF guard)
+
+render_label_html(
+    macros: MacroProfile,
+    request: GenerateLabelRequest,
+    unrounded_macros: dict[str, float] | None = None
+) → str
+  # unrounded_macros → %DV calc (falls back to rounded if None)
+  # Ingredients sorted by gram weight desc, names .upper()
+  # Template receives: macros, unrounded, daily_value_pcts, request fields, ingredients_string
+
+generate_pdf(html: str) → bytes
+  # weasyprint.HTML(string=html, url_fetcher=_no_external_fetch).write_pdf()
+```
 
 ### main.py — Routes
-  GET  /api/search?query=        → list[FoodSearchResult]  ([] if query<2 chars)
-  GET  /api/food/{fdc_id}        → FoodDetail              (404 if missing)
-  POST /api/generate_label       → PDF bytes Response      (400 bad request | 429 rate limit)
-    @limiter.limit("10/minute")  Content-Disposition: attachment; filename="nutrition_label.pdf"
+```
+GET  /api/health                 → {"status": "ok", "release": str}
+GET  /api/search?query=str       → list[FoodSearchResult]   ([] if query<2 chars)
+GET  /api/food/{fdc_id: int}     → FoodDetail               (404 if not found)
+POST /api/generate_label         → Response(PDF bytes, media_type="application/pdf")
+  Body: GenerateLabelRequest     Rate: 10/min  Timeout: 10s  Concurrency: 4
+  Content-Disposition: attachment; filename="nutrition_label.pdf"
+  Errors: 400 (bad request / missing fdc_ids) | 429 (rate limit + Retry-After)
+```
 
 ---
 
-## FRONTEND SIGNATURE MAP — frontend/src/utils/
+## Signature Map — Frontend  (frontend/src/)
 
-### units.ts
-  UNIT_CONVERSIONS: Record<UnitKey, number>  # same values as backend
-  convertToGrams(amount: number, unit: UnitKey) → number
+### utils/units.ts
+```typescript
+UNIT_CONVERSIONS: Record<UnitKey, number>     // same values as backend
+convertToGrams(amount: number, unit: UnitKey) → number
+```
 
-### nutrition.ts
-  FDA_DAILY_VALUES: Partial<Record<keyof MacroProfile, number>>
-  NUTRIENT_FIELDS: (keyof MacroProfile)[]
-  roundHalfUp(x: number, ndigits=0) → number  # internal; uses Number.EPSILON to fix FP drift
-  round1(n: number) → number  # roundHalfUp(n, 1); exported for display use
-  calculateRecipeMacros(ingredients: IngredientItem[], portionDivisor: number) → MacroProfile
-    # Uses ingredient.baseMacros (cached from API); same math as backend; throws RangeError if divisor out of [1,999]
-  getHighlightKeys(baseMacros: MacroProfile) → HighlightSet
-    # Returns Set of top 2 nutrient keys by %DV contribution; used for hover-highlight sync
-  computeDailyValues(profile: MacroProfile) → Partial<Record<keyof MacroProfile, number>>
-    # {nutrient: roundHalfUp((val/DV)*100)} only for nutrients with DV
-  formatDV(nutrient: keyof MacroProfile, profile: MacroProfile) → string
-    # "—" if no DV | "<1%" if rounds to 0 but val>0 | "{n}%"
-  buildIngredientsString(ingredients: IngredientItem[]) → string
-    # Sorted by gram weight desc, ALL CAPS, period-terminated; "" if empty
+### utils/nutrition.ts
+```typescript
+FDA_DAILY_VALUES: Partial<Record<keyof MacroProfile, number>>
+NUTRIENT_FIELDS: (keyof MacroProfile)[]
 
----
+roundHalfUp(x: number, ndigits: number=0) → number
+  // Uses +Number.EPSILON to fix float drift, then Math.round
 
-## FRONTEND SIGNATURE MAP — frontend/src/
+round1(n: number) → number   // roundHalfUp(n, 1)
 
-### types/index.ts (key types)
-  UnitKey: "g" | "ml" | "oz" | "lb" | "kg"
-  UNIT_LABELS: Record<UnitKey, string>  # display labels
-  MacroProfile: { calories, fat_total_g, ...13 nutrients... }  # all number
-  IngredientItem: { fdc_id, name, amount, unit: UnitKey, baseMacros: MacroProfile }
-  FoodSearchResult: { fdc_id: number, name: string }
-  PortionSize: { amount, modifier, gram_weight }
-  FoodDetail: { fdc_id, name, macros: MacroProfile, portions: PortionSize[] }
-  SavedFood: { fdc_id: number, name: string }
-  LabelDimensions: { widthInches: number, heightInches: number | null }
-  HighlightSet: Set<keyof MacroProfile>  # shared across recipe builder + label for hover-sync
-  RecipeStep: { id: string, text: string }  # text contains {Variable Label} tokens
-  RecipeVariable: { name: string, label: string, value: number, suffix?, min?, max?, step? }
-  RecipeVersion: { id, savedAt, note?, ingredients, portionDivisor, labelName, dimensions, instructions, variables }
-  SavedRecipe: { id, name, createdAt, versions: RecipeVersion[] }  # versions.at(-1) = latest
+calculateRecipeMacros(ingredients: IngredientItem[], portionDivisor: number) → MacroProfile
+  // Uses ingredient.baseMacros (per-100g from API cache)
+  // Same math as backend; throws RangeError if portionDivisor ∉ [1,999]
+  // Returns rounded MacroProfile only (no unrounded tuple)
+
+computeDailyValues(profile: MacroProfile) → Partial<Record<keyof MacroProfile, number>>
+  // {nutrient: roundHalfUp((val / DV) * 100)} for nutrients with DV
+
+formatDV(nutrient: keyof MacroProfile, profile: MacroProfile) → string
+  // "—" if no DV | "<1%" if rounds to 0 but val>0 | "{n}%"
+
+getHighlightKeys(baseMacros: MacroProfile) → HighlightSet
+  // Set of top-2 nutrient keys by %DV — used for hover-sync between builder + label
+
+buildIngredientsString(ingredients: IngredientItem[]) → string
+  // Sorted by gram weight desc, ALL CAPS, comma-separated, period-terminated; "" if empty
+```
+
+### utils/stepText.ts
+```typescript
+// Token types:
+//   { kind: "text", content: string }
+//   { kind: "var", variable: RecipeVariable, raw: string }
+//   { kind: "missing", label: string, raw: string }
+
+slugify(label: string) → string
+  // Lowercase, spaces→underscores, strip non-alphanumeric-underscore
+
+findVariable(variables: RecipeVariable[], key: string) → RecipeVariable | undefined
+  // Matches by variable.name or variable.label (case-insensitive)
+
+parseStepText(text: string, variables: RecipeVariable[]) → StepToken[]
+  // Splits on {Label} tokens; unresolved labels → kind:"missing"
+
+referencedVariableNames(text: string, variables: RecipeVariable[]) → Set<string>
+  // Names of all variables referenced in text
+
+insertVariableAt(text: string, cursor: number, variable: RecipeVariable) → string
+  // Inserts "{variable.label}" at cursor; adds surrounding spaces as needed
+```
 
 ### api/client.ts
-  class ApiError extends Error { status: number; retryAfter?: number }
-  searchFoods(query: string) → Promise<FoodSearchResult[]>
-  getFoodDetail(fdc_id: number) → Promise<FoodDetail>
-  generateLabel(ingredients, portionDivisor, labelName, dimensions) → Promise<Blob>
-    # Strips baseMacros before POST; handles 429 → ApiError with retryAfter
-  downloadBlob(blob: Blob, filename: string) → void
+```typescript
+class ApiError extends Error { status: number; retryAfter?: number }
 
-### store/recipeStore.ts (Zustand, not persisted)
-  state: { ingredients[], portionDivisor=8, labelName="", dimensions={w:2.75,h:null},
-           highlightedNutrients: HighlightSet, instructions: RecipeStep[], variables: RecipeVariable[],
-           currentRecipeId: string|null, viewingVersionId: string|null }
-  ingredient actions: addIngredient, removeIngredient, updateIngredientName,
-                      updateIngredientAmount, updateIngredientUnit, moveIngredient
-  meta actions: setPortionDivisor, setLabelName, setDimensions(Partial<>), setHighlightedNutrients
-  method actions: addStep(afterId?)→id, updateStepText, removeStep, moveStep
-                  addVariable (no-op if name exists), setVariableValue, updateVariable, removeVariable
-  lifecycle: clearRecipe, loadRecipe(SavedRecipe), loadVersion(SavedRecipe, RecipeVersion),
-             exitVersionView, setCurrentRecipeId
+searchFoods(query: string) → Promise<FoodSearchResult[]>
+getFoodDetail(fdc_id: number) → Promise<FoodDetail>
+generateLabel(ingredients: IngredientItem[], portionDivisor: number,
+              labelName: string, dimensions: LabelDimensions) → Promise<Blob>
+  // Strips baseMacros before POST; 429 → ApiError with retryAfter
+downloadBlob(blob: Blob, filename: string) → void
+```
 
-### store/preferencesStore.ts (Zustand + localStorage persist "nl_preferences")
-  state: { recents: SavedFood[], favorites: SavedFood[] }
-  actions: addRecent(food) [dedupe, prepend, trim to 15], toggleFavorite, isFavorite(id)→bool
-  partialize: stores under keys "nl_recents" / "nl_favorites"
+### types/index.ts — Key Types
+```typescript
+UnitKey = "g" | "ml" | "oz" | "lb" | "kg"
+MacroProfile: { calories, fat_total_g, fat_saturated_g, cholesterol_mg, sodium_mg,
+                carbohydrates_total_g, fiber_g, sugar_g, protein_g,
+                vitamin_d_mcg, calcium_mg, iron_mg, potassium_mg: number }
+IngredientItem: { fdc_id: number; name: string; amount: number; unit: UnitKey; baseMacros: MacroProfile }
+FoodSearchResult: { fdc_id: number; name: string; brand_owner?: string; data_type?: string }
+PortionSize: { amount: number; modifier: string; gram_weight: number }
+FoodDetail: { fdc_id: number; name: string; macros: MacroProfile; portions: PortionSize[] }
+LabelDimensions: { widthInches: number; heightInches: number | null }
+HighlightSet: Set<keyof MacroProfile>
+RecipeStep: { id: string; text: string }          // text may contain {Variable Label} tokens
+RecipeVariable: { name: string; label: string; value: number; suffix?: string; min?: number; max?: number; step?: number }
+RecipeVersion: { id: string; savedAt: number; note?: string; ingredients: IngredientItem[];
+                 portionDivisor: number; labelName: string; dimensions: LabelDimensions;
+                 instructions: RecipeStep[]; variables: RecipeVariable[] }
+SavedRecipe: { id: string; name: string; createdAt: number; versions: RecipeVersion[] }
+  // versions.at(-1) is always the latest version
+```
 
-### store/savedRecipesStore.ts (Zustand + localStorage persist "nl_saved_recipes", version:2)
-  type RecipeSnapshot = { ingredients, portionDivisor, labelName, dimensions, instructions, variables }
-  state: { recipes: SavedRecipe[] }  # max 50 recipes
-  actions: createRecipe(snapshot, note?)→id, appendVersion(recipeId, snapshot, note?) [trim to 20],
-           renameRecipe(recipeId, name), deleteRecipe(recipeId), deleteVersion(recipeId, versionId)
-  migration: v1→v2 wraps flat snapshot as single RecipeVersion
+### store/recipeStore.ts  (Zustand, not persisted)
+```typescript
+state: { ingredients: IngredientItem[]; portionDivisor: number; labelName: string;
+         dimensions: LabelDimensions; highlightedNutrients: HighlightSet;
+         instructions: RecipeStep[]; variables: RecipeVariable[];
+         currentRecipeId: string|null; viewingVersionId: string|null }
 
-### store/themeStore.ts (Zustand + localStorage persist "nl-theme")
-  ThemeKey: "paper" | "overcast" | "twilight" | "midnight"
-  THEME_DEFS: Record<ThemeKey, ThemeDef>  # bg/surface/ink/hairline/accent CSS vars; oled flag
-  THEME_ORDER: ThemeKey[]
-  useThemeStore: { theme, accents: Record<ThemeKey,string>, setTheme, setAccent }
-  useActiveTheme() → { theme, def: ThemeDef, accent: AccentDef }
-  themeVars(def, accentHex) → Record<string,string>  # CSS var map (--bg, --ink, --accent, etc.)
+// Ingredient actions
+addIngredient(item: IngredientItem): void
+removeIngredient(fdc_id: number): void
+updateIngredientName(fdc_id, name): void
+updateIngredientAmount(fdc_id, amount): void
+updateIngredientUnit(fdc_id, unit: UnitKey): void
+moveIngredient(fromIndex, toIndex): void
+
+// Recipe meta
+setPortionDivisor(n: number): void
+setLabelName(name: string): void
+setDimensions(dims: Partial<LabelDimensions>): void
+setHighlightedNutrients(set: HighlightSet): void
+
+// Method / variables
+addStep(afterId?: string) → string    // returns new step id
+updateStepText(id, text): void
+removeStep(id): void
+moveStep(fromIndex, toIndex): void
+addVariable(variable: RecipeVariable): void  // no-op if name already exists
+setVariableValue(name, value): void
+updateVariable(name, partial): void
+removeVariable(name): void
+
+// Lifecycle
+clearRecipe(): void
+loadRecipe(recipe: SavedRecipe): void           // loads latest version
+loadVersion(recipe: SavedRecipe, version: RecipeVersion): void
+exitVersionView(): void
+setCurrentRecipeId(id: string|null): void
+```
+
+### store/savedRecipesStore.ts  (Zustand + localStorage "nl_saved_recipes", schema v2)
+```typescript
+// max 50 recipes; max 20 versions per recipe
+createRecipe(snapshot: RecipeSnapshot, note?: string) → string   // returns new recipe id
+appendVersion(recipeId: string, snapshot: RecipeSnapshot, note?: string): void
+renameRecipe(recipeId: string, name: string): void
+deleteRecipe(recipeId: string): void
+deleteVersion(recipeId: string, versionId: string): void
+// Migration: v1 flat snapshot → v2 wraps as single RecipeVersion
+```
+
+### store/preferencesStore.ts  (Zustand + localStorage "nl_preferences")
+```typescript
+state: { recents: SavedFood[]; favorites: SavedFood[] }
+addRecent(food: SavedFood): void     // dedupe, prepend, trim to 15
+toggleFavorite(food: SavedFood): void
+isFavorite(fdc_id: number) → boolean
+```
+
+### store/themeStore.ts  (Zustand + localStorage "nl-theme")
+```typescript
+ThemeKey: "paper" | "overcast" | "twilight" | "midnight"
+THEME_DEFS: Record<ThemeKey, ThemeDef>   // bg/surface/ink/hairline/accent CSS var sets; oled flag
+useThemeStore: { theme: ThemeKey; setTheme(k: ThemeKey): void; ... }
+useActiveTheme() → { theme: ThemeKey; def: ThemeDef; accent: AccentDef }
+themeVars(def: ThemeDef, accentHex: string) → Record<string, string>  // --bg, --ink, --accent, …
+```
 
 ### hooks/
-  useNutritionCalc() → MacroProfile  # useMemo over calculateRecipeMacros
-  useIngredientSearch(query) → { results, isLoading, isError }  # 300ms debounce, staleTime 30s
-  useLabelResize() → { onMouseDown }  # drag resize; 96px/in; clamp [200,600]px → [2.08,6.25]in
-  useAnimatedNumber(target, duration=420) → number  # cubic-ease-out rAF loop; returns Math.round
-  useRecipeActions() → all store actions  # useShallow to prevent re-renders on stable refs
+```typescript
+useNutritionCalc() → MacroProfile
+  // useMemo over calculateRecipeMacros(ingredients, portionDivisor) from recipeStore
+
+useIngredientSearch(query: string) → { results: FoodSearchResult[]; isLoading: boolean; isError: boolean }
+  // React Query; 300ms debounce; staleTime 30s; enabled when query.length >= 2
+
+useLabelResize() → { onMouseDown: MouseEventHandler }
+  // Drag resize handler; 96px/in; clamps [200,600]px → [2.08,6.25]in
+
+useAnimatedNumber(target: number, duration?: number=420) → number
+  // cubic-ease-out rAF animation; returns Math.round of current value
+
+useRecipeActions() → all recipeStore actions
+  // useShallow prevents re-renders when action refs are stable
+```
 
 ---
 
-## FILE INDEX
+## File Index
 
+```
 backend/app/
-  main.py       routes (144 ln)
-  config.py     settings (18 ln)
-  constants.py  UNIT_CONVERSIONS, FDA_DAILY_VALUES, NUTRIENT_FIELDS (48 ln)
-  models.py     Pydantic models + validation constants (98 ln)
-  database.py   SQLite queries (81 ln)
-  nutrition.py  macro calc + %DV; returns (unrounded, rounded) tuple (98 ln)
-  search.py     ranking (37 ln)
-  pdf.py        Jinja2 + WeasyPrint + SSRF guard (82 ln)
+  main.py         routes + middleware
+  config.py       Pydantic Settings from env
+  constants.py    UNIT_CONVERSIONS, FDA_DAILY_VALUES, NUTRIENT_FIELDS
+  models.py       request/response Pydantic models + validation limits
+  database.py     SQLite read-only queries (FTS5)
+  nutrition.py    macro calc + rounding + %DV  →  (unrounded, rounded) tuple
+  search.py       result re-ranking (tier + prefix + alpha)
+  pdf.py          Jinja2 render + WeasyPrint + SSRF guard
 
-backend/
-  data/build_db.py    DB builder (284 ln)
-  templates/label.html  FDA label Jinja2 template
+backend/templates/label.html    FDA nutrition-facts Jinja2 template
+backend/data/build_db.py        one-time DB builder from USDA FDC CSVs
 
 frontend/src/
-  utils/nutrition.ts  (159 ln)  utils/units.ts (20 ln)
-  types/index.ts      (119 ln)
-  api/client.ts       (96 ln)
-  store/recipeStore.ts (213 ln)  store/preferencesStore.ts (68 ln)
-  store/savedRecipesStore.ts (178 ln)  store/themeStore.ts (166 ln)
-  hooks/useNutritionCalc.ts (19 ln)  hooks/useIngredientSearch.ts (37 ln)
-  hooks/useLabelResize.ts (50 ln)    hooks/useAnimatedNumber.ts (26 ln)
-  hooks/useRecipeActions.ts (39 ln)
-  components/recipe/  components/label/  components/search/  components/recipes/  components/layout/
+  utils/nutrition.ts    macro calc + %DV helpers
+  utils/units.ts        UNIT_CONVERSIONS + convertToGrams
+  utils/stepText.ts     {Variable} token parsing for recipe steps
+  types/index.ts        all TypeScript interfaces
+  api/client.ts         HTTP client (search, food detail, generate label)
+  store/recipeStore.ts         active recipe state (not persisted)
+  store/savedRecipesStore.ts   recipe catalog (localStorage v2)
+  store/preferencesStore.ts    recents + favorites (localStorage)
+  store/themeStore.ts          theme + accent (localStorage)
+  hooks/useNutritionCalc.ts    live macro derivation
+  hooks/useIngredientSearch.ts debounced search with React Query
+  hooks/useLabelResize.ts      drag-resize label width
+  hooks/useAnimatedNumber.ts   animated counter
+  hooks/useRecipeActions.ts    stable store action refs
+  components/recipe/RecipeBuilder.tsx     primary recipe UI
+  components/label/LabelPreview.tsx       label preview + PDF trigger
+  components/search/IngredientSearch.tsx  food search UI
+```
