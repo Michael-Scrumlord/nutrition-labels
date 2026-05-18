@@ -1,0 +1,18 @@
+# FDC source CSVs and old SR Legacy data — these are large and never go in the image.
+# The DB is built once by the db-init service and stored on the nutrition_db volume.
+data/sr_legacy/
+data/fdc/
+data/*.db
+data/*.db-journal
+data/*.db-wal
+data/*.db-shm
+
+# Test artifacts
+tests/
+pytest-cache-files-*/
+.pytest_cache/
+pytest.ini
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo

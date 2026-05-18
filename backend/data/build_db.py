@@ -238,7 +238,8 @@ PORTIONS = [
 ]
 
 # NOTE: build_db.py is kept as a reference for the original hand-curated dataset.
-# Production DB is now built by build_db_full.py (USDA SR Legacy, ~7,793 foods).
+# Production DB is now built by build_db_full.py from four USDA FoodData Central
+# sub-datasets: Foundation Foods, Survey/FNDDS, SR Legacy, and Branded Foods.
 # The Common foods tab (frontend/src/constants/commonFoods.ts) uses SR Legacy fdc_ids:
 COMMON_FDC_IDS = [
     173430,  # Butter, without salt

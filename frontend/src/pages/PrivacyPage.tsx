@@ -44,8 +44,10 @@ export function PrivacyPage() {
         do not associate this metadata with a personal profile.
       </p>
       <p>
-        When you search for ingredients, the search query is forwarded to
-        the USDA FoodData Central API in order to return matching foods.
+        When you search for ingredients, your query is processed entirely
+        on our own servers against a local copy of the USDA FoodData
+        Central database that ships with the Site. The query is never
+        forwarded to USDA, Google, or any third party.
       </p>
 
       <h2>Cookies, local storage, and similar technologies</h2>
@@ -55,7 +57,7 @@ export function PrivacyPage() {
         you save and your theme preference.
       </p>
       <p>
-        Once advertising is enabled (see below), Google and its partners
+        When advertising is active on the Site, Google and its partners
         may set cookies and similar identifiers on your device to serve
         and measure ads. You can manage these in your browser settings or
         via the opt-out tools listed under "Your choices".
@@ -86,8 +88,10 @@ export function PrivacyPage() {
       <p>
         Where required by the GDPR, UK GDPR, or Swiss FADP, we ask for
         your consent before non-essential cookies are set on your device.
-        You can change or withdraw consent at any time using the privacy
-        controls available in the consent banner.
+        The consent banner is provided by Google Funding Choices, a
+        Google-certified Consent Management Platform. You can change or
+        withdraw consent at any time using the privacy controls in that
+        banner.
       </p>
 
       <h2>Your choices</h2>

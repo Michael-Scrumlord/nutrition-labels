@@ -103,6 +103,8 @@ class FoodSearchResult(BaseModel):
     """One item in a search results list."""
     fdc_id: int
     name: str
+    brand_owner: str | None = None
+    data_type: str | None = None
 
 
 class PortionSize(BaseModel):

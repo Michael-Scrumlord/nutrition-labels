@@ -1,7 +1,8 @@
 # test_db_health.py
 #
-# Validates that the production nutrition.db has been built correctly.
-# These tests read the real database file, not the in-memory test fixture.
+# Validates that the production nutrition.db has been built correctly from
+# the four USDA FoodData Central sub-datasets (Foundation, FNDDS, SR Legacy,
+# Branded). These tests read the real database file, not the in-memory fixture.
 # They will FAIL loudly if build_db_full.py has not been run (e.g. after a
 # fresh clone or a Docker volume wipe).
 #
@@ -13,13 +14,31 @@ import sqlite3
 
 import pytest
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "../data/nutrition.db")
+# Honor DB_PATH from the environment so the test works inside the production
+# container (where the DB lives on a Docker volume at /db/nutrition.db) and
+# during local dev (data/nutrition.db).
+DB_PATH = os.environ.get(
+    "DB_PATH",
+    os.path.join(os.path.dirname(__file__), "../data/nutrition.db"),
+)
 
-# Minimum expected counts — SR Legacy ships 7,793 foods and 14,449 portions.
-MIN_FOODS = 7_000
-MIN_PORTIONS = 10_000
+# Minimum expected counts. The new DB is sourced from four FDC sub-datasets:
+#   Foundation (~1,100) + FNDDS (~8,500) + SR Legacy (~7,793) + Branded (~200k+)
+# Combined floor is conservative to allow for ongoing USDA dataset changes.
+MIN_FOODS = 15_000
+MIN_PORTIONS = 15_000
+
+# Required data_types — every dataset must contribute at least one row.
+REQUIRED_DATA_TYPES = {
+    "foundation_food",
+    "survey_fndds_food",
+    "sr_legacy_food",
+    "branded_food",
+}
 
 # Spot-check a handful of well-known SR Legacy entries.
+# These fdc_ids come from the Common Foods tab in the frontend and must keep
+# working: their continued presence is the whole reason SR Legacy is included.
 # (fdc_id, description_fragment, expected_calories_per_100g)
 KNOWN_FOODS = [
     (173430, "Butter",   717),   # Butter, without salt
@@ -74,6 +93,33 @@ def test_db_has_expected_portion_count(db):
     )
 
 
+def test_every_data_type_is_represented(db):
+    """Each FDC sub-dataset must contribute at least one row, or the DB is incomplete."""
+    rows = db.execute("SELECT DISTINCT data_type FROM food_macros").fetchall()
+    present = {r["data_type"] for r in rows}
+    missing = REQUIRED_DATA_TYPES - present
+    assert not missing, (
+        f"Missing data_types in food_macros: {missing}. "
+        "All four FDC sub-datasets must be built into the DB."
+    )
+
+
+def test_fts_search_table_exists(db):
+    """FTS5 search index must be populated."""
+    count = db.execute("SELECT COUNT(*) FROM food_search").fetchone()[0]
+    assert count >= MIN_FOODS, (
+        f"food_search has only {count} rows. FTS5 index not built — check build_db_full.py."
+    )
+
+
+def test_fts_match_returns_results(db):
+    """End-to-end check: an FTS5 MATCH query returns rows."""
+    rows = db.execute(
+        "SELECT fdc_id FROM food_search WHERE food_search MATCH '\"butter\"*' LIMIT 5"
+    ).fetchall()
+    assert len(rows) > 0, "FTS5 MATCH on 'butter*' returned no rows"
+
+
 @pytest.mark.parametrize("fdc_id,hint,expected_cal", KNOWN_FOODS)
 def test_known_food_exists_with_correct_calories(db, fdc_id, hint, expected_cal):
     row = db.execute(
@@ -88,16 +134,17 @@ def test_known_food_exists_with_correct_calories(db, fdc_id, hint, expected_cal)
 @pytest.mark.parametrize("term", EXPECTED_SEARCHES)
 def test_common_ingredient_is_searchable(db, term):
     rows = db.execute(
-        "SELECT fdc_id FROM food_macros WHERE LOWER(description) LIKE ?",
-        (f"%{term}%",),
+        "SELECT fdc_id FROM food_search WHERE food_search MATCH ? LIMIT 1",
+        (f'"{term}"*',),
     ).fetchall()
     assert len(rows) > 0, (
-        f"'{term}' returned no results — expected at least one matching food in SR Legacy"
+        f"'{term}' returned no FTS5 results — expected at least one matching food"
     )
 
 
 def test_all_common_tab_foods_exist(db):
-    """Every fdc_id shown in the frontend Common tab must exist in the DB."""
+    """Every fdc_id shown in the frontend Common tab must exist in the DB.
+    These are SR Legacy fdc_ids; if this test fails, SR Legacy was not built in."""
     common_fdc_ids = [
         173430, 171287, 169655, 168894, 171265, 173418,
         169640, 172804, 173468, 173471, 171413, 171509,
@@ -110,7 +157,10 @@ def test_all_common_tab_foods_exist(db):
     ).fetchall()
     found = {r["fdc_id"] for r in rows}
     missing = [fid for fid in common_fdc_ids if fid not in found]
-    assert not missing, f"Common-tab fdc_ids missing from DB: {missing}"
+    assert not missing, (
+        f"Common-tab fdc_ids missing from DB: {missing}. "
+        "SR Legacy sub-dataset is likely not built — see data/fdc/sr_legacy/."
+    )
 
 
 def test_nutrient_fields_are_populated(db):
@@ -122,3 +172,13 @@ def test_nutrient_fields_are_populated(db):
     assert row["fat_total_g"] > 0, "Butter fat_total_g should be > 0"
     assert row["fat_saturated_g"] > 0, "Butter fat_saturated_g should be > 0"
     assert row["calories"] > 0, "Butter calories should be > 0"
+
+
+def test_branded_metadata_is_populated(db):
+    """Branded foods must carry brand_owner and data_type='branded_food'."""
+    row = db.execute(
+        "SELECT brand_owner FROM food_macros "
+        "WHERE data_type = 'branded_food' AND brand_owner IS NOT NULL AND brand_owner != '' "
+        "LIMIT 1"
+    ).fetchone()
+    assert row is not None, "No branded foods with brand_owner found"
