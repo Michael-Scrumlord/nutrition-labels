@@ -9,17 +9,10 @@ import type {
   SavedRecipe, RecipeVersion,
   IngredientItem, LabelDimensions, RecipeStep, RecipeVariable,
 } from "../types";
+import { makeId } from "../utils/id";
 
 const MAX_RECIPES          = 50;
 const MAX_VERSIONS_PER     = 20;
-
-// crypto.randomUUID() is unavailable in insecure contexts (http://hostname).
-function makeId(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
-  }
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 11)}`;
-}
 
 export type RecipeSnapshot = {
   ingredients:    IngredientItem[];
