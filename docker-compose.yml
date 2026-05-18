@@ -2,16 +2,46 @@ version: '3.9'
 
 # Production compose. For local dev without Caddy/TLS, use
 # docker-compose.dev.yml (or just expose frontend:5173 directly).
+#
+# First-time setup:
+#   1. Run scripts/download_fdc.sh to fetch USDA FDC CSV data.
+#   2. docker-compose up --build
+#      The db-init service builds nutrition.db on the nutrition_db volume (one-time).
+#      Subsequent restarts skip the build because the DB already exists.
 
 services:
+
+  # ── One-time DB builder ────────────────────────────────────────────────────
+  # Runs build_db_full.py, writes nutrition.db to the nutrition_db volume, then exits.
+  # The backend waits for this to complete before starting.
+  # On subsequent deploys it exits immediately (DB already exists).
+  db-init:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dbbuilder
+    environment:
+      - FDC_DATA_DIR=/fdc-source
+      - DB_PATH=/db/nutrition.db
+    volumes:
+      - ./backend/data/fdc:/fdc-source:ro
+      - nutrition_db:/db
+    restart: "no"
+
+  # ── API server ─────────────────────────────────────────────────────────────
   backend:
     build: ./backend
     restart: unless-stopped
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
     env_file:
       - .env
     environment:
       - FORWARDED_ALLOW_IPS=*
       - CORS_ORIGINS=[]
+      - DB_PATH=/db/nutrition.db
+    volumes:
+      - nutrition_db:/db:ro
     expose:
       - "8000"
     read_only: true
@@ -30,6 +60,7 @@ services:
       retries: 3
       start_period: 15s
 
+  # ── Static frontend ────────────────────────────────────────────────────────
   frontend:
     build: ./frontend
     restart: unless-stopped
@@ -56,6 +87,7 @@ services:
     mem_limit: 128m
     cpus: 0.5
 
+  # ── Reverse proxy / TLS ────────────────────────────────────────────────────
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
@@ -79,3 +111,4 @@ services:
 volumes:
   caddy_data:
   caddy_config:
+  nutrition_db:

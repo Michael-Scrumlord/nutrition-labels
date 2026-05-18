@@ -4,7 +4,7 @@ A full-stack web application that lets you build custom recipes from USDA food d
 
 ## Features
 
-- **Ingredient Search** — Full-text search across the USDA FoodData Central database. Results ranked: prefix matches first (alphabetically), then contains matches.
+- **Ingredient Search** — SQLite FTS5 full-text search across four USDA FoodData Central sub-datasets (Foundation Foods, FNDDS, SR Legacy, Branded Foods — ~200k+ total). Results re-ranked by data-quality tier, then by prefix match, then alphabetically. See [DATA_SOURCES.md](DATA_SOURCES.md).
 - **Recipe Builder** — Add ingredients with custom amounts in g, ml, oz, lb, or kg. Drag to reorder. Adjust serving count with the portion divisor.
 - **Live Label Preview** — An FDA 2020-format Nutrition Facts panel updates in real time as you build your recipe.
 - **PDF Export** — Downloads a print-ready PDF label sized to your chosen dimensions (default 2.75 in wide).
@@ -15,6 +15,11 @@ A full-stack web application that lets you build custom recipes from USDA food d
 ## Quick Start (Docker)
 
 ```bash
+# 1. Download USDA FoodData Central CSVs (~700 MB, one-time, ~2 GB extracted)
+bash scripts/download_fdc.sh
+
+# 2. Start everything. The db-init service builds nutrition.db on first run
+#    (5–15 min on 2 vCPUs), then exits. Subsequent restarts skip the build.
 docker-compose up --build
 ```
 
@@ -23,6 +28,10 @@ docker-compose up --build
 | Frontend    | http://localhost:5173  |
 | Backend API | http://localhost:8000  |
 
+The compiled SQLite database lives on the `nutrition_db` Docker volume — it is
+**not** baked into the backend image, and the backend mounts it read-only. See
+[DATA_SOURCES.md](DATA_SOURCES.md) for the full data-pipeline architecture.
+
 ## API Reference
 
 ### `GET /api/search?query=<string>`
@@ -30,10 +39,15 @@ docker-compose up --build
 Search foods by name.
 
 - **Query params:** `query` (string) — minimum 2 characters; returns `[]` for shorter queries
-- **Returns:** `FoodSearchResult[]` — at most 40 results, prefix matches before contains matches
+- **Returns:** `FoodSearchResult[]` — at most 40 results, ranked by FTS5 BM25 then re-tiered: Foundation/FNDDS first, then SR Legacy, then Branded; prefix matches surface ahead of contains matches within each tier
 
 ```json
-[{ "fdc_id": 1097512, "name": "Butter, unsalted" }]
+[{
+  "fdc_id": 1097512,
+  "name": "Butter, unsalted",
+  "brand_owner": null,
+  "data_type": "foundation_food"
+}]
 ```
 
 ### `GET /api/food/{fdc_id}`

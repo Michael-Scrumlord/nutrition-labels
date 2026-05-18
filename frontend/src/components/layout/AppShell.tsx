@@ -3,9 +3,12 @@
 // Editorial plinth layout (R · Ledger direction).
 //   head head        ← sticky masthead
 //   body label       ← scrolling recipe body | raised plinth with FDA label
-//   foot foot        ← partner ribbon (footer ad slot — Phase 2 will replace
-//                      with a Google Anchor Ad and this row may go away)
 //   site site        ← always-visible text footer (Privacy · Terms · About …)
+//
+// The custom partner-ribbon row was deleted in Phase 6 in favor of Google
+// Anchor Ads, which Google injects/dismisses itself from Auto Ads. No
+// `foot` grid row should re-appear — keep the bottom of the page as the
+// SiteFooter text strip.
 //
 // The grid sets `container-type: inline-size; container-name: app;` so the
 // cqw-based fluid type ramp in index.css scales the whole shell across
@@ -17,7 +20,6 @@
 //   • runs the ~720ms cinematic wipe transition between themes
 
 import { Header } from "./Header";
-import { Footer } from "./Footer";
 import { SiteFooter } from "./SiteFooter";
 import { RecipeBuilder } from "../recipe/RecipeBuilder";
 import { LabelColumn } from "../label/LabelColumn";
@@ -38,8 +40,8 @@ export function AppShell() {
         style={{
           display: "grid",
           gridTemplateColumns: "minmax(0, 1fr) var(--ms-label-w)",
-          gridTemplateRows: "auto 1fr auto auto",
-          gridTemplateAreas: '"head head" "body label" "foot foot" "site site"',
+          gridTemplateRows: "auto 1fr auto",
+          gridTemplateAreas: '"head head" "body label" "site site"',
           minHeight: "100vh",
           fontFamily: "var(--f-body)",
           containerType: "inline-size",
@@ -49,7 +51,6 @@ export function AppShell() {
         <Header />
         <RecipeBuilder />
         <LabelColumn />
-        <Footer />
         <SiteFooter />
       </div>
     </ThemedFrame>

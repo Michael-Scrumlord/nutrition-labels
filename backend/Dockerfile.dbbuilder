@@ -1,0 +1,20 @@
+# Dockerfile.dbbuilder
+#
+# Minimal one-time image that builds nutrition.db from FDC CSV data.
+# Used only by the db-init service in docker-compose.yml — never runs in production.
+#
+# Mounts:
+#   /fdc-source  (read-only)  — host directory containing foundation/, survey/, branded/
+#   /db          (read-write) — nutrition_db Docker volume, receives nutrition.db
+
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Only the build script is needed — no web framework, no WeasyPrint.
+COPY data/build_db_full.py data/build_db_full.py
+
+ENV FDC_DATA_DIR=/fdc-source \
+    DB_PATH=/db/nutrition.db
+
+CMD ["python", "data/build_db_full.py"]

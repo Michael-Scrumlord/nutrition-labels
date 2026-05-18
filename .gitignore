@@ -35,3 +35,6 @@ Thumbs.db
 
 # Planned Features
 plan/
+
+# Data
+backend/data/*

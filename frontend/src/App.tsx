@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { useAdSenseBootstrap } from "./hooks/useAdSenseBootstrap";
 import { AppShell } from "./components/layout/AppShell";
 import { AboutPage } from "./pages/AboutPage";
 import { PrivacyPage } from "./pages/PrivacyPage";
@@ -11,6 +12,11 @@ import { ServingSizeRulesRACCExplained } from "./pages/guides/ServingSizeRulesRA
 import { LabelingAllergensCorrectly } from "./pages/guides/LabelingAllergensCorrectly";
 
 export function App() {
+  // No-op until VITE_ADSENSE_PUBLISHER_ID and VITE_ADSENSE_SIDEBAR_SLOT
+  // are set (see src/config/adsense.ts). Lives at the App root so a single
+  // bootstrap runs regardless of which route the user lands on first.
+  useAdSenseBootstrap();
+
   return (
     <BrowserRouter>
       <Routes>

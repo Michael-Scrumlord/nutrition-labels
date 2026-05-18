@@ -1,5 +1,7 @@
 # Backend Dockerfile
-# Multi-stage: builder installs deps + bakes the DB; final image runs as non-root.
+# Multi-stage: builder installs deps; final image runs as non-root.
+# The SQLite database is NOT baked in — it lives on the nutrition_db Docker volume
+# and is built once by the db-init service on first deploy.
 
 FROM python:3.11-slim AS builder
 
@@ -21,10 +23,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app/ ./app/
 COPY templates/ ./templates/
-COPY data/ ./data/
-
-# Bake the SQLite database into the image (~7,793 foods).
-RUN python data/build_db_full.py
 
 # ── Final image ───────────────────────────────────────────────────────────
 FROM python:3.11-slim AS final

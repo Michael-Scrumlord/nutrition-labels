@@ -20,7 +20,6 @@ def get_connection(db_path: str | None = None) -> sqlite3.Connection:
     (Docker volumes, NFS shares) that don't support POSIX locks.
     """
     path = db_path or settings.db_path
-    # Convert to absolute path for the URI
     abs_path = os.path.abspath(path)
     uri = f"file:{abs_path}?mode=ro&nolock=1"
     conn = sqlite3.connect(uri, uri=True)
@@ -28,17 +27,39 @@ def get_connection(db_path: str | None = None) -> sqlite3.Connection:
     return conn
 
 
-def search_foods(query: str, limit: int = 80, db_path: str | None = None) -> list[sqlite3.Row]:
+def _fts_query(query: str) -> str:
     """
-    Return food rows whose description contains the query string (case-insensitive).
-    We fetch more than the final limit here because the ranking step in search.py
-    will sort and trim the results down to 40.
+    Build a prefix-match FTS5 MATCH string from a user search query.
+    Each whitespace-separated term becomes a quoted prefix: "term"*
+    This matches "chick br" → foods containing words starting with "chick" AND "br".
+    Double-quotes in the input are stripped to avoid breaking FTS5 syntax.
     """
+    terms = query.strip().split()
+    if not terms:
+        return '""'
+    return " ".join(f'"{t.replace(chr(34), "")}"*' for t in terms)
+
+
+def search_foods(query: str, limit: int = 200, db_path: str | None = None) -> list[sqlite3.Row]:
+    """
+    Full-text search via the FTS5 food_search index.
+    Returns up to `limit` rows ordered by BM25 relevance score.
+    The caller (search.py) re-ranks and trims to 40 results.
+
+    Returned columns: fdc_id, description, brand_name, brand_owner, data_type
+    """
+    fts = _fts_query(query)
     with get_connection(db_path) as conn:
         return conn.execute(
-            "SELECT fdc_id, description FROM food_macros "
-            "WHERE LOWER(description) LIKE LOWER(?) LIMIT ?",
-            (f"%{query}%", limit),
+            """
+            SELECT fm.fdc_id, fm.description, fm.brand_name, fm.brand_owner, fm.data_type
+            FROM food_search
+            JOIN food_macros fm ON fm.fdc_id = food_search.rowid
+            WHERE food_search MATCH ?
+            ORDER BY food_search.rank
+            LIMIT ?
+            """,
+            (fts, limit),
         ).fetchall()
 
 
