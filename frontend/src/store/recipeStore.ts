@@ -3,14 +3,7 @@ import type {
   IngredientItem, LabelDimensions, UnitKey, HighlightSet,
   RecipeStep, RecipeVariable, SavedRecipe, RecipeVersion,
 } from "../types";
-
-// crypto.randomUUID() is unavailable in insecure contexts (http://hostname).
-function makeId(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
-  }
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 11)}`;
-}
+import { makeId } from "../utils/id";
 
 interface RecipeState {
   // ── Recipe content ────────────────────────────────────────────────────
