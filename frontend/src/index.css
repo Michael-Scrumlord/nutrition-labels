@@ -165,45 +165,44 @@ html, body {
   margin: 0 1px;
 }
 
-/* ── Donate pill ─────────────────────────────────────────────────────────── */
-/* Filled accent CTA promoted from a tertiary text link. Editorial vocabulary:
-   top accent rail echoes the FDA-rule motif in the wordmark, tracked caps +
-   arrow read as "action", small mono caption gives it character. */
+/* ── Donate pill — D · Letterpress ──────────────────────────────────────── */
+/* Surface-toned button with accent left rail + accent text. Inset shadow
+   reads as pressed-into-page. Text color is always var(--accent) so contrast
+   holds across all theme × accent combos with no per-theme overrides. */
 .donate-pill {
-  --donate-bg: color-mix(in srgb, var(--accent) 88%, var(--bg));
-  --donate-fg: #0a0a0a;
   position: relative;
-  display: inline-flex; align-items: center; gap: 0;
-  padding: calc(var(--ms-pad-y) * 0.5) calc(var(--ms-pad-x) * 0.4);
-  background: var(--donate-bg); color: var(--donate-fg);
+  display: inline-flex; align-items: center;
+  padding: calc(var(--ms-pad-y) * 0.5) calc(var(--ms-pad-x) * 0.4)
+           calc(var(--ms-pad-y) * 0.5) calc(var(--ms-pad-x) * 0.5);
   text-decoration: none; cursor: pointer; border: 0;
+  isolation: isolate;
+  background:
+    linear-gradient(180deg,
+      color-mix(in oklab, var(--bg) 100%, var(--ink) 4%) 0%,
+      color-mix(in oklab, var(--bg) 100%, var(--ink) 9%) 100%);
   box-shadow:
-    0 1px 0 rgba(255,255,255,0.18) inset,
-    0 -1px 0 rgba(0,0,0,0.18) inset,
-    0 1px 2px rgba(0,0,0,0.18),
-    0 2px 6px rgba(0,0,0,0.12);
-  transition: transform 120ms ease, box-shadow 160ms ease, background 160ms ease;
+    inset 0 1px 0 color-mix(in srgb, var(--ink) 6%, transparent),
+    inset 0 -1px 1px rgba(0,0,0,0.10),
+    inset 0 0 0 1px var(--hair-strong),
+    0 1px 0 color-mix(in srgb, var(--ink) 5%, transparent),
+    0 6px 14px -8px rgba(0,0,0,0.35);
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+.donate-pill__rail {
+  position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  background: var(--accent);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 60%, transparent);
 }
 .donate-pill:hover {
   transform: translateY(-1px);
-  background: var(--accent);
   box-shadow:
-    0 1px 0 rgba(255,255,255,0.22) inset,
-    0 -1px 0 rgba(0,0,0,0.2) inset,
-    0 2px 4px rgba(0,0,0,0.2),
-    0 4px 10px rgba(0,0,0,0.14);
+    inset 0 1px 0 color-mix(in srgb, var(--ink) 6%, transparent),
+    inset 0 -1px 1px rgba(0,0,0,0.12),
+    inset 0 0 0 1px var(--accent),
+    0 2px 0 color-mix(in srgb, var(--ink) 8%, transparent),
+    0 10px 22px -6px color-mix(in srgb, var(--accent) 40%, transparent);
 }
-.donate-pill:active {
-  transform: translateY(1px);
-  box-shadow:
-    0 1px 0 rgba(0,0,0,0.18) inset,
-    0 1px 1px rgba(0,0,0,0.16);
-}
-.donate-pill__rail {
-  position: absolute; left: 0; right: 0; top: 0;
-  height: calc(var(--ms-rule-h) * 0.55);
-  background: rgba(0,0,0,0.6);
-}
+.donate-pill:active { transform: translateY(1px); }
 .donate-pill__label {
   display: inline-flex; flex-direction: column;
   line-height: 1; align-items: flex-start; gap: 4px;
@@ -211,17 +210,20 @@ html, body {
 .donate-pill__cta {
   display: inline-flex; align-items: baseline; gap: 0.55em;
   font-family: var(--f-body);
-  font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase;
+  font-weight: 900; letter-spacing: 0.22em; text-transform: uppercase;
   font-size: var(--ms-mono-small);
+  color: var(--accent);
 }
-.donate-pill__arrow { display: inline-block; transition: transform 200ms ease; }
-.donate-pill:hover .donate-pill__arrow { transform: translateX(4px); }
+.donate-pill__arrow {
+  display: inline-block; transition: transform 200ms ease;
+  color: var(--accent);
+}
+.donate-pill:hover .donate-pill__arrow { transform: translateX(3px); }
 .donate-pill__sub {
   font-family: var(--f-mono);
   font-size: var(--ms-mono-micro);
-  letter-spacing: 0.30em;
-  text-transform: uppercase;
-  color: rgba(0,0,0,0.65);
+  letter-spacing: 0.30em; text-transform: uppercase;
+  color: var(--ink-3);
 }
 
 /* ── Info-page prose (/about, /privacy, /terms) ──────────────────────────── */
