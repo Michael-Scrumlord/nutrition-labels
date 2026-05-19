@@ -17,5 +17,13 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: "./tests/setup.ts",
+    // Permit tests to read the shared FE/BE parity vector that lives in
+    // backend/tests/data/. Without this, Vite's fs allowlist blocks any
+    // import path that resolves outside the frontend project root.
+    server: {
+      fs: {
+        allow: [".."],
+      },
+    },
   },
 });

@@ -4,10 +4,17 @@
 # in test_nutrition.py (which handles the golden paths).
 # All tests use plain dicts as food rows — no database needed.
 
+import json
+from pathlib import Path
+
 import pytest
-from app.nutrition import calculate_recipe_macros, compute_daily_value_pct
+from app.nutrition import calculate_recipe_macros, compute_daily_value_pct, round_half_up
 from app.models import IngredientItem
 from app.constants import UNIT_CONVERSIONS
+
+_PARITY_VECTORS = json.loads(
+    (Path(__file__).parent / "data" / "round_half_up_parity.json").read_text()
+)["cases"]
 
 
 # ---------------------------------------------------------------------------
@@ -242,3 +249,13 @@ def test_dv_vitamin_d_half():
 def test_dv_calcium_quarter():
     """325 mg calcium / 1300 mg DV = 25%."""
     assert compute_daily_value_pct(325, "calcium_mg") == 25
+
+
+@pytest.mark.parametrize("case", _PARITY_VECTORS, ids=lambda c: f"{c['input']}@{c['ndigits']}")
+def test_round_half_up_parity_vector(case):
+    """
+    Backend half of the shared FE/BE parity vector
+    (tests/data/round_half_up_parity.json). The TS roundHalfUp must produce
+    the same outputs for these inputs — see the matching vitest case.
+    """
+    assert round_half_up(case["input"], case["ndigits"]) == case["expected"]
