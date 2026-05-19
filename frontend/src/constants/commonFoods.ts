@@ -1,24 +1,215 @@
 import type { SavedFood } from "../types";
 
-// fdc_ids must exist in nutrition.db. These are canonical USDA SR Legacy
-// fdc_ids; the build script (backend/data/build_db_full.py) includes the
-// SR Legacy sub-dataset specifically so these references stay valid alongside
-// the newer Foundation Foods, FNDDS, and Branded sub-datasets.
-// The display name is a friendly shorthand — the API returns the full USDA description.
-export const COMMON_FOODS: SavedFood[] = [
-  { fdc_id: 173430, name: "Butter, unsalted"            },
-  { fdc_id: 171287, name: "Eggs, whole, raw"            },
-  { fdc_id: 169655, name: "Sugar, granulated"           },
-  { fdc_id: 168894, name: "All-purpose flour, white"    },
-  { fdc_id: 171265, name: "Whole milk"                  },
-  { fdc_id: 173418, name: "Cream cheese"                },
-  { fdc_id: 169640, name: "Honey"                       },
-  { fdc_id: 172804, name: "Baking powder"               },
-  { fdc_id: 173468, name: "Salt, table"                 },
-  { fdc_id: 173471, name: "Vanilla extract"             },
-  { fdc_id: 171413, name: "Olive oil"                   },
-  { fdc_id: 171509, name: "Chicken breast, raw"         },
-  { fdc_id: 174036, name: "Ground beef, 80% lean, raw"  },
-  { fdc_id: 169593, name: "Cocoa powder, unsweetened"   },
-  { fdc_id: 167976, name: "Chocolate, semi-sweet"       },
+// Common ingredients shown in the "Common" tab of the ingredient picker.
+// Every fdc_id must exist in nutrition.db (see backend/tests/test_db_health.py
+// which verifies this at build time). The display name is a friendly shorthand;
+// the API returns the full USDA description.
+//
+// Picked from Foundation Foods, FNDDS, and SR Legacy depending on which
+// dataset has the cleanest entry for the ingredient.
+
+export interface CommonFood extends SavedFood {
+  category: string;
+}
+
+export const COMMON_FOODS: CommonFood[] = [
+  // ── Baking essentials ─────────────────────────────────────────────────────
+  { category: "Baking",  fdc_id: 168894, name: "All-purpose flour"            },
+  { category: "Baking",  fdc_id: 790146, name: "Bread flour"                  },
+  { category: "Baking",  fdc_id: 169723, name: "Cake flour"                   },
+  { category: "Baking",  fdc_id: 790085, name: "Whole wheat flour"            },
+  { category: "Baking",  fdc_id: 2261420, name: "Almond flour"                },
+  { category: "Baking",  fdc_id: 168885, name: "Rye flour"                    },
+  { category: "Baking",  fdc_id: 169655, name: "Granulated sugar"             },
+  { category: "Baking",  fdc_id: 2710260, name: "Brown sugar"                 },
+  { category: "Baking",  fdc_id: 169656, name: "Powdered sugar"               },
+  { category: "Baking",  fdc_id: 175040, name: "Baking soda"                  },
+  { category: "Baking",  fdc_id: 172804, name: "Baking powder"                },
+  { category: "Baking",  fdc_id: 175043, name: "Active dry yeast"             },
+  { category: "Baking",  fdc_id: 169698, name: "Cornstarch"                   },
+  { category: "Baking",  fdc_id: 175041, name: "Cream of tartar"              },
+  { category: "Baking",  fdc_id: 173471, name: "Vanilla extract"              },
+  { category: "Baking",  fdc_id: 173468, name: "Salt"                         },
+  { category: "Baking",  fdc_id: 174928, name: "Breadcrumbs, plain"           },
+
+  // ── Dairy & eggs ──────────────────────────────────────────────────────────
+  { category: "Dairy & eggs", fdc_id: 173430, name: "Butter, unsalted"        },
+  { category: "Dairy & eggs", fdc_id: 173410, name: "Butter, salted"          },
+  { category: "Dairy & eggs", fdc_id: 171265, name: "Whole milk"              },
+  { category: "Dairy & eggs", fdc_id: 2705386, name: "2% milk"                },
+  { category: "Dairy & eggs", fdc_id: 2705388, name: "Skim milk"              },
+  { category: "Dairy & eggs", fdc_id: 172225, name: "Buttermilk"              },
+  { category: "Dairy & eggs", fdc_id: 170859, name: "Heavy cream"             },
+  { category: "Dairy & eggs", fdc_id: 2705614, name: "Sour cream"             },
+  { category: "Dairy & eggs", fdc_id: 173418, name: "Cream cheese"            },
+  { category: "Dairy & eggs", fdc_id: 171284, name: "Plain whole-milk yogurt" },
+  { category: "Dairy & eggs", fdc_id: 171304, name: "Greek yogurt, plain"     },
+  { category: "Dairy & eggs", fdc_id: 170851, name: "Ricotta, whole milk"     },
+  { category: "Dairy & eggs", fdc_id: 2705747, name: "Cottage cheese"         },
+  { category: "Dairy & eggs", fdc_id: 328637, name: "Cheddar cheese"          },
+  { category: "Dairy & eggs", fdc_id: 2705722, name: "Mozzarella"             },
+  { category: "Dairy & eggs", fdc_id: 325036, name: "Parmesan, grated"        },
+  { category: "Dairy & eggs", fdc_id: 2705714, name: "Feta cheese"            },
+  { category: "Dairy & eggs", fdc_id: 171287, name: "Egg, whole, raw"         },
+  { category: "Dairy & eggs", fdc_id: 2707168, name: "Egg white, raw"         },
+  { category: "Dairy & eggs", fdc_id: 2707172, name: "Egg yolk, raw"          },
+
+  // ── Fats & oils ───────────────────────────────────────────────────────────
+  { category: "Fats & oils", fdc_id: 171413, name: "Olive oil"                },
+  { category: "Fats & oils", fdc_id: 172336, name: "Canola oil"               },
+  { category: "Fats & oils", fdc_id: 172370, name: "Vegetable oil"            },
+  { category: "Fats & oils", fdc_id: 330458, name: "Coconut oil"              },
+  { category: "Fats & oils", fdc_id: 171016, name: "Sesame oil"               },
+  { category: "Fats & oils", fdc_id: 173573, name: "Avocado oil"              },
+  { category: "Fats & oils", fdc_id: 748608, name: "Extra virgin olive oil"   },
+  { category: "Fats & oils", fdc_id: 2710167, name: "Shortening"              },
+  { category: "Fats & oils", fdc_id: 2710166, name: "Lard"                    },
+
+  // ── Sweeteners ────────────────────────────────────────────────────────────
+  { category: "Sweeteners", fdc_id: 169640, name: "Honey"                     },
+  { category: "Sweeteners", fdc_id: 169661, name: "Maple syrup"               },
+  { category: "Sweeteners", fdc_id: 2710283, name: "Molasses"                 },
+  { category: "Sweeteners", fdc_id: 2710274, name: "Corn syrup"               },
+  { category: "Sweeteners", fdc_id: 2710282, name: "Agave"                    },
+
+  // ── Chocolate & cocoa ─────────────────────────────────────────────────────
+  { category: "Chocolate", fdc_id: 169593, name: "Cocoa powder, unsweetened"  },
+  { category: "Chocolate", fdc_id: 167976, name: "Chocolate, semi-sweet"      },
+  { category: "Chocolate", fdc_id: 170273, name: "Dark chocolate, 70-85%"     },
+  { category: "Chocolate", fdc_id: 170272, name: "Dark chocolate, 60-69%"     },
+  { category: "Chocolate", fdc_id: 2710339, name: "White chocolate"           },
+
+  // ── Nuts & seeds ──────────────────────────────────────────────────────────
+  { category: "Nuts & seeds", fdc_id: 2346393, name: "Almonds, raw"           },
+  { category: "Nuts & seeds", fdc_id: 2346394, name: "Walnuts, raw"           },
+  { category: "Nuts & seeds", fdc_id: 2346395, name: "Pecans, raw"            },
+  { category: "Nuts & seeds", fdc_id: 2515374, name: "Cashews, raw"           },
+  { category: "Nuts & seeds", fdc_id: 2515376, name: "Peanuts, raw"           },
+  { category: "Nuts & seeds", fdc_id: 2515379, name: "Pistachios, raw"        },
+  { category: "Nuts & seeds", fdc_id: 2515375, name: "Hazelnuts, raw"         },
+  { category: "Nuts & seeds", fdc_id: 168586, name: "Coconut, shredded"       },
+  { category: "Nuts & seeds", fdc_id: 2262072, name: "Peanut butter"          },
+  { category: "Nuts & seeds", fdc_id: 2262074, name: "Almond butter"          },
+  { category: "Nuts & seeds", fdc_id: 2707587, name: "Tahini"                 },
+  { category: "Nuts & seeds", fdc_id: 2710819, name: "Chia seeds"             },
+  { category: "Nuts & seeds", fdc_id: 2262075, name: "Flaxseed, ground"       },
+  { category: "Nuts & seeds", fdc_id: 2515381, name: "Sunflower seeds"        },
+  { category: "Nuts & seeds", fdc_id: 2515380, name: "Pumpkin seeds"          },
+  { category: "Nuts & seeds", fdc_id: 2707586, name: "Sesame seeds"           },
+
+  // ── Grains, breads & pasta ────────────────────────────────────────────────
+  { category: "Grains & bread", fdc_id: 2512381, name: "White rice"           },
+  { category: "Grains & bread", fdc_id: 2512380, name: "Brown rice"           },
+  { category: "Grains & bread", fdc_id: 2346396, name: "Rolled oats"          },
+  { category: "Grains & bread", fdc_id: 2346397, name: "Steel-cut oats"       },
+  { category: "Grains & bread", fdc_id: 2512372, name: "Quinoa flour"         },
+  { category: "Grains & bread", fdc_id: 170284, name: "Pearled barley"        },
+  { category: "Grains & bread", fdc_id: 169699, name: "Couscous, dry"         },
+  { category: "Grains & bread", fdc_id: 169731, name: "Egg noodles, dry"      },
+  { category: "Grains & bread", fdc_id: 2707598, name: "White bread"          },
+  { category: "Grains & bread", fdc_id: 2707709, name: "Whole-wheat bread"    },
+  { category: "Grains & bread", fdc_id: 2707824, name: "Flour tortilla"       },
+  { category: "Grains & bread", fdc_id: 2707823, name: "Corn tortilla"        },
+  { category: "Grains & bread", fdc_id: 170288, name: "Cornmeal"              },
+
+  // ── Fruits ────────────────────────────────────────────────────────────────
+  { category: "Fruits",  fdc_id: 2709215, name: "Apple"                       },
+  { category: "Fruits",  fdc_id: 2709224, name: "Banana"                      },
+  { category: "Fruits",  fdc_id: 2709171, name: "Orange"                      },
+  { category: "Fruits",  fdc_id: 2709168, name: "Lemon"                       },
+  { category: "Fruits",  fdc_id: 2709170, name: "Lime"                        },
+  { category: "Fruits",  fdc_id: 167747, name: "Lemon juice"                  },
+  { category: "Fruits",  fdc_id: 168156, name: "Lime juice"                   },
+  { category: "Fruits",  fdc_id: 2709283, name: "Strawberries"                },
+  { category: "Fruits",  fdc_id: 2709275, name: "Blueberries"                 },
+  { category: "Fruits",  fdc_id: 2709281, name: "Raspberries"                 },
+  { category: "Fruits",  fdc_id: 2709273, name: "Blackberries"                },
+  { category: "Fruits",  fdc_id: 2709237, name: "Grapes"                      },
+  { category: "Fruits",  fdc_id: 2709260, name: "Pineapple"                   },
+  { category: "Fruits",  fdc_id: 2709242, name: "Mango"                       },
+  { category: "Fruits",  fdc_id: 2709249, name: "Peach"                       },
+  { category: "Fruits",  fdc_id: 2709254, name: "Pear"                        },
+  { category: "Fruits",  fdc_id: 2709270, name: "Watermelon"                  },
+  { category: "Fruits",  fdc_id: 2709226, name: "Cantaloupe"                  },
+  { category: "Fruits",  fdc_id: 2709223, name: "Avocado"                     },
+  { category: "Fruits",  fdc_id: 2709212, name: "Raisins"                     },
+  { category: "Fruits",  fdc_id: 2709203, name: "Dates"                       },
+
+  // ── Vegetables ────────────────────────────────────────────────────────────
+  { category: "Vegetables", fdc_id: 2709795, name: "Onion"                    },
+  { category: "Vegetables", fdc_id: 2709794, name: "Green onion"              },
+  { category: "Vegetables", fdc_id: 169230, name: "Garlic"                    },
+  { category: "Vegetables", fdc_id: 169231, name: "Ginger root"               },
+  { category: "Vegetables", fdc_id: 170457, name: "Tomato"                    },
+  { category: "Vegetables", fdc_id: 2709660, name: "Carrot"                   },
+  { category: "Vegetables", fdc_id: 2709778, name: "Celery"                   },
+  { category: "Vegetables", fdc_id: 170028, name: "Potato, white"             },
+  { category: "Vegetables", fdc_id: 2346401, name: "Russet potato"            },
+  { category: "Vegetables", fdc_id: 2346404, name: "Sweet potato"             },
+  { category: "Vegetables", fdc_id: 321900, name: "Broccoli"                  },
+  { category: "Vegetables", fdc_id: 2709777, name: "Cauliflower"              },
+  { category: "Vegetables", fdc_id: 2709614, name: "Spinach"                  },
+  { category: "Vegetables", fdc_id: 327923, name: "Romaine lettuce"           },
+  { category: "Vegetables", fdc_id: 2258590, name: "Red bell pepper"          },
+  { category: "Vegetables", fdc_id: 2258588, name: "Green bell pepper"        },
+  { category: "Vegetables", fdc_id: 2709784, name: "Cucumber"                 },
+  { category: "Vegetables", fdc_id: 2685568, name: "Zucchini"                 },
+  { category: "Vegetables", fdc_id: 2709793, name: "Mushroom"                 },
+  { category: "Vegetables", fdc_id: 169998, name: "Sweet corn, raw"           },
+  { category: "Vegetables", fdc_id: 2710089, name: "Green olives"             },
+  { category: "Vegetables", fdc_id: 2710090, name: "Black olives"             },
+
+  // ── Meat, poultry & fish ──────────────────────────────────────────────────
+  { category: "Meat & fish", fdc_id: 2646170, name: "Chicken breast, raw"     },
+  { category: "Meat & fish", fdc_id: 2646171, name: "Chicken thigh, raw"      },
+  { category: "Meat & fish", fdc_id: 2514744, name: "Ground beef, 80/20"      },
+  { category: "Meat & fish", fdc_id: 2514743, name: "Ground beef, 90/10"      },
+  { category: "Meat & fish", fdc_id: 2514747, name: "Ground turkey, 93/7"     },
+  { category: "Meat & fish", fdc_id: 168277, name: "Bacon, raw"               },
+  { category: "Meat & fish", fdc_id: 2646168, name: "Pork loin, raw"          },
+  { category: "Meat & fish", fdc_id: 2705878, name: "Ham"                     },
+  { category: "Meat & fish", fdc_id: 2706189, name: "Italian sausage"         },
+  { category: "Meat & fish", fdc_id: 2684441, name: "Salmon, raw"             },
+  { category: "Meat & fish", fdc_id: 334194, name: "Tuna, canned in water"    },
+  { category: "Meat & fish", fdc_id: 2684443, name: "Shrimp, raw"             },
+  { category: "Meat & fish", fdc_id: 2684442, name: "Tilapia, raw"            },
+  { category: "Meat & fish", fdc_id: 2684444, name: "Cod, raw"                },
+
+  // ── Beans, legumes & soy ──────────────────────────────────────────────────
+  { category: "Beans & legumes", fdc_id: 2644283, name: "Lentils, dry"        },
+  { category: "Beans & legumes", fdc_id: 335912, name: "Black beans, dry"     },
+  { category: "Beans & legumes", fdc_id: 2644282, name: "Chickpeas, dry"      },
+  { category: "Beans & legumes", fdc_id: 335245, name: "Kidney beans, dry"    },
+  { category: "Beans & legumes", fdc_id: 172476, name: "Tofu"                 },
+  { category: "Beans & legumes", fdc_id: 168410, name: "Edamame, frozen"      },
+
+  // ── Herbs & spices ────────────────────────────────────────────────────────
+  { category: "Herbs & spices", fdc_id: 171317, name: "Basil, dried"          },
+  { category: "Herbs & spices", fdc_id: 171328, name: "Oregano, dried"        },
+  { category: "Herbs & spices", fdc_id: 170938, name: "Thyme, dried"          },
+  { category: "Herbs & spices", fdc_id: 171333, name: "Rosemary, dried"       },
+  { category: "Herbs & spices", fdc_id: 171320, name: "Cinnamon"              },
+  { category: "Herbs & spices", fdc_id: 170926, name: "Ginger, ground"        },
+  { category: "Herbs & spices", fdc_id: 171325, name: "Garlic powder"         },
+  { category: "Herbs & spices", fdc_id: 171327, name: "Onion powder"          },
+  { category: "Herbs & spices", fdc_id: 171329, name: "Paprika"               },
+  { category: "Herbs & spices", fdc_id: 170931, name: "Black pepper"          },
+  { category: "Herbs & spices", fdc_id: 170923, name: "Cumin"                 },
+  { category: "Herbs & spices", fdc_id: 171319, name: "Chili powder"          },
+  { category: "Herbs & spices", fdc_id: 170917, name: "Bay leaf"              },
+
+  // ── Pantry liquids & condiments ───────────────────────────────────────────
+  { category: "Pantry", fdc_id: 173469, name: "Apple cider vinegar"           },
+  { category: "Pantry", fdc_id: 172241, name: "Balsamic vinegar"              },
+  { category: "Pantry", fdc_id: 172237, name: "Distilled vinegar"             },
+  { category: "Pantry", fdc_id: 172240, name: "Red wine vinegar"              },
+  { category: "Pantry", fdc_id: 2707442, name: "Soy sauce"                    },
+  { category: "Pantry", fdc_id: 2707447, name: "Worcestershire sauce"         },
+  { category: "Pantry", fdc_id: 2709733, name: "Ketchup"                      },
+  { category: "Pantry", fdc_id: 326698, name: "Yellow mustard"                },
+  { category: "Pantry", fdc_id: 2710204, name: "Mayonnaise"                   },
+  { category: "Pantry", fdc_id: 2710093, name: "Hot pepper sauce"             },
+  { category: "Pantry", fdc_id: 2685580, name: "Tomato paste"                 },
+  { category: "Pantry", fdc_id: 333281, name: "Diced tomatoes, canned"        },
+  { category: "Pantry", fdc_id: 2705413, name: "Coconut milk"                 },
 ];
