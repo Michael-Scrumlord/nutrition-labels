@@ -46,13 +46,13 @@ def search_foods(query: str, limit: int = 200, db_path: str | None = None) -> li
     Returns up to `limit` rows ordered by BM25 relevance score.
     The caller (search.py) re-ranks and trims to 40 results.
 
-    Returned columns: fdc_id, description, brand_name, brand_owner, data_type
+    Returned columns: fdc_id, description, data_type
     """
     fts = _fts_query(query)
     with get_connection(db_path) as conn:
         return conn.execute(
             """
-            SELECT fm.fdc_id, fm.description, fm.brand_name, fm.brand_owner, fm.data_type
+            SELECT fm.fdc_id, fm.description, fm.data_type
             FROM food_search
             JOIN food_macros fm ON fm.fdc_id = food_search.rowid
             WHERE food_search MATCH ?

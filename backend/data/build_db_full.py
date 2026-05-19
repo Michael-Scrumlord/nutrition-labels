@@ -1,21 +1,20 @@
 """
 build_db_full.py
 
-Builds nutrition.db from four USDA FoodData Central datasets:
+Builds nutrition.db from three USDA FoodData Central datasets:
   - Foundation Foods  (~1,100 foods, gold-standard analytical data)
-  - Survey / FNDDS    (~8,500 foods, clean everyday names)
-  - SR Legacy         (~7,793 foods, retained for backward-compatible fdc_ids
-                       used by frontend/src/constants/commonFoods.ts)
-  - Branded Foods     (~200-400k US products, filtered to active US market)
+  - Survey / FNDDS    (~8,500 foods, clean everyday names — "Tomato, red, ripe")
+  - SR Legacy         (~7,793 foods, frozen 2019 — has the pantry/spice/herb
+                       entries that FNDDS lacks: baking soda, vanilla extract,
+                       dried oregano, garlic powder, chicken broth, vinegars)
 
-All four are official USDA FoodData Central sub-datasets. Search results are
-re-ranked by data quality tier in backend/app/search.py:
-  Foundation/FNDDS (tier 0) → SR Legacy (tier 1) → Branded (tier 2)
+All three load through the same uniform code path. The Branded sub-dataset is
+intentionally excluded: it contributes ~99% of disk size for packaged-product
+SKUs that flood generic searches.
 
 Environment variables:
-    FDC_DATA_DIR  Path containing foundation/, survey/, sr_legacy/, branded/
-                  subdirectories. Defaults to the directory that contains
-                  this script.
+    FDC_DATA_DIR  Path containing foundation/, survey/, sr_legacy/ subdirs.
+                  Defaults to the directory that contains this script.
     DB_PATH       Output SQLite path.
                   Defaults to nutrition.db next to this script.
 
@@ -26,9 +25,6 @@ Expected layout under FDC_DATA_DIR:
     foundation/food_category.csv          (optional)
     survey/...                            (same files)
     sr_legacy/...                         (same files)
-    branded/food.csv
-    branded/food_nutrient.csv
-    branded/branded_food.csv              (portion data lives here, not food_portion.csv)
 
 Download the CSVs from: https://fdc.nal.usda.gov/download-foods.html
 Or run: bash scripts/download_fdc.sh
@@ -44,8 +40,13 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FDC_DATA_DIR = os.environ.get("FDC_DATA_DIR", BASE_DIR)
 DB_PATH = os.environ.get("DB_PATH", os.path.join(BASE_DIR, "nutrition.db"))
 
-# USDA nutrient IDs → our column names (consistent across all FDC datasets)
+# USDA nutrient codes → our column names.
+# A USDA quirk: Foundation's food_nutrient.csv stores the 4-digit `nutrient.id`
+# (1008 = Energy), but FNDDS's food_nutrient.csv stores the 3-digit
+# `nutrient.nutrient_nbr` (208 = Energy) in the same column. We accept both so
+# one loader works for both datasets.
 NUTRIENT_ID_MAP: dict[str, str] = {
+    # 4-digit Foundation/SR-Legacy IDs
     "1008": "calories",
     "1004": "fat_total_g",
     "1258": "fat_saturated_g",
@@ -59,22 +60,32 @@ NUTRIENT_ID_MAP: dict[str, str] = {
     "1087": "calcium_mg",
     "1089": "iron_mg",
     "1092": "potassium_mg",
+    # 3-digit FNDDS nutrient_nbr equivalents
+    "208": "calories",
+    "204": "fat_total_g",
+    "606": "fat_saturated_g",
+    "601": "cholesterol_mg",
+    "307": "sodium_mg",
+    "205": "carbohydrates_total_g",
+    "291": "fiber_g",
+    "269": "sugar_g",
+    "203": "protein_g",
+    "328": "vitamin_d_mcg",
+    "301": "calcium_mg",
+    "303": "iron_mg",
+    "306": "potassium_mg",
 }
 
 # (subdirectory, data_type value written to food_macros.data_type)
 # Order matters: foods are inserted with INSERT OR IGNORE, so earlier datasets
-# win on fdc_id collisions (rare across FDC sub-datasets but possible).
+# win on fdc_id collisions.
 DATASETS = [
     ("foundation", "foundation_food"),
     ("survey",     "survey_fndds_food"),
     ("sr_legacy",  "sr_legacy_food"),
-    ("branded",    "branded_food"),
 ]
 
-# Files every FDC sub-dataset ships. Note: the Branded ZIP intentionally does
-# not include food_portion.csv — branded portion data lives in branded_food.csv
-# (household_serving_fulltext + serving_size). See validate_inputs().
-REQUIRED_FILES = ("food.csv", "food_nutrient.csv")
+REQUIRED_FILES = ("food.csv", "food_nutrient.csv", "food_portion.csv")
 
 
 def csv_path(subdir: str, filename: str) -> str:
@@ -95,9 +106,6 @@ def create_schema(conn: sqlite3.Connection) -> None:
             fdc_id                  INTEGER PRIMARY KEY,
             description             TEXT NOT NULL,
             data_type               TEXT NOT NULL,
-            brand_owner             TEXT,
-            brand_name              TEXT,
-            gtin_upc                TEXT,
             food_category           TEXT,
             calories                REAL DEFAULT 0,
             fat_total_g             REAL DEFAULT 0,
@@ -124,10 +132,11 @@ def create_schema(conn: sqlite3.Connection) -> None:
 
         -- FTS5 content table: index lives here, text is read from food_macros.
         -- porter unicode61 = unicode-aware tokenizer + Porter stemming.
+        -- Only `description` is indexed: indexing food_category caused
+        -- spurious matches (e.g. "baking soda" hit "Bread, irish soda" via
+        -- the "Baked Products" category).
         CREATE VIRTUAL TABLE food_search USING fts5(
             description,
-            brand_name,
-            food_category,
             content='food_macros',
             content_rowid='fdc_id',
             tokenize='porter unicode61'
@@ -177,76 +186,80 @@ def load_foods(
                 "description": row["description"],
                 "data_type": data_type,
                 "food_category": categories.get(cat_id, ""),
-                "brand_owner": None,
-                "brand_name": None,
-                "gtin_upc": None,
             }
     if skipped:
         print(f"  [{data_type}] Skipped {skipped:,} rows of other data_types in food.csv.")
     return foods
 
 
-def load_branded_meta(subdir: str, food_ids: set[str]) -> dict[str, dict]:
-    """
-    Read branded_food.csv and return metadata for active US products only.
-    Foods with a discontinued_date or a non-US market_country are excluded.
-    """
-    meta: dict[str, dict] = {}
-    path = csv_path(subdir, "branded_food.csv")
-    if not os.path.exists(path):
-        print(f"  WARNING: {path} not found — branded metadata will be empty.", file=sys.stderr)
-        return meta
-    with open(path, newline="", encoding="utf-8") as f:
-        for row in csv.DictReader(f):
-            fid = row["fdc_id"]
-            if fid not in food_ids:
-                continue
-            if row.get("discontinued_date", "").strip():
-                continue
-            market = row.get("market_country", "United States").strip()
-            if market not in ("United States", ""):
-                continue
-            meta[fid] = {
-                "brand_owner":               row.get("brand_owner", "").strip() or None,
-                "brand_name":                row.get("brand_name", "").strip() or None,
-                "gtin_upc":                  row.get("gtin_upc", "").strip() or None,
-                "food_category":             row.get("branded_food_category", "").strip(),
-                "household_serving_fulltext": row.get("household_serving_fulltext", "").strip(),
-                "serving_size":              row.get("serving_size", "").strip(),
-                "serving_size_unit":         row.get("serving_size_unit", "").strip().lower(),
-            }
-    return meta
+# Foundation Foods store Energy under Atwater conversion-factor nutrient IDs
+# (2047 = Atwater specific, 2048 = Atwater general) instead of the standard
+# Energy id 1008 that SR Legacy and FNDDS use. Map all three to "calories";
+# CALORIES_PRIORITY is consulted by the loader so that 1008 > 2047 > 2048
+# when more than one is published for the same food.
+CALORIES_PRIORITY: dict[str, int] = {"1008": 0, "208": 0, "2047": 1, "2048": 2}
+_CALORIE_ALIASES = {"2047": "calories", "2048": "calories"}
 
 
 def load_nutrients(
     subdir: str, food_ids: set[str]
 ) -> dict[str, dict[str, float]]:
     """
-    Stream food_nutrient.csv (potentially millions of rows for branded dataset)
-    and return {fdc_id: {nutrient_field: value}} for our 13 nutrients.
+    Stream food_nutrient.csv and return {fdc_id: {nutrient_field: value}}
+    for our 13 nutrients.
     """
     nutrients: dict[str, dict[str, float]] = {fid: {} for fid in food_ids}
+    # Track which Energy source supplied each food's calories so we don't
+    # overwrite a higher-priority value with a lower-priority one.
+    calorie_src: dict[str, int] = {}
     with open(csv_path(subdir, "food_nutrient.csv"), newline="", encoding="utf-8") as f:
         for row in csv.DictReader(f):
             fid = row["fdc_id"]
             nid = row["nutrient_id"]
-            if fid not in food_ids or nid not in NUTRIENT_ID_MAP:
+            if fid not in food_ids:
                 continue
-            field = NUTRIENT_ID_MAP[nid]
+            field = NUTRIENT_ID_MAP.get(nid) or _CALORIE_ALIASES.get(nid)
+            if field is None:
+                continue
             try:
-                nutrients[fid][field] = float(row["amount"])
+                value = float(row["amount"])
             except (ValueError, KeyError):
-                pass
+                continue
+            if field == "calories":
+                prio = CALORIES_PRIORITY.get(nid, 99)
+                if calorie_src.get(fid, 99) <= prio:
+                    continue
+                calorie_src[fid] = prio
+            nutrients[fid][field] = value
     return nutrients
+
+
+def load_measure_units(subdir: str) -> dict[str, str]:
+    """Return {measure_unit_id: human_name} for joining FDC portion rows."""
+    units: dict[str, str] = {}
+    path = csv_path(subdir, "measure_unit.csv")
+    if not os.path.exists(path):
+        return units
+    with open(path, newline="", encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            units[row["id"]] = row.get("name", "").strip()
+    return units
 
 
 def load_portions(subdir: str, food_ids: set[str]) -> list[tuple]:
     """Return (fdc_id, amount, modifier, gram_weight) tuples from food_portion.csv.
-    Returns [] if the file is absent (expected for the Branded dataset)."""
+
+    The portion label picks the most human-readable field available:
+      - FNDDS rows: measure_unit_id is always "9999" (undetermined) and the
+        readable label lives in portion_description ("1 cup", "1 tablespoon").
+      - Foundation rows: measure_unit_id points at a real unit ("1001"=tablespoon)
+        and portion_description is empty.
+      - A non-numeric `modifier` ("stick", "slice") wins last as a fallback —
+        FNDDS uses this column for opaque numeric codes, which we discard.
+    """
+    measure_units = load_measure_units(subdir)
     portions: list[tuple] = []
     path = csv_path(subdir, "food_portion.csv")
-    if not os.path.exists(path):
-        return portions
     with open(path, newline="", encoding="utf-8") as f:
         for row in csv.DictReader(f):
             fid = row["fdc_id"]
@@ -259,9 +272,21 @@ def load_portions(subdir: str, food_ids: set[str]) -> list[tuple]:
                 continue
             if gram_weight <= 0:
                 continue
-            modifier = row.get("modifier", "").strip()
+
             desc = row.get("portion_description", "").strip()
-            label = modifier or desc or "serving"
+            unit_id = row.get("measure_unit_id", "").strip()
+            unit_name = measure_units.get(unit_id, "")
+            modifier = row.get("modifier", "").strip()
+
+            if desc:
+                label = desc
+            elif unit_name and unit_name.lower() != "undetermined":
+                label = unit_name
+            elif modifier and not modifier.isdigit():
+                label = modifier
+            else:
+                label = "serving"
+
             portions.append((int(fid), amount, label, gram_weight))
     return portions
 
@@ -282,52 +307,22 @@ def insert_dataset(
     food_ids = set(foods.keys())
     print(f"  [{data_type}] {len(food_ids):,} foods in food.csv.")
 
-    branded_meta: dict[str, dict] = {}
-    if data_type == "branded_food":
-        print(f"  [{data_type}] Filtering to active US products ...")
-        branded_meta = load_branded_meta(subdir, food_ids)
-        food_ids = set(branded_meta.keys())
-        print(f"  [{data_type}] {len(food_ids):,} foods after US/active filter.")
-
-    print(f"  [{data_type}] Loading nutrients (large file — may take a few minutes) ...")
+    print(f"  [{data_type}] Loading nutrients ...")
     nutrients = load_nutrients(subdir, food_ids)
 
     print(f"  [{data_type}] Loading portions ...")
     portions = load_portions(subdir, food_ids)
 
-    # For branded foods: supplement portions from household_serving_fulltext
-    # when food_portion.csv has no entry for that food.
-    if data_type == "branded_food":
-        has_portion = {p[0] for p in portions}
-        for fid, meta in branded_meta.items():
-            fid_int = int(fid)
-            if fid_int in has_portion:
-                continue
-            serving_text = meta["household_serving_fulltext"]
-            serving_size = meta["serving_size"]
-            serving_unit = meta["serving_size_unit"]
-            if serving_text and serving_size and serving_unit == "g":
-                try:
-                    gram_weight = float(serving_size)
-                    if gram_weight > 0:
-                        portions.append((fid_int, 1.0, serving_text, gram_weight))
-                except ValueError:
-                    pass
-
     print(f"  [{data_type}] Inserting {len(food_ids):,} foods, {len(portions):,} portions ...")
     food_rows = []
     for fid in food_ids:
         fd = foods.get(fid, {})
-        bm = branded_meta.get(fid, {})
         n = nutrients.get(fid, {})
         food_rows.append((
             int(fid),
             fd.get("description", ""),
             data_type,
-            bm.get("brand_owner") or fd.get("brand_owner"),
-            bm.get("brand_name") or fd.get("brand_name"),
-            bm.get("gtin_upc") or fd.get("gtin_upc"),
-            bm.get("food_category") or fd.get("food_category") or "",
+            fd.get("food_category", ""),
             n.get("calories", 0.0),
             n.get("fat_total_g", 0.0),
             n.get("fat_saturated_g", 0.0),
@@ -343,9 +338,9 @@ def insert_dataset(
             n.get("potassium_mg", 0.0),
         ))
 
-    # INSERT OR IGNORE so duplicate fdc_ids (shouldn't happen across datasets) are skipped.
+    # INSERT OR IGNORE so duplicate fdc_ids (rare across datasets) are skipped.
     conn.executemany(
-        "INSERT OR IGNORE INTO food_macros VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "INSERT OR IGNORE INTO food_macros VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         food_rows,
     )
     conn.executemany(
@@ -363,12 +358,8 @@ def insert_dataset(
 def build_fts_index(conn: sqlite3.Connection) -> None:
     print("  Building FTS5 search index ...")
     conn.execute("""
-        INSERT INTO food_search(rowid, description, brand_name, food_category)
-        SELECT fdc_id,
-               description,
-               COALESCE(brand_name, ''),
-               COALESCE(food_category, '')
-        FROM food_macros
+        INSERT INTO food_search(rowid, description)
+        SELECT fdc_id, description FROM food_macros
     """)
     # Merge all segment files into one for fastest read-time performance.
     conn.execute("INSERT INTO food_search(food_search) VALUES('optimize')")
@@ -385,20 +376,12 @@ def main() -> None:
         sys.exit(0)
 
     # Verify required CSVs are present before doing any work.
-    # Branded is special: no food_portion.csv (portions live in branded_food.csv),
-    # but branded_food.csv itself is required.
     missing: list[str] = []
     for subdir, _ in DATASETS:
         for fname in REQUIRED_FILES:
             p = csv_path(subdir, fname)
             if not os.path.exists(p):
                 missing.append(p)
-        if subdir == "branded":
-            if not os.path.exists(csv_path(subdir, "branded_food.csv")):
-                missing.append(csv_path(subdir, "branded_food.csv"))
-        else:
-            if not os.path.exists(csv_path(subdir, "food_portion.csv")):
-                missing.append(csv_path(subdir, "food_portion.csv"))
     if missing:
         print("ERROR: Missing FDC data files:", file=sys.stderr)
         for p in missing:
@@ -408,7 +391,7 @@ def main() -> None:
             "and extract each into the corresponding subdirectory under FDC_DATA_DIR:\n"
             f"  {FDC_DATA_DIR}/foundation/\n"
             f"  {FDC_DATA_DIR}/survey/\n"
-            f"  {FDC_DATA_DIR}/branded/\n"
+            f"  {FDC_DATA_DIR}/sr_legacy/\n"
             "\nOr run: scripts/download_fdc.sh",
             file=sys.stderr,
         )
@@ -443,6 +426,15 @@ def main() -> None:
     print("  Running ANALYZE for query planner ...")
     conn.execute("ANALYZE")
     conn.execute("PRAGMA optimize")
+
+    # Merge the WAL into the main DB and switch back to rollback-journal mode
+    # so the resulting nutrition.db is self-contained. Without this, SQLite
+    # leaves a multi-hundred-MB .wal file alongside the DB and the read-only
+    # backend container can't apply it on open (sqlite3.OperationalError:
+    # unable to open database file).
+    print("  Checkpointing WAL and switching to rollback-journal mode ...")
+    conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    conn.execute("PRAGMA journal_mode=DELETE")
     conn.close()
 
     db_mb = os.path.getsize(DB_PATH) / 1024 / 1024

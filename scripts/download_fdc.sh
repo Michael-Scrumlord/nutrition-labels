@@ -6,8 +6,7 @@
 #
 #   backend/data/fdc/foundation/   (~30 MB extracted)
 #   backend/data/fdc/survey/       (~100 MB extracted)
-#   backend/data/fdc/sr_legacy/    (~50 MB extracted — for legacy fdc_id compat)
-#   backend/data/fdc/branded/      (~2 GB extracted)
+#   backend/data/fdc/sr_legacy/    (~50 MB extracted — pantry/spice/herb coverage)
 #
 # Run from the repo root:
 #   bash scripts/download_fdc.sh
@@ -24,7 +23,6 @@ FDC_DIR="$SCRIPT_DIR/../backend/data/fdc"
 FOUNDATION_URL="https://fdc.nal.usda.gov/fdc-datasets/FoodData_Central_foundation_food_csv_2024-10-31.zip"
 SURVEY_URL="https://fdc.nal.usda.gov/fdc-datasets/FoodData_Central_survey_food_csv_2024-10-31.zip"
 SR_LEGACY_URL="https://fdc.nal.usda.gov/fdc-datasets/FoodData_Central_sr_legacy_food_csv_2018-04.zip"
-BRANDED_URL="https://fdc.nal.usda.gov/fdc-datasets/FoodData_Central_branded_food_csv_2024-10-31.zip"
 # ─────────────────────────────────────────────────────────────────────────────
 
 check_tool() {
@@ -68,10 +66,9 @@ echo ""
 download_and_extract "$FOUNDATION_URL" "$FDC_DIR/foundation"
 download_and_extract "$SURVEY_URL"     "$FDC_DIR/survey"
 download_and_extract "$SR_LEGACY_URL"  "$FDC_DIR/sr_legacy"
-download_and_extract "$BRANDED_URL"    "$FDC_DIR/branded"
 
 echo ""
 echo "=== Download complete ==="
 echo ""
 echo "Next step: docker-compose up --build"
-echo "(The db-init service will build nutrition.db on first startup — allow 5-15 minutes.)"
+echo "(The db-init service will build nutrition.db on first startup — allow 1-2 minutes.)"

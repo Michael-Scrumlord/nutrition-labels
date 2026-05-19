@@ -4,7 +4,7 @@
 // Tabs: Search (USDA) / Common / Recent / Favorites.
 // Selecting a food drops into an inline add-form inside the modal.
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, Fragment } from "react";
 import { usePreferencesStore } from "../../store/preferencesStore";
 import { useIngredientSearch } from "../../hooks/useIngredientSearch";
 import { useQuery } from "@tanstack/react-query";
@@ -252,34 +252,58 @@ export function IngredientSearch({ open, onClose }: IngredientSearchProps) {
           )}
 
           <ul style={{ listStyle: "none", margin: 0, padding: "8px 0" }}>
-            {activeList.map((food) => {
+            {activeList.map((food, i) => {
               const fav = isFavorite(food.fdc_id);
+              // On the Common tab, COMMON_FOODS carries a `category` field
+              // and is already grouped — inject a header whenever the
+              // category changes from the previous row.
+              const cat = tab === "common" ? (food as { category?: string }).category : undefined;
+              const prevCat = tab === "common" && i > 0
+                ? (activeList[i - 1] as { category?: string }).category
+                : undefined;
+              const showHeader = cat && cat !== prevCat;
+
               return (
-                <li
-                  key={food.fdc_id}
-                  style={{
-                    display: "flex", justifyContent: "space-between", alignItems: "center",
-                    padding: "10px 22px", borderBottom: "1px solid var(--hair)",
-                    cursor: "pointer",
-                  }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLLIElement).style.background = "color-mix(in srgb, var(--accent) 6%, transparent)"; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLLIElement).style.background = ""; }}
-                  onClick={() => setSelected(food)}
-                >
-                  <span className="pl-display" style={{ fontSize: 20, color: "var(--ink)" }}>
-                    {food.name}
-                  </span>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); toggleFavorite(food); }}
+                <Fragment key={food.fdc_id}>
+                  {showHeader && (
+                    <li
+                      style={{
+                        padding: "14px 22px 6px",
+                        fontSize: 10, letterSpacing: "0.16em",
+                        fontFamily: "var(--f-mono)", color: "var(--ink-3)",
+                        textTransform: "uppercase",
+                        background: "var(--surface)",
+                        borderBottom: "1px solid var(--hair)",
+                      }}
+                    >
+                      {cat}
+                    </li>
+                  )}
+                  <li
                     style={{
-                      background: "transparent", border: "none", cursor: "pointer",
-                      color: fav ? "var(--accent)" : "var(--ink-3)", fontSize: 18, padding: "0 4px",
+                      display: "flex", justifyContent: "space-between", alignItems: "center",
+                      padding: "10px 22px", borderBottom: "1px solid var(--hair)",
+                      cursor: "pointer",
                     }}
-                    aria-label={fav ? "Unfavorite" : "Favorite"}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLLIElement).style.background = "color-mix(in srgb, var(--accent) 6%, transparent)"; }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLLIElement).style.background = ""; }}
+                    onClick={() => setSelected(food)}
                   >
-                    {fav ? "★" : "☆"}
-                  </button>
-                </li>
+                    <span className="pl-display" style={{ fontSize: 20, color: "var(--ink)" }}>
+                      {food.name}
+                    </span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); toggleFavorite(food); }}
+                      style={{
+                        background: "transparent", border: "none", cursor: "pointer",
+                        color: fav ? "var(--accent)" : "var(--ink-3)", fontSize: 18, padding: "0 4px",
+                      }}
+                      aria-label={fav ? "Unfavorite" : "Favorite"}
+                    >
+                      {fav ? "★" : "☆"}
+                    </button>
+                  </li>
+                </Fragment>
               );
             })}
           </ul>
