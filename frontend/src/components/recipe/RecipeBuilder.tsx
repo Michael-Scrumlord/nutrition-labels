@@ -18,7 +18,6 @@ import { MethodSection } from "./MethodSection";
 import { ingredientGrams } from "../../utils/units";
 import { RecipeStatsBar } from "./RecipeStatsBar";
 import { VersionBanner } from "./VersionBanner";
-import { convertToGrams } from "../../utils/units";
 import { getHighlightKeys } from "../../utils/nutrition";
 
 export function RecipeBuilder() {
@@ -32,12 +31,8 @@ export function RecipeBuilder() {
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
 
   const macros      = useNutritionCalc();
-  const animatedCal = useAnimatedNumber(macros.calories);
   const totalGrams  = useMemo(
     () => ingredients.reduce((s, i) => s + ingredientGrams(i), 0),
-  const macros     = useNutritionCalc();
-  const totalGrams = useMemo(
-    () => ingredients.reduce((s, i) => s + convertToGrams(i.amount, i.unit), 0),
     [ingredients],
   );
 
