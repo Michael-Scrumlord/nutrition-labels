@@ -111,10 +111,7 @@ export function LabelColumn() {
     <aside
       style={{
         gridArea: "label",
-        position: "sticky",
-        top: 0,
-        alignSelf: "start",
-        height: "100vh",
+        height: "100%",
         overflow: "hidden", // glow is clipped here; inner scroller handles content
         background: "var(--plinth-bg)",
         borderLeft: "1px solid var(--hair-strong)",

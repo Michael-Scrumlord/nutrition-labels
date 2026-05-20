@@ -7,6 +7,13 @@
 # Set DOMAIN in your .env (e.g. DOMAIN=nutrition-label-generator.example.com).
 # For local testing, swap {$DOMAIN} for `:80` and remove the tls block.
 
+# The rate_limit directive is provided by github.com/mholt/caddy-ratelimit,
+# baked into the local Caddy build (see caddy/Dockerfile). It MUST be declared
+# at the global level before site blocks reference it.
+{
+    order rate_limit before reverse_proxy
+}
+
 {$DOMAIN} {
     encode zstd gzip
 
@@ -15,11 +22,23 @@
     header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
     header -Server
 
-    # Per-IP request shaping at the edge. Pairs with slowapi inside FastAPI.
-    # (Requires Caddy v2.8+; comment out if you're on an older version.)
-    # rate_limit {
-    #     zone donate { key {remote_host}  events 60  window 1m }
-    # }
+    # Edge rate-limiting for the expensive endpoint. slowapi inside FastAPI
+    # only rejects AFTER the request reaches Python (which has already
+    # consumed a gunicorn worker on a multi-second PDF render). Rejecting
+    # at Caddy keeps a burst from chewing through the worker pool.
+    #
+    # /api/generate_label: 10 requests per minute per client IP.
+    # All other paths are unrestricted at the edge — slowapi handles them.
+    rate_limit {
+        zone generate {
+            match {
+                path /api/generate_label
+            }
+            key    {remote_host}
+            events 10
+            window 1m
+        }
+    }
 
     reverse_proxy frontend:80 {
         header_up X-Forwarded-Proto {scheme}

@@ -10,9 +10,24 @@ export interface IngredientItem {
   name: string;       // Display name on the label (user can edit this)
   amount: number;
   unit: UnitKey;
+  // When set, `amount` is interpreted as "this many `portionRef`s" instead
+  // of "this much of `unit`". Picking "tbsp" sets portionRef; picking "g"
+  // clears it. Only one of (unit, portionRef) drives the math at a time.
+  portionRef?: PortionRef | null;
+  // The food's known portion sizes from /api/food/{fdc_id}, cached here so
+  // the recipe row's unit picker can show them after the food detail query
+  // has been discarded.
+  availablePortions?: PortionSize[];
   // baseMacros is loaded from GET /api/food/{fdc_id} and cached here
   // so we don't need to re-fetch every time the amount changes.
   baseMacros: MacroProfile;
+}
+
+// A food-specific unit ("1 tablespoon = 14.2 g"), normalized to grams-per-1.
+// Built from a PortionSize via `normalizePortion()` in utils/units.ts.
+export interface PortionRef {
+  modifier: string;      // "tablespoon", "cup", "large egg"
+  gramsPerUnit: number;  // PortionSize.gram_weight / PortionSize.amount
 }
 
 // ── Unit choices ──────────────────────────────────────────────────────────

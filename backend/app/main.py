@@ -5,6 +5,8 @@
 
 import asyncio
 import logging
+import os
+import sys
 from typing import Annotated
 
 from fastapi import FastAPI, HTTPException, Path, Request, Response
@@ -14,6 +16,7 @@ from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app import database, search as search_module, nutrition, pdf
 from app.config import settings
@@ -26,6 +29,15 @@ from app.models import (
     GenerateLabelRequest,
 )
 from app.constants import NUTRIENT_FIELDS
+
+# One JSON object per log line. Pipe `docker compose logs backend` through
+# `jq` for filtering, or ship straight to an aggregator without reformatting.
+# LOG_LEVEL overridable via env (default INFO).
+logging.basicConfig(
+    level=os.environ.get("LOG_LEVEL", "INFO"),
+    format='{"ts":"%(asctime)s","lvl":"%(levelname)s","logger":"%(name)s","msg":"%(message)s"}',
+    stream=sys.stdout,
+)
 
 logger = logging.getLogger("nutritionlabels")
 
@@ -62,6 +74,11 @@ app.state.limiter = limiter
 
 app.add_middleware(BodySizeLimitMiddleware, max_bytes=settings.max_body_bytes)
 
+# Reject requests whose Host header isn't in our allow-list. Defense-in-depth
+# against Host-header injection; also blocks the random-IP scanners that hit
+# the bare server IP looking for vhosts.
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.allowed_hosts)
+
 # CORS is only needed when the frontend is served from a different origin
 # (typical only in local dev). In prod, nginx/Caddy proxies /api/ same-origin.
 if settings.cors_origins:
@@ -94,6 +111,20 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     )
 
 
+@app.get("/api/health")
+def health() -> dict:
+    """
+    Liveness + readiness in one. Probes the DB so a missing/corrupt
+    nutrition.db volume surfaces as an unhealthy container instead of
+    silently 500ing every real request.
+    """
+    try:
+        with database.get_connection() as conn:
+            conn.execute("SELECT 1 FROM food_macros LIMIT 1").fetchone()
+    except Exception:
+        logger.exception("health check db probe failed")
+        raise HTTPException(status_code=503, detail="database unavailable")
+    return {"status": "ok", "release": settings.release_sha}
 async def _render_pdf_with_timeout(html: str) -> bytes:
     """Run WeasyPrint in a thread, bounded by the semaphore and a timeout."""
     try:

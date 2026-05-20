@@ -21,6 +21,7 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 
 # Custom nginx config: serve static files + proxy /api/* to backend
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY security-headers.conf /etc/nginx/security-headers.conf
 
 EXPOSE 80
 

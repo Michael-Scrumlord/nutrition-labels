@@ -6,6 +6,12 @@
 # Tests NEVER touch data/nutrition.db.
 
 import os
+
+# Allow the httpx test client's "test" Host header through TrustedHostMiddleware.
+# Must be set BEFORE `from app.main import app` so Settings() picks it up at
+# import time.
+os.environ["ALLOWED_HOSTS"] = '["*"]'
+
 import sqlite3
 import tempfile
 import pytest

@@ -11,14 +11,17 @@ import type { SavedFood } from "../types";
 const MAX_RECENTS = 15;
 const RECENTS_KEY  = "nl_recents";
 const FAVORITES_KEY = "nl_favorites";
+const METHOD_EXPANDED_KEY = "nl_methodExpanded";
 
 interface PreferencesState {
   recents: SavedFood[];
   favorites: SavedFood[];
+  isMethodExpanded: boolean;
 
   addRecent: (food: SavedFood) => void;
   toggleFavorite: (food: SavedFood) => void;
   isFavorite: (fdc_id: number) => boolean;
+  toggleMethodExpanded: () => void;
 }
 
 export const usePreferencesStore = create<PreferencesState>()(
@@ -26,6 +29,7 @@ export const usePreferencesStore = create<PreferencesState>()(
     (set, get) => ({
       recents: [],
       favorites: [],
+      isMethodExpanded: true,
 
       addRecent: (food) =>
         set((state) => {
@@ -46,21 +50,26 @@ export const usePreferencesStore = create<PreferencesState>()(
 
       isFavorite: (fdc_id) =>
         get().favorites.some((f) => f.fdc_id === fdc_id),
+
+      toggleMethodExpanded: () =>
+        set((state) => ({ isMethodExpanded: !state.isMethodExpanded })),
     }),
     {
       name: "nl_preferences",
-      // Store recents and favorites under their own keys for clarity
+      // Store each preference under its own key for clarity
       partialize: (state) => ({
-        [RECENTS_KEY]:  state.recents,
-        [FAVORITES_KEY]: state.favorites,
+        [RECENTS_KEY]:         state.recents,
+        [FAVORITES_KEY]:       state.favorites,
+        [METHOD_EXPANDED_KEY]: state.isMethodExpanded,
       }),
       // Re-map the stored keys back to state shape on hydration
       merge: (persisted, current) => {
-        const stored = persisted as Record<string, SavedFood[]>;
+        const stored = persisted as Record<string, unknown>;
         return {
           ...current,
-          recents:   stored[RECENTS_KEY]   ?? [],
-          favorites: stored[FAVORITES_KEY] ?? [],
+          recents:          (stored[RECENTS_KEY]   as SavedFood[] | undefined) ?? [],
+          favorites:        (stored[FAVORITES_KEY] as SavedFood[] | undefined) ?? [],
+          isMethodExpanded: (stored[METHOD_EXPANDED_KEY] as boolean | undefined) ?? true,
         };
       },
     },

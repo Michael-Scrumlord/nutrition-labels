@@ -15,9 +15,9 @@ import { IngredientSearch } from "../search/IngredientSearch";
 import { IngredientRow } from "./IngredientRow";
 import { NutritionBreakdownTable } from "./NutritionBreakdownTable";
 import { MethodSection } from "./MethodSection";
+import { ingredientGrams } from "../../utils/units";
 import { RecipeStatsBar } from "./RecipeStatsBar";
 import { VersionBanner } from "./VersionBanner";
-import { convertToGrams } from "../../utils/units";
 import { getHighlightKeys } from "../../utils/nutrition";
 
 export function RecipeBuilder() {
@@ -30,9 +30,9 @@ export function RecipeBuilder() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
 
-  const macros     = useNutritionCalc();
-  const totalGrams = useMemo(
-    () => ingredients.reduce((s, i) => s + convertToGrams(i.amount, i.unit), 0),
+  const macros      = useNutritionCalc();
+  const totalGrams  = useMemo(
+    () => ingredients.reduce((s, i) => s + ingredientGrams(i), 0),
     [ingredients],
   );
 
@@ -61,9 +61,6 @@ export function RecipeBuilder() {
       >
         {/* ── Viewing older version banner ─────────────────────────────── */}
         {viewingVersionId && <VersionBanner onDismiss={exitVersionView} />}
-
-        {/* ── Recipe № mark ────────────────────────────────────────────── */}
-        <div className="pl-meta" style={{ marginBottom: 4 }}>RECIPE №&nbsp;04</div>
 
         {/* ── Recipe name (editorial hero — 56px) ──────────────────────── */}
         <div style={{ width: "100%", marginBottom: 18 }}>

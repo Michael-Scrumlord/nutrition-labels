@@ -18,15 +18,20 @@ A full-stack web application that lets you build custom recipes from USDA food d
 # 1. Download USDA FoodData Central CSVs (~700 MB, one-time, ~2 GB extracted)
 bash scripts/download_fdc.sh
 
-# 2. Start everything. The db-init service builds nutrition.db on first run
-#    (5–15 min on 2 vCPUs), then exits. Subsequent restarts skip the build.
-docker-compose up --build
+# 2. Start everything (local dev mode — publishes ports, skips Caddy/TLS).
+#    The db-init service builds nutrition.db on first run (5–15 min on
+#    2 vCPUs), then exits. Subsequent restarts skip the build.
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 ```
 
 | Service      | URL                    |
 |-------------|------------------------|
 | Frontend    | http://localhost:5173  |
 | Backend API | http://localhost:8000  |
+
+For production deploys (Caddy on :80/:443, no published frontend/backend
+ports), use `docker compose up --build` without the dev override. See
+[docs/DEPLOY.md](docs/DEPLOY.md).
 
 The compiled SQLite database lives on the `nutrition_db` Docker volume — it is
 **not** baked into the backend image, and the backend mounts it read-only. See

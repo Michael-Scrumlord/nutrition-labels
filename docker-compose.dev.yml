@@ -1,0 +1,29 @@
+# Local-only override for docker-compose.yml.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+#
+# What this changes vs. prod:
+#   - Publishes the frontend nginx on host port 5173 so you can hit
+#     http://localhost:5173 in a browser. (Prod doesn't publish this —
+#     Caddy is the only public entry point.)
+#   - Publishes the backend on host port 8000 so `npm run dev` (if you're
+#     running Vite on the host) can proxy /api/* to it directly.
+#   - Disables the Caddy service — no TLS, no Let's Encrypt, no DOMAIN
+#     required for local browsing.
+
+services:
+  backend:
+    ports:
+      - "8000:8000"
+
+  frontend:
+    ports:
+      - "5173:80"
+
+  # Local dev doesn't need TLS termination or Let's Encrypt.
+  # `replicas: 0` keeps the service defined (so the compose file merges
+  # cleanly) but doesn't actually start a Caddy container.
+  caddy:
+    deploy:
+      replicas: 0

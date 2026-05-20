@@ -5,12 +5,12 @@
 // All values are computed client-side.
 
 import { useRecipeStore } from "../../store/recipeStore";
-import { UNIT_CONVERSIONS } from "../../utils/units";
+import { ingredientGrams } from "../../utils/units";
 import { round1 } from "../../utils/nutrition";
 import type { IngredientItem } from "../../types";
 
 function ingredientWeightGrams(ing: IngredientItem): number {
-  return ing.amount * UNIT_CONVERSIONS[ing.unit];
+  return ingredientGrams(ing);
 }
 
 /** Macros for a single ingredient at its full (un-divided) quantity. */

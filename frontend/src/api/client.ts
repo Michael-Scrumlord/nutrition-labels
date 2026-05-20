@@ -5,6 +5,7 @@
 // status code so callers can handle 429 vs 4xx vs 5xx distinctly.
 
 import type { FoodDetail, FoodSearchResult, IngredientItem, LabelDimensions } from "../types";
+import { ingredientGrams } from "../utils/units";
 
 const BASE = "/api";
 
@@ -60,12 +61,26 @@ export async function generateLabel(
     label_name: labelName,
     width_inches: dimensions.widthInches,
     height_inches: dimensions.heightInches,
-    ingredients: ingredients.map((ing) => ({
-      fdc_id:  ing.fdc_id,
-      name:    ing.name,
-      amount:  ing.amount,
-      unit:    ing.unit,
-    })),
+    // Portion-based ingredients ("2 tablespoons") are flattened to grams
+    // before sending — the backend's Pydantic model only validates global
+    // UnitKeys, and macro math is the same either way. Round to 2 decimals
+    // so we don't ship 28.349500000001 to the server.
+    ingredients: ingredients.map((ing) => {
+      if (ing.portionRef) {
+        return {
+          fdc_id: ing.fdc_id,
+          name:   ing.name,
+          amount: Math.round(ingredientGrams(ing) * 100) / 100,
+          unit:   "g" as const,
+        };
+      }
+      return {
+        fdc_id: ing.fdc_id,
+        name:   ing.name,
+        amount: ing.amount,
+        unit:   ing.unit,
+      };
+    }),
   };
 
   const res = await fetch(`${BASE}/generate_label`, {

@@ -8,9 +8,23 @@
 import { useState } from "react";
 import { useRecipeStore } from "../../store/recipeStore";
 import { ScrubNumber } from "../ui/ScrubNumber";
-import { convertToGrams } from "../../utils/units";
+import { ingredientGrams, normalizePortion } from "../../utils/units";
 import { getHighlightKeys } from "../../utils/nutrition";
-import type { IngredientItem } from "../../types";
+import { UNIT_LABELS } from "../../types";
+import type { IngredientItem, UnitKey } from "../../types";
+
+const UNIT_KEYS = Object.keys(UNIT_LABELS) as UnitKey[];
+const MAX_INGREDIENT_AMOUNT = 1_000_000;  // matches backend validation
+
+// Picker option encoding:
+//   "unit:g", "unit:oz", ...        → global UnitKey
+//   "portion:tablespoon", ...       → portion modifier (looked up in availablePortions)
+type PickerValue = `unit:${UnitKey}` | `portion:${string}`;
+
+function currentPickerValue(item: IngredientItem): PickerValue {
+  if (item.portionRef) return `portion:${item.portionRef.modifier}`;
+  return `unit:${item.unit}`;
+}
 
 interface IngredientRowProps {
   ingredient: IngredientItem;
@@ -24,28 +38,37 @@ interface IngredientRowProps {
 export function IngredientRow({
   ingredient, index: _index, isHovered, totalGrams, onHoverEnter, onHoverLeave,
 }: IngredientRowProps) {
-  const updateAmount = useRecipeStore((s) => s.updateIngredientAmount);
-  const updateUnit   = useRecipeStore((s) => s.updateIngredientUnit);
-  const remove       = useRecipeStore((s) => s.removeIngredient);
-  const move         = useRecipeStore((s) => s.moveIngredient);
+  const updateAmount  = useRecipeStore((s) => s.updateIngredientAmount);
+  const updateUnit    = useRecipeStore((s) => s.updateIngredientUnit);
+  const updatePortion = useRecipeStore((s) => s.updateIngredientPortion);
+  const remove        = useRecipeStore((s) => s.removeIngredient);
+  const move          = useRecipeStore((s) => s.moveIngredient);
   const [actionsHover, setActionsHover] = useState(false);
 
-  const grams   = Math.round(convertToGrams(ingredient.amount, ingredient.unit));
-  const pctMix  = totalGrams > 0
-    ? (convertToGrams(ingredient.amount, ingredient.unit) / totalGrams) * 100
-    : 0;
+  const grams   = ingredientGrams(ingredient);
+  const pctMix  = totalGrams > 0 ? (grams / totalGrams) * 100 : 0;
   const kcal    = (ingredient.baseMacros.calories * grams) / 100;
+
+  // Picker option list: food-specific portions first, then a divider, then
+  // the global units. Portions normalize to "1 of these" so the user can
+  // type a clean integer count.
+  const portions = ingredient.availablePortions ?? [];
+
+  function handlePickerChange(raw: string) {
+    if (raw.startsWith("portion:")) {
+      const modifier = raw.slice("portion:".length);
+      const match = portions.find((p) => p.modifier === modifier);
+      if (match) updatePortion(ingredient.fdc_id, normalizePortion(match));
+    } else if (raw.startsWith("unit:")) {
+      updateUnit(ingredient.fdc_id, raw.slice("unit:".length) as UnitKey);
+    }
+  }
 
   const dominantKeys = getHighlightKeys(ingredient.baseMacros);
   const dominantLabel = [...dominantKeys]
     .map((k) => k.replace(/_/g, " ").replace(/(mg|g|mcg)$/, "").trim())
     .join(", ")
     .toUpperCase();
-
-  function setGrams(g: number) {
-    updateAmount(ingredient.fdc_id, g);
-    if (ingredient.unit !== "g") updateUnit(ingredient.fdc_id, "g");
-  }
 
   return (
     <li
@@ -98,19 +121,55 @@ export function IngredientRow({
         </span>
       </div>
 
-      {/* Scrubable gram weight */}
-      <span style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums" }}>
+      {/* Scrubable amount + inline unit picker */}
+      <span style={{
+        display: "inline-flex", alignItems: "baseline", gap: 4,
+        fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums",
+      }}>
         <ScrubNumber
-          value={grams}
-          min={0}
-          max={5000}
-          step={1}
-          onChange={setGrams}
+          value={ingredient.amount}
+          min={0.01}
+          max={MAX_INGREDIENT_AMOUNT}
+          decimals={2}
+          onChange={(n) => updateAmount(ingredient.fdc_id, n)}
           className="pl-scrub"
           style={{ fontSize: 22, fontWeight: 800 }}
-          ariaLabel={`${ingredient.name} grams`}
+          ariaLabel={`${ingredient.name} amount`}
         />
-        <span style={{ color: "var(--ink)", fontSize: 14, marginLeft: 2, fontWeight: 500 }}>g</span>
+        <select
+          aria-label={`${ingredient.name} unit`}
+          value={currentPickerValue(ingredient)}
+          onChange={(e) => handlePickerChange(e.target.value)}
+          style={{
+            background: "transparent",
+            border: "none",
+            color: "var(--ink)",
+            font: "inherit",
+            fontSize: 14,
+            fontWeight: 500,
+            padding: 0,
+            marginLeft: 2,
+            cursor: "pointer",
+            appearance: "none",
+            WebkitAppearance: "none",
+            MozAppearance: "none",
+          }}
+        >
+          {portions.length > 0 && (
+            <optgroup label="Food portions">
+              {portions.map((p) => (
+                <option key={`portion-${p.modifier}`} value={`portion:${p.modifier}`}>
+                  {p.modifier}
+                </option>
+              ))}
+            </optgroup>
+          )}
+          <optgroup label={portions.length > 0 ? "Standard units" : undefined}>
+            {UNIT_KEYS.map((u) => (
+              <option key={`unit-${u}`} value={`unit:${u}`}>{u}</option>
+            ))}
+          </optgroup>
+        </select>
       </span>
 
       {/* Row controls — hover only, stacked vertical */}

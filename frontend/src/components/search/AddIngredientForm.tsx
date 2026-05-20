@@ -51,11 +51,13 @@ export function AddIngredientForm({ food, onClose }: AddIngredientFormProps) {
     if (!foodDetail) return;
     const parsedAmount = parseFloat(amount);
     if (isNaN(parsedAmount) || parsedAmount <= 0) return;
+    // Round to 2 decimals so the store never holds 3.14159 from a paste.
+    const rounded = Math.round(parsedAmount * 100) / 100;
 
     addIngredient({
       fdc_id:     food.fdc_id,
       name:       displayName,
-      amount:     parsedAmount,
+      amount:     rounded,
       unit,
       baseMacros: foodDetail.macros,
     });
@@ -80,7 +82,7 @@ export function AddIngredientForm({ food, onClose }: AddIngredientFormProps) {
           label="Quantity"
           type="number"
           min="0.01"
-          step="any"
+          step="0.01"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
           className="w-24"

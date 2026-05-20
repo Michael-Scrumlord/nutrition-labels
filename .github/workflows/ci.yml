@@ -1,0 +1,86 @@
+name: CI
+
+# Runs on every push to long-lived branches and on every PR targeting master.
+# Three jobs run in parallel: backend tests, frontend build, docker build.
+# See docs/DEPLOY.md for how to enable branch protection so failing CI blocks
+# merges to master.
+
+on:
+  push:
+    branches: [master, Development]
+  pull_request:
+    branches: [master]
+
+jobs:
+  # ── Python: install deps + run the pytest suite ──────────────────────────
+  backend-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      # WeasyPrint needs Pango/Cairo at import time, even for tests that
+      # don't render PDFs. apt-installing here is faster than building from source.
+      - name: Install WeasyPrint system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libpango-1.0-0 libpangocairo-1.0-0 libcairo2 libcairo-gobject2 \
+            libgdk-pixbuf-2.0-0 shared-mime-info
+
+      - name: Install Python deps
+        run: pip install -r backend/requirements.txt
+
+      # test_db_health.py reads the real nutrition.db, which doesn't exist in
+      # CI (it's built on-host from FDC data). Skip that file here; the rest
+      # of the suite uses the in-memory fixture from conftest.py.
+      - name: Run pytest
+        working-directory: backend
+        run: pytest --ignore=tests/test_db_health.py
+
+  # ── Frontend: install deps + production build ────────────────────────────
+  frontend-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install npm deps
+        working-directory: frontend
+        run: npm ci
+
+      - name: Type-check
+        working-directory: frontend
+        run: npx tsc --noEmit
+
+      - name: Production build
+        working-directory: frontend
+        run: npm run build
+
+  # ── Docker: every image (db-init, backend, frontend, caddy) must build ──
+  # Catches Dockerfile typos, missing files, and dep-resolution breakage
+  # without actually running anything.
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # docker compose build needs DOMAIN even though we're not running the
+      # stack — it's substituted into the Caddyfile mount.
+      - name: Build all images
+        run: DOMAIN=ci.example.com docker compose build
