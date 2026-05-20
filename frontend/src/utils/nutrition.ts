@@ -5,7 +5,7 @@
 // If you change the math here, change it there too (and vice versa).
 
 import type { IngredientItem, MacroProfile, HighlightSet } from "../types";
-import { UNIT_CONVERSIONS } from "./units";
+import { ingredientGrams } from "./units";
 
 // FDA 2020 daily values. Nutrients without a DV show a dash on the label.
 // MUST match FDA_DAILY_VALUES in backend/app/constants.py.
@@ -68,7 +68,7 @@ export function calculateRecipeMacros(
   };
 
   for (const ingredient of ingredients) {
-    const grams = ingredient.amount * UNIT_CONVERSIONS[ingredient.unit];
+    const grams = ingredientGrams(ingredient);
     const multiplier = grams / 100; // DB stores values per 100g
 
     for (const field of NUTRIENT_FIELDS) {
@@ -152,8 +152,7 @@ export function formatDV(
 export function buildIngredientsString(ingredients: IngredientItem[]): string {
   if (ingredients.length === 0) return "";
   const sorted = [...ingredients].sort(
-    (a, b) =>
-      b.amount * UNIT_CONVERSIONS[b.unit] - a.amount * UNIT_CONVERSIONS[a.unit],
+    (a, b) => ingredientGrams(b) - ingredientGrams(a),
   );
   return sorted.map((ing) => ing.name.toUpperCase()).join(", ") + ".";
 }

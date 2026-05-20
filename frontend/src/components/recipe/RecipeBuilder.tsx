@@ -16,7 +16,7 @@ import { IngredientSearch } from "../search/IngredientSearch";
 import { IngredientRow } from "./IngredientRow";
 import { NutritionBreakdownTable } from "./NutritionBreakdownTable";
 import { MethodSection } from "./MethodSection";
-import { convertToGrams } from "../../utils/units";
+import { ingredientGrams } from "../../utils/units";
 import { getHighlightKeys } from "../../utils/nutrition";
 
 export function RecipeBuilder() {
@@ -32,7 +32,7 @@ export function RecipeBuilder() {
   const macros      = useNutritionCalc();
   const animatedCal = useAnimatedNumber(macros.calories);
   const totalGrams  = useMemo(
-    () => ingredients.reduce((s, i) => s + convertToGrams(i.amount, i.unit), 0),
+    () => ingredients.reduce((s, i) => s + ingredientGrams(i), 0),
     [ingredients],
   );
 
@@ -93,9 +93,6 @@ export function RecipeBuilder() {
             </button>
           </div>
         )}
-
-        {/* ── Recipe № mark ────────────────────────────────────────────── */}
-        <div className="pl-meta" style={{ marginBottom: 4 }}>RECIPE №&nbsp;04</div>
 
         {/* ── Recipe name (editorial hero — 56px) ──────────────────────── */}
         <div style={{ width: "100%", marginBottom: 18 }}>

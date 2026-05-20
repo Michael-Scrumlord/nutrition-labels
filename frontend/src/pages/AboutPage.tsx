@@ -36,7 +36,7 @@ export function AboutPage() {
 
       <h2>Who runs it</h2>
       <p>
-        Built and maintained by Michael Daza. The project is open to
+        Built and maintained by me, Michael. The project is open to
         feedback, bug reports, and partnership inquiries at the contact
         email in the footer.
       </p>

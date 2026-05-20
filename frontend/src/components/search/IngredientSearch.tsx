@@ -13,14 +13,24 @@ import { useRecipeStore } from "../../store/recipeStore";
 import { useActiveTheme } from "../../store/themeStore";
 import { Spinner } from "../ui/Spinner";
 import { COMMON_FOODS } from "../../constants/commonFoods";
-import type { FoodSearchResult, SavedFood } from "../../types";
+import { normalizePortion } from "../../utils/units";
+import { UNIT_LABELS } from "../../types";
+import type { FoodSearchResult, SavedFood, UnitKey, PortionRef, PortionSize } from "../../types";
+
+const UNIT_KEYS = Object.keys(UNIT_LABELS) as UnitKey[];
 
 type TabId = "search" | "common" | "recent" | "favorites";
 
 // ── Inline add-form ──────────────────────────────────────────────────────────
 
 function AddForm({ food, onClose }: { food: FoodSearchResult; onClose: () => void }) {
-  const [grams, setGrams] = useState("100");
+  // The picker state is encoded the same way as in IngredientRow:
+  //   "unit:g" | "unit:oz" | … | "portion:tablespoon" | …
+  // Default flips between "1 of the first portion" (e.g. 1 tbsp) when the
+  // food has known portions, and "100 g" when it doesn't.
+  const [amount, setAmount] = useState("1");
+  const [picker, setPicker] = useState<string>("unit:g");
+  const [defaulted, setDefaulted] = useState(false);
   const addIngredient = useRecipeStore((s) => s.addIngredient);
   const addRecent     = usePreferencesStore((s) => s.addRecent);
   const { def: themeDef } = useActiveTheme();
@@ -31,14 +41,58 @@ function AddForm({ food, onClose }: { food: FoodSearchResult; onClose: () => voi
     staleTime: Infinity,
   });
 
+  // Once we know what portions exist, set a smart default ONCE. We don't
+  // overwrite the user's choice on re-renders; the `defaulted` flag locks it.
+  useEffect(() => {
+    if (defaulted || !detail) return;
+    if (detail.portions.length > 0) {
+      setPicker(`portion:${detail.portions[0].modifier}`);
+      setAmount("1");
+    } else {
+      setPicker("unit:g");
+      setAmount("100");
+    }
+    setDefaulted(true);
+  }, [detail, defaulted]);
+
+  // Reset the form when the user picks a different food.
+  useEffect(() => {
+    setDefaulted(false);
+    setAmount("1");
+    setPicker("unit:g");
+  }, [food.fdc_id]);
+
   function handleAdd() {
     if (!detail) return;
-    const g = parseFloat(grams);
-    if (isNaN(g) || g <= 0) return;
-    addIngredient({ fdc_id: food.fdc_id, name: food.name, amount: g, unit: "g", baseMacros: detail.macros });
+    const parsed = parseFloat(amount);
+    if (isNaN(parsed) || parsed <= 0) return;
+    const rounded = Math.round(parsed * 100) / 100;
+
+    let unit: UnitKey = "g";
+    let portionRef: PortionRef | null = null;
+
+    if (picker.startsWith("portion:")) {
+      const modifier = picker.slice("portion:".length);
+      const match = detail.portions.find((p) => p.modifier === modifier);
+      if (match) portionRef = normalizePortion(match);
+    } else if (picker.startsWith("unit:")) {
+      unit = picker.slice("unit:".length) as UnitKey;
+    }
+
+    addIngredient({
+      fdc_id:     food.fdc_id,
+      name:       food.name,
+      amount:     rounded,
+      unit,
+      portionRef,
+      availablePortions: detail.portions,
+      baseMacros: detail.macros,
+    });
     addRecent({ fdc_id: food.fdc_id, name: food.name });
     onClose();
   }
+
+  const portions: PortionSize[] = detail?.portions ?? [];
 
   return (
     <div style={{ padding: "16px 22px", borderTop: "1px solid var(--hair)", background: "var(--surface)" }}>
@@ -46,14 +100,15 @@ function AddForm({ food, onClose }: { food: FoodSearchResult; onClose: () => voi
         {food.name}
       </p>
 
-      <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
+      <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
         <label style={{ display: "grid", gap: 4 }}>
-          <span style={{ fontSize: 10, letterSpacing: "0.14em", color: "var(--ink-3)", fontFamily: "var(--f-mono)" }}>GRAMS</span>
+          <span style={{ fontSize: 10, letterSpacing: "0.14em", color: "var(--ink-3)", fontFamily: "var(--f-mono)" }}>AMOUNT</span>
           <input
-            type="number" min="0.1" step="any"
-            value={grams}
-            onChange={(e) => setGrams(e.target.value)}
+            type="number" min="0.01" step="0.01"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
             autoFocus
+            aria-label="Amount"
             style={{
               width: 90,
               padding: "8px 10px",
@@ -66,6 +121,43 @@ function AddForm({ food, onClose }: { food: FoodSearchResult; onClose: () => voi
               outline: "none",
             }}
           />
+        </label>
+
+        <label style={{ display: "grid", gap: 4 }}>
+          <span style={{ fontSize: 10, letterSpacing: "0.14em", color: "var(--ink-3)", fontFamily: "var(--f-mono)" }}>UNIT</span>
+          <select
+            value={picker}
+            onChange={(e) => setPicker(e.target.value)}
+            aria-label="Unit"
+            disabled={!detail}
+            style={{
+              minWidth: 140,
+              padding: "8px 10px",
+              border: "1px solid var(--ink)",
+              background: "var(--bg)",
+              color: "var(--ink)",
+              fontFamily: "var(--f-body)",
+              fontSize: 14,
+              fontWeight: 500,
+              outline: "none",
+              cursor: detail ? "pointer" : "default",
+            }}
+          >
+            {portions.length > 0 && (
+              <optgroup label="Food portions">
+                {portions.map((p) => (
+                  <option key={`portion-${p.modifier}`} value={`portion:${p.modifier}`}>
+                    {p.modifier}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+            <optgroup label={portions.length > 0 ? "Standard units" : undefined}>
+              {UNIT_KEYS.map((u) => (
+                <option key={`unit-${u}`} value={`unit:${u}`}>{u}</option>
+              ))}
+            </optgroup>
+          </select>
         </label>
 
         {isLoading && <Spinner size={16} />}

@@ -9,6 +9,35 @@ import pytest
 pytestmark = pytest.mark.anyio
 
 
+async def test_health_returns_ok_when_db_present(client):
+    """GET /api/health returns 200 with status=ok when the DB probe succeeds."""
+    async with client as c:
+        response = await c.get("/api/health")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "ok"
+    assert "release" in body
+
+
+async def test_health_returns_503_when_db_missing(client, monkeypatch):
+    """If the DB file is unreachable, /api/health should 503 (not 200)."""
+    import app.database as db_module
+    monkeypatch.setattr(db_module.settings, "db_path", "/nonexistent/nutrition.db")
+    async with client as c:
+        response = await c.get("/api/health")
+    assert response.status_code == 503
+
+
+async def test_trusted_host_middleware_present(client):
+    """Sanity check that TrustedHostMiddleware is wired — a bad Host gets 400.
+    The test client's ALLOWED_HOSTS=["*"] override (conftest.py) means we
+    have to assert this via app inspection, not a live request."""
+    from starlette.middleware.trustedhost import TrustedHostMiddleware
+    from app.main import app
+    types = [m.cls for m in app.user_middleware]
+    assert TrustedHostMiddleware in types
+
+
 async def test_search_returns_results(client):
     """GET /api/search?query=butter should return at least one result."""
     async with client as c:

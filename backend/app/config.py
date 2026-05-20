@@ -17,6 +17,16 @@ class Settings(BaseSettings):
     # Set to "*" only behind a controlled edge (e.g. Caddy on the same host).
     forwarded_allow_ips: str = "127.0.0.1"
 
+    # Hosts the FastAPI app will respond to. Anything else gets a 400.
+    # Defense-in-depth against Host-header injection. Override via the
+    # ALLOWED_HOSTS env var (JSON array or comma-separated list).
+    # Use ["*"] only in dev/tests.
+    allowed_hosts: list[str] = [
+        "nutrition-label-generator.org",
+        "localhost",
+        "127.0.0.1",
+    ]
+
     # Hard cap on request body bytes (rejected before parsing).
     max_body_bytes: int = 64 * 1024  # 64 KB
 
@@ -26,7 +36,10 @@ class Settings(BaseSettings):
     rate_limit_generate: str = "10/minute"
 
     # PDF generation concurrency cap (in-process semaphore).
-    pdf_max_concurrency: int = 4
+    # Dropped from 4 → 2 because WeasyPrint can spike 150–250 MB per render;
+    # at 4 concurrent + 2 gunicorn workers we were within OOM range of the
+    # 1g container limit. Two is the comfortable steady-state value.
+    pdf_max_concurrency: int = 2
     # Per-request PDF generation timeout (seconds).
     pdf_timeout_seconds: float = 10.0
 

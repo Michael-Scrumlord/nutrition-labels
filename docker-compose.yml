@@ -1,11 +1,15 @@
 version: '3.9'
 
-# Production compose. For local dev without Caddy/TLS, use
-# docker-compose.dev.yml (or just expose frontend:5173 directly).
+# Production compose. Caddy is the only public entry point — neither the
+# backend nor the frontend nginx is reachable from the host directly.
 #
-# First-time setup:
+# For local browsing without Caddy/TLS, layer in docker-compose.dev.yml:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+# That override publishes frontend:5173 and backend:8000 and disables Caddy.
+#
+# First-time setup (either mode):
 #   1. Run scripts/download_fdc.sh to fetch USDA FDC CSV data.
-#   2. docker-compose up --build
+#   2. docker compose up --build
 #      The db-init service builds nutrition.db on the nutrition_db volume (one-time).
 #      Subsequent restarts skip the build because the DB already exists.
 
@@ -37,6 +41,13 @@ services:
     env_file:
       - .env
     environment:
+      # `*` is safe here because the backend has no `ports:` mapping —
+      # only `expose:` — so port 8000 is reachable solely from inside
+      # the docker network. The only container on that network that
+      # talks to the backend is nginx, which forwards Caddy's already-
+      # sanitized X-Forwarded-For (see Caddyfile + nginx.conf #4 fix).
+      # Gunicorn's --forwarded-allow-ips doesn't accept CIDR notation,
+      # so we can't narrow this any further without per-IP enumeration.
       - FORWARDED_ALLOW_IPS=*
       - CORS_ORIGINS=[]
       - DB_PATH=/db/nutrition.db
@@ -51,7 +62,10 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
-    mem_limit: 512m
+    # 1g gives WeasyPrint headroom for transient spikes (150–250 MB per
+    # render) at pdf_max_concurrency=2 + 2 gunicorn workers. The previous
+    # 512m was within OOM range of worst-case concurrent PDF generation.
+    mem_limit: 1g
     cpus: 1.0
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/api/health"]
@@ -69,8 +83,6 @@ services:
         condition: service_healthy
     expose:
       - "80"
-    ports:
-      - "5173:80"
     read_only: true
     tmpfs:
       - /var/cache/nginx:size=16m
@@ -88,8 +100,11 @@ services:
     cpus: 0.5
 
   # ── Reverse proxy / TLS ────────────────────────────────────────────────────
+  # Built locally so we can include the caddy-ratelimit community plugin —
+  # the stock image doesn't ship the `rate_limit` directive. See caddy/Dockerfile.
   caddy:
-    image: caddy:2-alpine
+    build:
+      context: ./caddy
     restart: unless-stopped
     env_file:
       - .env

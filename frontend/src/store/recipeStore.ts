@@ -2,7 +2,9 @@ import { create } from "zustand";
 import type {
   IngredientItem, LabelDimensions, UnitKey, HighlightSet,
   RecipeStep, RecipeVariable, SavedRecipe, RecipeVersion,
+  PortionRef,
 } from "../types";
+import { UNIT_CONVERSIONS, ingredientGrams } from "../utils/units";
 
 // crypto.randomUUID() is unavailable in insecure contexts (http://hostname).
 function makeId(): string {
@@ -32,6 +34,9 @@ interface RecipeState {
   updateIngredientName:    (fdc_id: number, name: string) => void;
   updateIngredientAmount:  (fdc_id: number, amount: number) => void;
   updateIngredientUnit:    (fdc_id: number, unit: UnitKey) => void;
+  // Switch the row to a food-specific portion ("1 tbsp"). Passing `null`
+  // clears any active portionRef and falls back to the row's `unit`.
+  updateIngredientPortion: (fdc_id: number, portion: PortionRef | null) => void;
   moveIngredient:          (fdc_id: number, direction: -1 | 1) => void;
 
   // ── Recipe meta actions ───────────────────────────────────────────────
@@ -91,9 +96,43 @@ export const useRecipeStore = create<RecipeState>((set) => ({
       ingredients: state.ingredients.map((i) => i.fdc_id === fdc_id ? { ...i, amount } : i),
     })),
 
+  // Changing the unit on an existing ingredient re-expresses the amount in
+  // the new unit so the physical gram weight stays constant. e.g. 100 g of
+  // butter, switched to oz, becomes 3.53 oz — not 100 oz. If the row was on
+  // a portion ("1 tbsp"), that portion is cleared. Displayed amount rounds
+  // to 2 decimals to match the row UI's precision.
   updateIngredientUnit: (fdc_id, unit) =>
     set((state) => ({
-      ingredients: state.ingredients.map((i) => i.fdc_id === fdc_id ? { ...i, unit } : i),
+      ingredients: state.ingredients.map((i) => {
+        if (i.fdc_id !== fdc_id) return i;
+        // No-op if neither unit nor portion would change.
+        if (!i.portionRef && i.unit === unit) return i;
+        const grams = ingredientGrams(i);
+        const newAmount = grams / UNIT_CONVERSIONS[unit];
+        return {
+          ...i,
+          unit,
+          portionRef: null,
+          amount: Math.round(newAmount * 100) / 100,
+        };
+      }),
+    })),
+
+  // Switch to a food-specific portion ("1 cup ≈ 227 g") while preserving
+  // gram weight. Passing `null` clears portionRef without changing unit.
+  updateIngredientPortion: (fdc_id, portion) =>
+    set((state) => ({
+      ingredients: state.ingredients.map((i) => {
+        if (i.fdc_id !== fdc_id) return i;
+        const grams = ingredientGrams(i);
+        if (portion === null) {
+          // Falling back to the row's `unit` — re-express grams there.
+          const newAmount = grams / UNIT_CONVERSIONS[i.unit];
+          return { ...i, portionRef: null, amount: Math.round(newAmount * 100) / 100 };
+        }
+        const newAmount = grams / portion.gramsPerUnit;
+        return { ...i, portionRef: portion, amount: Math.round(newAmount * 100) / 100 };
+      }),
     })),
 
   moveIngredient: (fdc_id, direction) =>

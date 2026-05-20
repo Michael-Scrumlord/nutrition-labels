@@ -56,11 +56,14 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
 
 # Gunicorn supervises uvicorn workers — restarts crashed workers, gives us
 # a real process model for production. Workers = 2 by default; override in compose.
+# Access log emits one JSON object per request, matching the app log format
+# in app/main.py — pipe both through `jq` or ship straight to an aggregator.
 CMD ["gunicorn", "app.main:app", \
      "--workers", "2", \
      "--worker-class", "uvicorn.workers.UvicornWorker", \
      "--bind", "0.0.0.0:8000", \
      "--forwarded-allow-ips", "*", \
      "--access-logfile", "-", \
+     "--access-logformat", "{\"client\":\"%(h)s\",\"method\":\"%(m)s\",\"path\":\"%(U)s\",\"query\":\"%(q)s\",\"status\":%(s)s,\"duration_ms\":%(M)s,\"length\":\"%(B)s\",\"ua\":\"%(a)s\"}", \
      "--error-logfile", "-", \
      "--timeout", "30"]
