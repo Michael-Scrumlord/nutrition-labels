@@ -7,8 +7,9 @@ import asyncio
 import logging
 import os
 import sys
+from typing import Annotated
 
-from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi import FastAPI, HTTPException, Path, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import Limiter
@@ -22,6 +23,7 @@ from app.config import settings
 from app.models import (
     FoodSearchResult,
     FoodDetail,
+    HealthResponse,
     MacroProfile,
     PortionSize,
     GenerateLabelRequest,
@@ -123,6 +125,22 @@ def health() -> dict:
         logger.exception("health check db probe failed")
         raise HTTPException(status_code=503, detail="database unavailable")
     return {"status": "ok", "release": settings.release_sha}
+async def _render_pdf_with_timeout(html: str) -> bytes:
+    """Run WeasyPrint in a thread, bounded by the semaphore and a timeout."""
+    try:
+        async with _pdf_semaphore:
+            return await asyncio.wait_for(
+                asyncio.to_thread(pdf.generate_pdf, html),
+                timeout=settings.pdf_timeout_seconds,
+            )
+    except asyncio.TimeoutError:
+        logger.warning("PDF generation timed out after %.1fs", settings.pdf_timeout_seconds)
+        raise HTTPException(status_code=504, detail="PDF generation timed out")
+
+
+@app.get("/api/health", response_model=HealthResponse)
+def health() -> HealthResponse:
+    return HealthResponse(status="ok", release=settings.release_sha)
 
 
 @app.get("/api/search", response_model=list[FoodSearchResult])
@@ -143,7 +161,10 @@ def search(request: Request, query: str = "") -> list[dict]:
 
 @app.get("/api/food/{fdc_id}", response_model=FoodDetail)
 @limiter.limit(settings.rate_limit_food)
-def get_food(request: Request, fdc_id: int) -> FoodDetail:
+def get_food(
+    request: Request,
+    fdc_id: Annotated[int, Path(ge=1, description="USDA FoodData Central food ID")],
+) -> FoodDetail:
     """
     Return full macro data and portion sizes for one food.
     Returns 404 if the fdc_id is not in the database.
@@ -198,18 +219,7 @@ async def generate_label(request: Request, payload: GenerateLabelRequest) -> Res
         raise HTTPException(status_code=400, detail=str(e))
 
     html = pdf.render_label_html(macros, payload, unrounded_macros)
-
-    # Cap concurrent renders and time each one out so a slow/heavy render
-    # can't tie up the worker indefinitely.
-    try:
-        async with _pdf_semaphore:
-            pdf_bytes = await asyncio.wait_for(
-                asyncio.to_thread(pdf.generate_pdf, html),
-                timeout=settings.pdf_timeout_seconds,
-            )
-    except asyncio.TimeoutError:
-        logger.warning("PDF generation timed out after %.1fs", settings.pdf_timeout_seconds)
-        raise HTTPException(status_code=504, detail="PDF generation timed out")
+    pdf_bytes = await _render_pdf_with_timeout(html)
 
     return Response(
         content=pdf_bytes,

@@ -17,6 +17,14 @@ import {
 import { UNIT_CONVERSIONS } from "../../src/utils/units";
 import type { IngredientItem, MacroProfile } from "../../src/types";
 
+// Shared FE/BE parity vectors. The backend test
+// (backend/tests/test_nutrition_edge_cases.py) loads the same JSON.
+// Vitest is configured (vite.config.ts → test.server.deps.inline + fs.allow)
+// to allow reading this file from the sibling backend/ directory.
+import parityVectorsJson from "../../../backend/tests/data/round_half_up_parity.json";
+const PARITY_VECTORS: { input: number; ndigits: number; expected: number }[] =
+  (parityVectorsJson as { cases: { input: number; ndigits: number; expected: number }[] }).cases;
+
 // ── Fixtures ───────────────────────────────────────────────────────────────
 
 const ZERO_MACROS: MacroProfile = {
@@ -75,6 +83,39 @@ describe("round1", () => {
   it("handles large values", () => {
     expect(round1(1234.56789)).toBe(1234.6);
   });
+});
+
+// ── FE/BE parity vector ────────────────────────────────────────────────────
+// These vectors are also exercised by the backend pytest in
+// test_nutrition_edge_cases.py::test_round_half_up_parity_vector.
+// If you change the shared JSON, both suites must still pass.
+describe("roundHalfUp parity with backend", () => {
+  for (const { input, ndigits, expected } of PARITY_VECTORS) {
+    it(`${input} @ ${ndigits} decimal place(s) → ${expected}`, () => {
+      // round1 covers ndigits=1; for ndigits=0 use Math.round equivalent via the
+      // exported round1 multiplied/divided path is not exposed, so we round-trip
+      // through calculateRecipeMacros indirectly here is overkill — instead we
+      // re-derive via a tiny adapter that mirrors what the helper does.
+      // To keep this test focused on the helper itself, we import it via the
+      // public round1 alias for ndigits=1 and assert directly otherwise.
+      if (ndigits === 1) {
+        expect(round1(input)).toBe(expected);
+      } else {
+        // For ndigits=0 the public surface is `calories` rounding inside
+        // calculateRecipeMacros. Mirror that by feeding a single-ingredient
+        // recipe whose per-serving calories equals `input`.
+        const ingredient: IngredientItem = {
+          fdc_id: 1,
+          name: "Test",
+          amount: 100, // 100g, multiplier = 1.0
+          unit: "g",
+          baseMacros: { ...ZERO_MACROS, calories: input },
+        };
+        const result = calculateRecipeMacros([ingredient], 1);
+        expect(result.calories).toBe(expected);
+      }
+    });
+  }
 });
 
 // ── calculateRecipeMacros — unit conversion edge cases ────────────────────

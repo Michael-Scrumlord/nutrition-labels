@@ -9,7 +9,6 @@
 import { useState, useMemo } from "react";
 import { useRecipeStore } from "../../store/recipeStore";
 import { useNutritionCalc } from "../../hooks/useNutritionCalc";
-import { useAnimatedNumber } from "../../hooks/useAnimatedNumber";
 import { useRecipeActions } from "../../hooks/useRecipeActions";
 import { ScrubNumber } from "../ui/ScrubNumber";
 import { IngredientSearch } from "../search/IngredientSearch";
@@ -17,6 +16,9 @@ import { IngredientRow } from "./IngredientRow";
 import { NutritionBreakdownTable } from "./NutritionBreakdownTable";
 import { MethodSection } from "./MethodSection";
 import { ingredientGrams } from "../../utils/units";
+import { RecipeStatsBar } from "./RecipeStatsBar";
+import { VersionBanner } from "./VersionBanner";
+import { convertToGrams } from "../../utils/units";
 import { getHighlightKeys } from "../../utils/nutrition";
 
 export function RecipeBuilder() {
@@ -33,6 +35,9 @@ export function RecipeBuilder() {
   const animatedCal = useAnimatedNumber(macros.calories);
   const totalGrams  = useMemo(
     () => ingredients.reduce((s, i) => s + ingredientGrams(i), 0),
+  const macros     = useNutritionCalc();
+  const totalGrams = useMemo(
+    () => ingredients.reduce((s, i) => s + convertToGrams(i.amount, i.unit), 0),
     [ingredients],
   );
 
@@ -60,39 +65,7 @@ export function RecipeBuilder() {
         }}
       >
         {/* ── Viewing older version banner ─────────────────────────────── */}
-        {viewingVersionId && (
-          <div style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 14,
-            marginBottom: 18,
-            padding: "10px 14px",
-            background: "color-mix(in srgb, var(--accent) 6%, transparent)",
-            border: "1px solid var(--accent)",
-            animation: "popfade 0.18s ease",
-          }}>
-            <span className="pl-meta" style={{ color: "var(--accent)", fontWeight: 700 }}>
-              ◉ VIEWING OLDER VERSION
-            </span>
-            <span style={{ fontSize: 12, color: "var(--ink-2)", flex: 1 }}>
-              saving will append a new version on top of the current latest — nothing is overwritten.
-            </span>
-            <button
-              onClick={exitVersionView}
-              className="pl-meta"
-              style={{
-                background: "transparent",
-                border: "1px solid var(--ink)",
-                padding: "5px 12px",
-                cursor: "pointer",
-                fontWeight: 700,
-                color: "var(--ink)",
-              }}
-            >
-              DISMISS
-            </button>
-          </div>
-        )}
+        {viewingVersionId && <VersionBanner onDismiss={exitVersionView} />}
 
         {/* ── Recipe name (editorial hero — 56px) ──────────────────────── */}
         <div style={{ width: "100%", marginBottom: 18 }}>
@@ -111,44 +84,12 @@ export function RecipeBuilder() {
         </div>
 
         {/* ── Stats — single typographic line (editorial mode) ─────────── */}
-        <div style={{
-          display: "flex",
-          alignItems: "baseline",
-          gap: 18,
-          flexWrap: "wrap",
-          marginBottom: 28,
-          paddingBottom: 20,
-          borderBottom: "1px solid var(--hair-strong)",
-          fontSize: 18,
-          color: "var(--ink-2)",
-        }}>
-          <span>yields&nbsp;
-            <ScrubNumber
-              value={portionDivisor} min={1} max={96} step={1}
-              onChange={setPortionDivisor}
-              ariaLabel="servings per batch"
-              className="pl-scrub"
-              style={{ fontSize: 24 }}
-            />
-            &nbsp;servings
-          </span>
-          <span style={{ color: "var(--hair-strong)" }}>·</span>
-          <span>per serving&nbsp;
-            <span
-              key={animatedCal}
-              className="pl-scrub"
-              style={{ fontSize: 24, display: "inline-block", animation: "popPulse 0.42s ease-out" }}
-            >
-              {animatedCal}
-            </span>
-            &nbsp;kcal
-          </span>
-          <span style={{ color: "var(--hair-strong)" }}>·</span>
-          <span>batch&nbsp;
-            <span className="pl-scrub" style={{ fontSize: 24 }}>{Math.round(totalGrams)}</span>
-            &nbsp;g
-          </span>
-        </div>
+        <RecipeStatsBar
+          portionDivisor={portionDivisor}
+          calories={macros.calories}
+          totalGrams={totalGrams}
+          onPortionDivisorChange={setPortionDivisor}
+        />
 
         {/* ── Ingredients section header ───────────────────────────────── */}
         <div style={{ display: "flex", alignItems: "baseline", gap: 18, marginBottom: 8 }}>

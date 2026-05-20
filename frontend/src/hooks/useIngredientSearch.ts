@@ -4,8 +4,8 @@
 // Debounces the query by 300ms before hitting the API.
 
 import { useQuery } from "@tanstack/react-query";
-import { useState, useEffect } from "react";
 import { searchFoods } from "../api/client";
+import { useDebounce } from "./useDebounce";
 import type { FoodSearchResult } from "../types";
 
 export function useIngredientSearch(query: string): {
@@ -13,12 +13,7 @@ export function useIngredientSearch(query: string): {
   isLoading: boolean;
   isError: boolean;
 } {
-  const [debouncedQuery, setDebouncedQuery] = useState(query);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedQuery(query), 300);
-    return () => clearTimeout(timer);
-  }, [query]);
+  const debouncedQuery = useDebounce(query, 300);
 
   const enabled = debouncedQuery.length >= 2;
 

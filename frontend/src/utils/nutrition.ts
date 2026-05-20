@@ -31,14 +31,20 @@ export const NUTRIENT_FIELDS: (keyof MacroProfile)[] = [
 
 /**
  * Round to the specified number of digits using round-half-away-from-zero.
- * This ensures consistent rounding behavior between frontend and backend.
- * Note: For very high precision (ndigits > 15), floating-point precision limits apply.
+ * Matches Python's `Decimal(x).quantize(..., ROUND_HALF_UP)`.
+ *
+ * `Number.prototype.toFixed` is specified to pick the integer that
+ * minimizes the distance to the true mathematical value of `x` (the
+ * stored IEEE-754 number, not its short decimal display), with halfway
+ * ties broken away from zero — i.e. the same rule Python's Decimal uses.
+ * A naive `Math.round(x * f + EPSILON) / f` diverges at boundaries where
+ * the binary expansion of `x` is just below `.x5` (e.g. 0.15 → JS 0.2 vs
+ * Py 0.1) because the EPSILON nudge crosses the half-mark in one
+ * direction but not the other.
  */
 function roundHalfUp(x: number, ndigits: number = 0): number {
-  const factor = Math.pow(10, ndigits);
-  // Add tiny epsilon to handle floating-point representation issues
-  // (e.g., 1.005 * 10 = 10.050000000001)
-  return Math.round(x * factor + Number.EPSILON) / factor;
+  if (!Number.isFinite(x)) return x;
+  return Number(x.toFixed(Math.max(0, ndigits)));
 }
 
 /**

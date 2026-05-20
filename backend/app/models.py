@@ -119,3 +119,9 @@ class FoodDetail(BaseModel):
     name: str
     macros: MacroProfile
     portions: list[PortionSize]
+
+
+class HealthResponse(BaseModel):
+    """Response body for GET /api/health."""
+    status: str
+    release: str
