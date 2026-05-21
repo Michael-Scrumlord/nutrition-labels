@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@dnd-kit/core": "^6.1.0",
+    "@react-pdf/renderer": "^4.5.1",
     "@tanstack/react-query": "^5.62.7",
     "lucide-react": "^0.460.0",
     "react": "^18.3.1",

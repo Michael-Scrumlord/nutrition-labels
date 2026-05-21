@@ -7,8 +7,11 @@ export function LabelDimensions() {
   const dimensions    = useRecipeStore((s) => s.dimensions);
   const setDimensions = useRecipeStore((s) => s.setDimensions);
 
-  const setWidth  = (v: number) => setDimensions({ widthInches:  Math.max(2, Math.round(v * 10) / 10) });
-  const setHeight = (v: number) => setDimensions({ heightInches: Math.max(2, Math.round(v * 10) / 10) });
+  // Round to 0.01" — the typed input lets users hit any 2-decimal value while
+  // drag/wheel/arrow nudge by a coarser step (see step= below) so scrubbing
+  // doesn't feel twitchy at hundredths-of-an-inch granularity.
+  const setWidth  = (v: number) => setDimensions({ widthInches:  Math.max(2, Math.round(v * 100) / 100) });
+  const setHeight = (v: number) => setDimensions({ heightInches: Math.max(2, Math.round(v * 100) / 100) });
   const clearHeight = () => setDimensions({ heightInches: null });
 
   return (
@@ -31,7 +34,8 @@ export function LabelDimensions() {
             value={dimensions.widthInches}
             min={2}
             max={8}
-            step={0.1}
+            step={0.05}
+            decimals={2}
             onChange={setWidth}
             suffix="″"
             style={{ fontSize: 22, fontWeight: 700, color: "var(--ink)" }}
@@ -52,7 +56,8 @@ export function LabelDimensions() {
                 value={dimensions.heightInches}
                 min={2}
                 max={12}
-                step={0.1}
+                step={0.05}
+                decimals={2}
                 onChange={setHeight}
                 suffix="″"
                 style={{ fontSize: 22, fontWeight: 700, color: "var(--ink)" }}
