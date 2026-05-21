@@ -7,7 +7,7 @@
 //   • Save / Save-As-New / Reset controls (existing functionality)
 //   • Sponsored AdSlot anchored at the very bottom of the column
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef, useLayoutEffect } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useRecipeStore } from "../../store/recipeStore";
 import { useSavedRecipesStore, type RecipeSnapshot } from "../../store/savedRecipesStore";
@@ -16,6 +16,7 @@ import { useRecipeActions } from "../../hooks/useRecipeActions";
 import { useNutritionCalc } from "../../hooks/useNutritionCalc";
 import { LabelPreview } from "./LabelPreview";
 import { LabelDimensions } from "./LabelDimensions";
+import { LabelResizeHandle } from "./LabelResizeHandle";
 import { GenerateButton } from "./GenerateButton";
 import { SaveControls } from "./SaveControls";
 import { AdSlot } from "./AdSlot";
@@ -55,10 +56,26 @@ export function LabelColumn() {
   const baseWidthPx = 288;
   const targetPx    = Math.max(dimensions.widthInches * 96, 192);
   const scale       = targetPx / baseWidthPx;
-  const estimatedH  = 560;
-  const containerH  = dimensions.heightInches
-    ? dimensions.heightInches * 96
-    : estimatedH * scale;
+
+  // Measure the unscaled LabelPreview so the proof container hugs real content
+  // instead of relying on a 560px estimate. Transforms don't affect layout, so
+  // offsetHeight on the inner div is the natural (pre-scale) height.
+  const measureRef = useRef<HTMLDivElement | null>(null);
+  const [naturalH, setNaturalH] = useState(560);
+  useLayoutEffect(() => {
+    const el = measureRef.current;
+    if (!el) return;
+    const update = () => setNaturalH(el.offsetHeight);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [ingredients, portionDivisor, dimensions.widthInches]);
+
+  const requestedH = dimensions.heightInches ? dimensions.heightInches * 96 : null;
+  const scaledNaturalH = naturalH * scale;
+  const containerH = requestedH ?? scaledNaturalH;
+  const isClipped  = requestedH != null && scaledNaturalH > requestedH + 1;
 
   const canSave      = ingredients.length > 0;
   const isLoaded     = !!currentRecipeId && !!savedRecipe;
@@ -152,32 +169,59 @@ export function LabelColumn() {
           </span>
         </div>
 
-        {/* Printable label — always white paper */}
+        {/* Printable label — always white paper. The wrapper is `position: relative`
+            so the edge and corner resize handles can absolute-position themselves
+            against it. Handles are siblings of the label paper, not children, so
+            they're never clipped by the `overflow: hidden` that prevents content
+            spillover. */}
         <div style={{ display: "flex", justifyContent: "center" }}>
-          <div
-            className="pop-printable"
-            style={{
-              width: targetPx,
-              height: containerH,
-              overflow: "hidden",
-              background: "#ffffff",
-              boxShadow: "var(--paper-shadow)",
-            }}
-          >
-            <div style={{ width: baseWidthPx, transform: `scale(${scale})`, transformOrigin: "top left" }}>
-              <LabelPreview
-                macros={macros}
-                portionDivisor={portionDivisor}
-                ingredients={ingredients}
-                widthPx={baseWidthPx}
-                highlightSet={highlightedNutrients}
-              />
+          <div style={{ position: "relative" }}>
+            <div
+              className="pop-printable"
+              style={{
+                width: targetPx,
+                height: containerH,
+                overflow: "hidden",
+                background: "#ffffff",
+                boxShadow: "var(--paper-shadow)",
+              }}
+            >
+              <div ref={measureRef} style={{ width: baseWidthPx, transform: `scale(${scale})`, transformOrigin: "top left" }}>
+                <LabelPreview
+                  macros={macros}
+                  portionDivisor={portionDivisor}
+                  ingredients={ingredients}
+                  widthPx={baseWidthPx}
+                  highlightSet={highlightedNutrients}
+                />
+              </div>
             </div>
+            <LabelResizeHandle variant="east" />
+            <LabelResizeHandle variant="south" />
+            <LabelResizeHandle variant="corner" />
           </div>
         </div>
 
         <div style={{ width: "100%", maxWidth: 380 }}>
           <LabelDimensions />
+          {isClipped && (
+            <div
+              role="alert"
+              style={{
+                marginTop: 8,
+                padding: "6px 10px",
+                fontFamily: "var(--f-mono)",
+                fontSize: 10,
+                letterSpacing: "0.16em",
+                textTransform: "uppercase",
+                color: "var(--color-danger)",
+                border: "1px solid var(--color-danger)",
+                background: "color-mix(in srgb, var(--color-danger) 8%, transparent)",
+              }}
+            >
+              ⚠ Content clipped — increase height or set to auto
+            </div>
+          )}
         </div>
 
         <div style={{ width: "100%", maxWidth: 380 }}>

@@ -27,8 +27,9 @@ MIN_INGREDIENTS = 1           # Minimum ingredients required
 MAX_INGREDIENTS = 100         # Maximum ingredients allowed
 MIN_PORTION_DIVISOR = 1       # Minimum servings
 MAX_PORTION_DIVISOR = 999     # Maximum servings
-MIN_WIDTH = 0.1               # Minimum label width in inches
+MIN_WIDTH = 2                 # Minimum label width in inches (FDA min)
 MAX_WIDTH = 12                # Maximum label width in inches
+MIN_HEIGHT = 2                # Minimum label height in inches (matches frontend clamp)
 MAX_HEIGHT = 20               # Maximum label height in inches
 
 
@@ -68,14 +69,26 @@ class GenerateLabelRequest(BaseModel):
 
     portion_divisor: int = Field(8, ge=MIN_PORTION_DIVISOR, le=MAX_PORTION_DIVISOR)
     label_name: str = Field("", max_length=MAX_NAME_LENGTH)
-    width_inches: float = Field(2.75, gt=MIN_WIDTH, le=MAX_WIDTH)
-    height_inches: float | None = Field(None, gt=0, le=MAX_HEIGHT)
+    width_inches: float = Field(2.75, ge=MIN_WIDTH, le=MAX_WIDTH)
+    height_inches: float | None = Field(None, ge=MIN_HEIGHT, le=MAX_HEIGHT)
     ingredients: list[IngredientItem] = Field(..., min_length=MIN_INGREDIENTS, max_length=MAX_INGREDIENTS)
 
     @field_validator("label_name")
     @classmethod
     def label_name_no_control_chars(cls, v: str) -> str:
         return _strip_control(v).strip()
+
+    # Snap dimensions to 0.01" so float noise (e.g. 2.7500000001) can't drift
+    # the WeasyPrint @page size between identical-looking client requests.
+    @field_validator("width_inches")
+    @classmethod
+    def round_width(cls, v: float) -> float:
+        return round(v, 2)
+
+    @field_validator("height_inches")
+    @classmethod
+    def round_height(cls, v: float | None) -> float | None:
+        return None if v is None else round(v, 2)
 
 
 # ---------------------------------------------------------------------------

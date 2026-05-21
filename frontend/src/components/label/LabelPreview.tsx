@@ -6,6 +6,7 @@
 
 import type { MacroProfile, IngredientItem, HighlightSet } from "../../types";
 import { formatDV, buildIngredientsString } from "../../utils/nutrition";
+import { MACRO_ROWS, MICRO_ROWS, type LabelRow } from "./labelSpec";
 
 // The FDA label is a regulated print artifact — always black ink on white
 // paper. Keep this local so theme changes never recolor the label borders.
@@ -88,15 +89,23 @@ export function LabelPreview({ macros, portionDivisor, ingredients, widthPx, hig
           % Daily Value*
         </div>
 
-        <MacroRow label="Total Fat"        value={macros.fat_total_g}           unit="g"   bold    nutrient="fat_total_g"          macros={macros} highlight={hl.has("fat_total_g")} />
-        <MacroRow label="Saturated Fat"    value={macros.fat_saturated_g}       unit="g"   indent={1} nutrient="fat_saturated_g"   macros={macros} highlight={hl.has("fat_saturated_g")} />
-        <MacroRow label="Trans Fat"        value={0}                            unit="g"   indent={1}                               macros={macros} faded />
-        <MacroRow label="Cholesterol"      value={macros.cholesterol_mg}        unit="mg"  bold    nutrient="cholesterol_mg"       macros={macros} highlight={hl.has("cholesterol_mg")} />
-        <MacroRow label="Sodium"           value={macros.sodium_mg}             unit="mg"  bold    nutrient="sodium_mg"            macros={macros} highlight={hl.has("sodium_mg")} />
-        <MacroRow label="Total Carbohydrate" value={macros.carbohydrates_total_g} unit="g" bold    nutrient="carbohydrates_total_g" macros={macros} highlight={hl.has("carbohydrates_total_g")} />
-        <MacroRow label="Dietary Fiber"    value={macros.fiber_g}               unit="g"   indent={1} nutrient="fiber_g"          macros={macros} highlight={hl.has("fiber_g")} />
-        <MacroRow label="Total Sugars"     value={macros.sugar_g}               unit="g"   indent={1}                              macros={macros} highlight={hl.has("sugar_g")} />
-        <MacroRow label="Includes 0g Added Sugars" value={0} unit="" indent={2}             macros={macros} faded />
+        {MACRO_ROWS.map((row: LabelRow) => {
+          const value = row.fixedValue ?? (row.nutrient ? macros[row.nutrient] : 0);
+          return (
+            <MacroRow
+              key={row.label}
+              label={row.label}
+              value={value}
+              unit={row.unit}
+              bold={row.bold}
+              indent={row.indent}
+              nutrient={row.noDV ? undefined : row.nutrient}
+              macros={macros}
+              faded={row.faded}
+              highlight={row.nutrient ? hl.has(row.nutrient) : false}
+            />
+          );
+        })}
 
         <div style={{
           display: "flex", justifyContent: "space-between", alignItems: "baseline",
@@ -108,29 +117,26 @@ export function LabelPreview({ macros, portionDivisor, ingredients, widthPx, hig
           <span style={{ visibility: "hidden" }}>—</span>
         </div>
 
-        {(
-          [
-            ["Vitamin D",  macros.vitamin_d_mcg,  "mcg", "vitamin_d_mcg" ],
-            ["Calcium",    macros.calcium_mg,      "mg",  "calcium_mg"   ],
-            ["Iron",       macros.iron_mg,         "mg",  "iron_mg"      ],
-            ["Potassium",  macros.potassium_mg,    "mg",  "potassium_mg" ],
-          ] as const
-        ).map(([label, value, unit, key], i) => (
-          <div
-            key={key}
-            style={{
-              display: "flex", justifyContent: "space-between",
-              fontSize: "0.625rem",
-              borderBottom: i < 3 ? `0.5px solid ${INK}` : "none",
-              padding: "1.5px 0",
-              background: hl.has(key as keyof MacroProfile) ? "var(--color-accent-blush)" : "transparent",
-              transition: "background 0.22s ease",
-            }}
-          >
-            <span>{label} {value}{unit}</span>
-            <span>{formatDV(key as keyof MacroProfile, macros)}</span>
-          </div>
-        ))}
+        {MICRO_ROWS.map((row, i) => {
+          const key = row.nutrient as keyof MacroProfile;
+          const value = macros[key];
+          return (
+            <div
+              key={row.label}
+              style={{
+                display: "flex", justifyContent: "space-between",
+                fontSize: "0.625rem",
+                borderBottom: i < MICRO_ROWS.length - 1 ? `0.5px solid ${INK}` : "none",
+                padding: "1.5px 0",
+                background: hl.has(key) ? "var(--color-accent-blush)" : "transparent",
+                transition: "background 0.22s ease",
+              }}
+            >
+              <span>{row.label} {value}{row.unit}</span>
+              <span>{formatDV(key, macros)}</span>
+            </div>
+          );
+        })}
 
         <div style={{ fontSize: "0.45rem", marginTop: 3, lineHeight: 1.3 }}>
           * The % Daily Value (DV) tells you how much a nutrient in a serving contributes to a daily diet.

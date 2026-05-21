@@ -1,47 +1,66 @@
-// label/GenerateButton.tsx — primary CTA, themed.
+// label/GenerateButton.tsx — primary CTA.
+//
+// Client-side PDF generation: dynamically imports @react-pdf/renderer +
+// LabelPdfDoc only on click, so the ~450 KB library stays out of the
+// initial bundle. The server's /api/generate_label endpoint is still
+// available as a fallback for API consumers but the browser path is the
+// default now.
 
 import { useState } from "react";
 import { useRecipeStore } from "../../store/recipeStore";
 import { useActiveTheme } from "../../store/themeStore";
-import { generateLabel, downloadBlob, ApiError } from "../../api/client";
+import { useNutritionCalc } from "../../hooks/useNutritionCalc";
+import { downloadBlob } from "../../api/client";
+
+// When the user leaves height in "auto" mode, react-pdf needs a concrete page
+// height up front (no `auto`). We use a generous canvas — printers / users
+// can trim. Matches the legacy WeasyPrint behaviour (20in max).
+const AUTO_HEIGHT_INCHES = 11;
 
 export function GenerateButton() {
   const ingredients    = useRecipeStore((s) => s.ingredients);
   const portionDivisor = useRecipeStore((s) => s.portionDivisor);
   const labelName      = useRecipeStore((s) => s.labelName);
   const dimensions     = useRecipeStore((s) => s.dimensions);
+  const macros         = useNutritionCalc();
   const { def }        = useActiveTheme();
 
-  const [isLoading, setIsLoading]   = useState(false);
-  const [error, setError]           = useState<string | null>(null);
-  const [retryAfter, setRetryAfter] = useState<number | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error,     setError]     = useState<string | null>(null);
 
   async function handleGenerate() {
     if (ingredients.length === 0) return;
     setIsLoading(true);
     setError(null);
-    setRetryAfter(null);
     try {
-      const blob = await generateLabel(ingredients, portionDivisor, labelName, dimensions);
+      // Lazy-load both the renderer and the doc so neither lands in the
+      // initial JS bundle. Vite splits this into its own chunk automatically.
+      const [{ pdf }, { LabelPdfDoc }] = await Promise.all([
+        import("@react-pdf/renderer"),
+        import("./LabelPdfDoc"),
+      ]);
+
+      const blob = await pdf(
+        <LabelPdfDoc
+          macros={macros}
+          portionDivisor={portionDivisor}
+          ingredients={ingredients}
+          labelName={labelName}
+          widthInches={dimensions.widthInches}
+          heightInches={dimensions.heightInches ?? AUTO_HEIGHT_INCHES}
+        />,
+      ).toBlob();
+
       downloadBlob(blob, "nutrition_label.pdf");
     } catch (err) {
-      if (err instanceof ApiError) {
-        if (err.status === 429) {
-          const wait = err.retryAfter ?? 60;
-          setRetryAfter(wait);
-          setError(`Rate limit reached — try again in ${wait}s.`);
-        } else {
-          setError(err.message);
-        }
-      } else {
-        setError("PDF generation failed. Please try again.");
-      }
+      console.error("PDF generation failed:", err);
+      setError("PDF generation failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
   }
 
-  const disabled = ingredients.length === 0 || !!retryAfter;
+  const disabled = ingredients.length === 0;
 
   return (
     <div style={{ marginTop: 4, width: "100%" }}>
