@@ -111,8 +111,8 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     )
 
 
-@app.get("/api/health")
-def health() -> dict:
+@app.get("/api/health", response_model=HealthResponse)
+def health() -> HealthResponse:
     """
     Liveness + readiness in one. Probes the DB so a missing/corrupt
     nutrition.db volume surfaces as an unhealthy container instead of
@@ -124,22 +124,6 @@ def health() -> dict:
     except Exception:
         logger.exception("health check db probe failed")
         raise HTTPException(status_code=503, detail="database unavailable")
-    return {"status": "ok", "release": settings.release_sha}
-async def _render_pdf_with_timeout(html: str) -> bytes:
-    """Run WeasyPrint in a thread, bounded by the semaphore and a timeout."""
-    try:
-        async with _pdf_semaphore:
-            return await asyncio.wait_for(
-                asyncio.to_thread(pdf.generate_pdf, html),
-                timeout=settings.pdf_timeout_seconds,
-            )
-    except asyncio.TimeoutError:
-        logger.warning("PDF generation timed out after %.1fs", settings.pdf_timeout_seconds)
-        raise HTTPException(status_code=504, detail="PDF generation timed out")
-
-
-@app.get("/api/health", response_model=HealthResponse)
-def health() -> HealthResponse:
     return HealthResponse(status="ok", release=settings.release_sha)
 
 
@@ -188,6 +172,19 @@ def get_food(
             for p in portions
         ],
     )
+
+
+async def _render_pdf_with_timeout(html: str) -> bytes:
+    """Run WeasyPrint in a thread, bounded by the semaphore and a timeout."""
+    try:
+        async with _pdf_semaphore:
+            return await asyncio.wait_for(
+                asyncio.to_thread(pdf.generate_pdf, html),
+                timeout=settings.pdf_timeout_seconds,
+            )
+    except asyncio.TimeoutError:
+        logger.warning("PDF generation timed out after %.1fs", settings.pdf_timeout_seconds)
+        raise HTTPException(status_code=504, detail="PDF generation timed out")
 
 
 @app.post("/api/generate_label")
