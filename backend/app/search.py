@@ -26,13 +26,16 @@ def ranked_search(query: str, food_rows: list) -> list[dict]:
         name: str = row["description"]
         name_lower = name.lower()
 
+        if q not in name_lower:
+            continue
+
         # 0 = prefix match (higher priority), 1 = contains match
         prefix_rank = 0 if name_lower.startswith(q) else 1
 
         result = {
             "fdc_id":    row["fdc_id"],
             "name":      name,
-            "data_type": row["data_type"],
+            "data_type": row["data_type"] if "data_type" in row.keys() else None,
         }
         buckets.append((prefix_rank, name_lower, result))
 
