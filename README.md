@@ -44,14 +44,14 @@ The compiled SQLite database lives on the `nutrition_db` Docker volume — it is
 Search foods by name.
 
 - **Query params:** `query` (string) — minimum 2 characters; returns `[]` for shorter queries
-- **Returns:** `FoodSearchResult[]` — at most 40 results, ranked by FTS5 BM25 then re-tiered: Foundation/FNDDS first, then SR Legacy, then Branded; prefix matches surface ahead of contains matches within each tier
+- **Returns:** `FoodSearchResult[]` — at most 40 results, ranked by FTS5 BM25; prefix matches surface ahead of contains matches, each group sorted alphabetically
+- **429** if more than 60 requests are made per minute from the same IP
 
 ```json
 [{
   "fdc_id": 1097512,
   "name": "Butter, unsalted",
-  "brand_owner": null,
-  "data_type": "foundation_food"
+  "data_type": "sr_legacy_food"
 }]
 ```
 
@@ -59,9 +59,10 @@ Search foods by name.
 
 Retrieve full macro data and portion sizes for one food.
 
-- **Path params:** `fdc_id` (integer)
+- **Path params:** `fdc_id` (integer, ≥ 1)
 - **Returns:** `FoodDetail` with `macros` (13 nutrients per 100 g) and `portions`
 - **404** if the food is not in the database
+- **429** if more than 120 requests are made per minute from the same IP
 
 ```json
 {
@@ -103,11 +104,11 @@ Calculate per-serving macros for a recipe, render an FDA Nutrition Facts label, 
 |--------------------|-----------------------------------------------|
 | `portion_divisor`  | Integer, 1–999                                |
 | `label_name`       | String, max 120 characters                    |
-| `width_inches`     | Float, > 0.1 and ≤ 12                         |
-| `height_inches`    | Float > 0 and ≤ 20, or `null` (auto-size)     |
+| `width_inches`     | Float, ≥ 2 and ≤ 12 (snapped to 0.01″)        |
+| `height_inches`    | Float, ≥ 2 and ≤ 20, or `null` (auto-size); snapped to 0.01″ |
 | `ingredients`      | 1–100 items                                   |
 | `amount`           | Float, > 0 and ≤ 1,000,000                    |
-| `name` (ingredient)| String, 1–120 characters                      |
+| `name` (ingredient)| String, 1–120 characters (control chars stripped) |
 
 ## Nutrient Tracking
 
@@ -155,7 +156,7 @@ Rounding: calories → nearest integer; all other nutrients → 1 decimal place.
 nutrition-labels/
 ├── backend/                    # FastAPI + SQLite
 │   ├── app/
-│   │   ├── main.py             # 3 API routes + rate limiter
+│   │   ├── main.py             # 4 API routes + rate limiter
 │   │   ├── nutrition.py        # Pure macro calculation math
 │   │   ├── search.py           # Search ranking logic
 │   │   ├── database.py         # SQLite access layer
@@ -213,5 +214,5 @@ npm test
 - **Ingredient ordering** — FDA regulations require ingredients sorted by gram weight descending. Both the frontend label preview and the backend PDF template implement this.
 - **`<1%` rule** — When a nutrient's %DV rounds to 0 but its raw value is > 0, the label shows `<1%` rather than `0%`.
 - **Frontend DV permissiveness** — The frontend `calculateRecipeMacros` throws a `RangeError` for `portionDivisor` outside 1–999. In live preview the UI guards against passing 0.
-- **Rate limiting** — PDF generation is capped at 10 requests per minute per IP. The `429` response includes a `Retry-After` header. Other routes are not rate-limited.
+- **Rate limiting** — All three data routes are rate-limited per IP: `GET /api/search` at 60/min, `GET /api/food/{id}` at 120/min, and `POST /api/generate_label` at 10/min. Every `429` response includes a `Retry-After` header.
 - **Recipe versioning** — Recipes are saved to `localStorage` as a list of timestamped snapshots. Each recipe holds up to 20 versions; older ones are pruned automatically. Max 50 recipes total.

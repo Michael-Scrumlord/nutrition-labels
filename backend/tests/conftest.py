@@ -25,33 +25,33 @@ from app.constants import NUTRIENT_FIELDS
 # Known foods used throughout the tests
 # (fdc_id, description, calories, fat_total_g, fat_saturated_g, cholesterol_mg,
 #  sodium_mg, carbohydrates_total_g, fiber_g, sugar_g, protein_g,
-#  vitamin_d_mcg, calcium_mg, iron_mg, potassium_mg)
+#  vitamin_d_mcg, calcium_mg, iron_mg, potassium_mg, data_type)
 # ---------------------------------------------------------------------------
 TEST_FOODS = [
     # Butter — all values per 100g
     (1097512, "Butter, unsalted",
-     717, 81.1, 51.4, 215, 11, 0.1, 0.0, 0.1, 0.9, 1.5, 24, 0.02, 24),
+     717, 81.1, 51.4, 215, 11, 0.1, 0.0, 0.1, 0.9, 1.5, 24, 0.02, 24, "sr_legacy_food"),
     # Flour
     (1100209, "All-purpose flour, white",
-     364, 1.0, 0.2, 0, 2, 76.3, 2.7, 0.3, 10.3, 0.0, 15, 4.64, 107),
+     364, 1.0, 0.2, 0, 2, 76.3, 2.7, 0.3, 10.3, 0.0, 15, 4.64, 107, "sr_legacy_food"),
     # Sugar
     (1104330, "Sugar, granulated white",
-     387, 0.0, 0.0, 0, 1, 99.8, 0.0, 99.8, 0.0, 0.0, 1, 0.01, 2),
+     387, 0.0, 0.0, 0, 1, 99.8, 0.0, 99.8, 0.0, 0.0, 1, 0.01, 2, "sr_legacy_food"),
     # Eggs
     (1097517, "Eggs, whole, raw",
-     143, 9.5, 3.1, 372, 142, 0.7, 0.0, 0.4, 12.6, 2.0, 56, 1.75, 138),
+     143, 9.5, 3.1, 372, 142, 0.7, 0.0, 0.4, 12.6, 2.0, 56, 1.75, 138, "sr_legacy_food"),
     # Chicken breast
     (1105001, "Chicken breast, raw",
-     120, 2.6, 0.7, 64, 74, 0.0, 0.0, 0.0, 22.5, 0.1, 11, 0.37, 256),
+     120, 2.6, 0.7, 64, 74, 0.0, 0.0, 0.0, 22.5, 0.1, 11, 0.37, 256, "sr_legacy_food"),
     # Olive oil
     (1103301, "Olive oil",
-     884, 100.0, 13.8, 0, 2, 0.0, 0.0, 0.0, 0.0, 0.0, 1, 0.56, 1),
+     884, 100.0, 13.8, 0, 2, 0.0, 0.0, 0.0, 0.0, 0.0, 1, 0.56, 1, "sr_legacy_food"),
     # Salt (edge case: almost all sodium)
     (1102203, "Salt, table",
-     0, 0.0, 0.0, 0, 38758, 0.0, 0.0, 0.0, 0.0, 0.0, 24, 0.33, 8),
+     0, 0.0, 0.0, 0, 38758, 0.0, 0.0, 0.0, 0.0, 0.0, 24, 0.33, 8, "sr_legacy_food"),
     # Cocoa powder
     (1100216, "Cocoa powder, unsweetened",
-     228, 13.7, 8.1, 0, 21, 57.9, 33.2, 1.8, 19.6, 0.0, 128, 13.86, 1524),
+     228, 13.7, 8.1, 0, 21, 57.9, 33.2, 1.8, 19.6, 0.0, 128, 13.86, 1524, "sr_legacy_food"),
 ]
 
 TEST_PORTIONS = [
@@ -84,7 +84,7 @@ def test_db_path(tmp_path_factory):
             fiber_g REAL DEFAULT 0, sugar_g REAL DEFAULT 0,
             protein_g REAL DEFAULT 0, vitamin_d_mcg REAL DEFAULT 0,
             calcium_mg REAL DEFAULT 0, iron_mg REAL DEFAULT 0,
-            potassium_mg REAL DEFAULT 0
+            potassium_mg REAL DEFAULT 0, data_type TEXT DEFAULT NULL
         )
     """)
     conn.execute("""
@@ -94,27 +94,27 @@ def test_db_path(tmp_path_factory):
             modifier TEXT NOT NULL, gram_weight REAL NOT NULL
         )
     """)
+    # FTS5 virtual table mirrors the production schema used by database.search_foods().
+    # rowid maps to food_macros.fdc_id via the JOIN in database.search_foods().
+    conn.execute("""
+        CREATE VIRTUAL TABLE food_search USING fts5(
+            description,
+            content='food_macros',
+            content_rowid='fdc_id'
+        )
+    """)
     conn.executemany(
-        """INSERT INTO food_macros
-           (fdc_id, description, calories, fat_total_g, fat_saturated_g,
-            cholesterol_mg, sodium_mg, carbohydrates_total_g, fiber_g,
-            sugar_g, protein_g, vitamin_d_mcg, calcium_mg, iron_mg, potassium_mg)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        "INSERT INTO food_macros VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         TEST_FOODS,
     )
     conn.executemany(
         "INSERT INTO food_portions (fdc_id, amount, modifier, gram_weight) VALUES (?,?,?,?)",
         TEST_PORTIONS,
     )
-
-    # FTS5 virtual table for full-text search (mirrors the production schema).
-    # Keyed by rowid = fdc_id so the JOIN in database.search_foods works.
-    conn.execute("CREATE VIRTUAL TABLE food_search USING fts5(description)")
-    conn.executemany(
-        "INSERT INTO food_search(rowid, description) VALUES (?, ?)",
-        [(fdc_id, desc) for fdc_id, desc, *_ in TEST_FOODS],
+    # Populate the FTS5 index from food_macros so search tests work.
+    conn.execute(
+        "INSERT INTO food_search(rowid, description) SELECT fdc_id, description FROM food_macros"
     )
-
     conn.commit()
     conn.close()
 
