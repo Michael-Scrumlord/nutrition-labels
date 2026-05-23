@@ -43,6 +43,7 @@ Each route follows the same pattern: **validate → fetch → calculate → retu
 
 | Route                    | Method | Delegates to                                              |
 |--------------------------|--------|-----------------------------------------------------------|
+| `/api/health`            | GET    | `database.get_connection` (DB probe); returns `{"status":"ok","release":"..."}` |
 | `/api/search`            | GET    | `search.ranked_search`                                    |
 | `/api/food/{fdc_id}`     | GET    | `database.get_food_by_id`, `database.get_portions_by_id`  |
 | `/api/generate_label`    | POST   | `nutrition.calculate_recipe_macros` → `pdf.render_label_html` → `pdf.generate_pdf` |
@@ -88,11 +89,11 @@ Each route follows the same pattern: **validate → fetch → calculate → retu
 |----------------------|---------------------------------------------------|
 | `amount`             | Float, > 0 and ≤ 1,000,000                        |
 | `unit`               | Must be a key in `UNIT_CONVERSIONS` (g/ml/oz/lb/kg) |
-| `name` (ingredient)  | String, 1–120 characters                          |
+| `name` (ingredient)  | String, 1–120 characters; control chars stripped  |
 | `portion_divisor`    | Integer, 1–999 inclusive                          |
-| `label_name`         | String, max 120 characters (empty allowed)        |
-| `width_inches`       | Float, > 0.1 (strictly) and ≤ 12                  |
-| `height_inches`      | Float > 0 and ≤ 20, or `null` (auto-size)         |
+| `label_name`         | String, max 120 characters (empty allowed); control chars stripped |
+| `width_inches`       | Float, ≥ 2 and ≤ 12; snapped to 0.01″ precision   |
+| `height_inches`      | Float, ≥ 2 and ≤ 20, or `null` (auto-size); snapped to 0.01″ |
 | `ingredients`        | List, 1–100 items                                 |
 | Extra fields         | Rejected (`extra="forbid"`)                       |
 
@@ -205,7 +206,7 @@ Lifecycle actions: `clearRecipe`, `loadRecipe`, `loadVersion`, `exitVersionView`
 
 7. **No business logic in routes** — `main.py` only validates input, delegates to modules, and assembles responses. Math, ranking, and rendering are isolated in their own modules.
 
-8. **Rate limiting** — `POST /api/generate_label` is rate-limited to 10 requests per minute per remote IP via `slowapi`. The `429` response includes a `Retry-After` header. Other routes are not rate-limited.
+8. **Rate limiting** — All three data routes are rate-limited per remote IP via `slowapi`: `GET /api/search` at 60/min, `GET /api/food/{fdc_id}` at 120/min, and `POST /api/generate_label` at 10/min. Every `429` response includes a `Retry-After` header.
 
 ---
 

@@ -17,6 +17,7 @@ from app.models import (
     MAX_PORTION_DIVISOR,
     MIN_WIDTH,
     MAX_WIDTH,
+    MIN_HEIGHT,
     MAX_HEIGHT,
 )
 
@@ -189,10 +190,15 @@ class TestGenerateLabelRequestInvalid:
         with pytest.raises(ValidationError):
             GenerateLabelRequest(**valid_request(portion_divisor=MAX_PORTION_DIVISOR + 1))
 
-    def test_width_at_minimum_boundary_rejected(self):
-        # Field uses gt= (strictly greater than), so MIN_WIDTH itself is invalid
+    def test_width_at_minimum_boundary_accepted(self):
+        # Field uses ge= (greater than or equal), so MIN_WIDTH itself is valid
+        req = GenerateLabelRequest(**valid_request(width_inches=MIN_WIDTH))
+        assert req.width_inches == MIN_WIDTH
+
+    def test_width_below_minimum_rejected(self):
+        # Any value strictly less than MIN_WIDTH must be rejected
         with pytest.raises(ValidationError):
-            GenerateLabelRequest(**valid_request(width_inches=MIN_WIDTH))
+            GenerateLabelRequest(**valid_request(width_inches=MIN_WIDTH - 0.01))
 
     def test_width_above_maximum_rejected(self):
         with pytest.raises(ValidationError):
@@ -213,6 +219,15 @@ class TestGenerateLabelRequestInvalid:
     def test_height_negative_rejected(self):
         with pytest.raises(ValidationError):
             GenerateLabelRequest(**valid_request(height_inches=-0.1))
+
+    def test_height_at_minimum_boundary_accepted(self):
+        # Field uses ge= (greater than or equal), so MIN_HEIGHT itself is valid
+        req = GenerateLabelRequest(**valid_request(height_inches=MIN_HEIGHT))
+        assert req.height_inches == MIN_HEIGHT
+
+    def test_height_below_minimum_rejected(self):
+        with pytest.raises(ValidationError):
+            GenerateLabelRequest(**valid_request(height_inches=MIN_HEIGHT - 0.01))
 
     def test_height_above_maximum_rejected(self):
         with pytest.raises(ValidationError):
