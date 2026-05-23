@@ -77,6 +77,7 @@ def test_db_path(tmp_path_factory):
     conn.execute("""
         CREATE TABLE food_macros (
             fdc_id INTEGER PRIMARY KEY, description TEXT NOT NULL,
+            data_type TEXT DEFAULT NULL,
             calories REAL DEFAULT 0, fat_total_g REAL DEFAULT 0,
             fat_saturated_g REAL DEFAULT 0, cholesterol_mg REAL DEFAULT 0,
             sodium_mg REAL DEFAULT 0, carbohydrates_total_g REAL DEFAULT 0,
@@ -94,13 +95,26 @@ def test_db_path(tmp_path_factory):
         )
     """)
     conn.executemany(
-        "INSERT INTO food_macros VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        """INSERT INTO food_macros
+           (fdc_id, description, calories, fat_total_g, fat_saturated_g,
+            cholesterol_mg, sodium_mg, carbohydrates_total_g, fiber_g,
+            sugar_g, protein_g, vitamin_d_mcg, calcium_mg, iron_mg, potassium_mg)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
         TEST_FOODS,
     )
     conn.executemany(
         "INSERT INTO food_portions (fdc_id, amount, modifier, gram_weight) VALUES (?,?,?,?)",
         TEST_PORTIONS,
     )
+
+    # FTS5 virtual table for full-text search (mirrors the production schema).
+    # Keyed by rowid = fdc_id so the JOIN in database.search_foods works.
+    conn.execute("CREATE VIRTUAL TABLE food_search USING fts5(description)")
+    conn.executemany(
+        "INSERT INTO food_search(rowid, description) VALUES (?, ?)",
+        [(fdc_id, desc) for fdc_id, desc, *_ in TEST_FOODS],
+    )
+
     conn.commit()
     conn.close()
 
