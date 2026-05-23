@@ -123,9 +123,13 @@ export function MethodSection() {
 
           {/* ── Methodology footnote ────────────────────────────────────── */}
           <p style={{ marginTop: 36, maxWidth: 720, fontSize: 13, lineHeight: 1.55, color: "var(--ink-3)" }}>
-            Variables let readers tweak this recipe. Click{" "}
-            <em className="pl-display" style={{ color: "var(--accent)" }}>+ insert variable</em>{" "}
-            while editing a step to place any tweakable value — bake time, oven temp, even how many cups.
+            Variables let readers tweak this recipe. While editing any step, type{" "}
+            <kbd style={{
+              fontFamily: "var(--f-mono)", fontSize: 11,
+              border: "1px solid var(--hair-strong)", borderRadius: 2,
+              padding: "1px 6px", color: "var(--ink)", background: "var(--bg)",
+            }}>/</kbd>{" "}
+            anywhere in the prose to drop in a tweakable value — bake time, oven temp, even how many cups.
             Readers drag the accent numbers to adjust on the fly; every reference updates in lockstep.
           </p>
         </div>

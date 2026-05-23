@@ -15,7 +15,10 @@ export function VariablesPanel() {
   const instructions = useRecipeStore((s) => s.instructions);
   const { updateVariable, setVariableValue, removeVariable } = useRecipeActions();
 
-  const [open, setOpen] = useState(true);
+  // Closed by default — under the slash-command paradigm the panel is a
+  // quiet reference at the bottom of the method, not the primary editing
+  // surface. Users invoke inline via "/" in step text instead.
+  const [open, setOpen] = useState(false);
 
   // Map each variable name → array of step indices that reference it
   const usageMap = useMemo(() => {
@@ -48,7 +51,7 @@ export function VariablesPanel() {
         }}
       >
         <span>{open ? "▾" : "▸"}</span>
-        <span>VARIABLES · {variables.length}</span>
+        <span>ALL VARIABLES · {variables.length}</span>
       </button>
 
       {open && (
