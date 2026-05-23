@@ -131,6 +131,10 @@ class TestGenerateLabelRequestValid:
         req = GenerateLabelRequest(**valid_request(portion_divisor=MAX_PORTION_DIVISOR))
         assert req.portion_divisor == MAX_PORTION_DIVISOR
 
+    def test_width_at_minimum_accepted(self):
+        req = GenerateLabelRequest(**valid_request(width_inches=MIN_WIDTH))
+        assert req.width_inches == MIN_WIDTH
+
     def test_width_just_above_minimum(self):
         req = GenerateLabelRequest(**valid_request(width_inches=MIN_WIDTH + 0.01))
         assert req.width_inches > MIN_WIDTH

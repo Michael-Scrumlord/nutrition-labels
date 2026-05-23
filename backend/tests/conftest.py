@@ -77,6 +77,7 @@ def test_db_path(tmp_path_factory):
     conn.execute("""
         CREATE TABLE food_macros (
             fdc_id INTEGER PRIMARY KEY, description TEXT NOT NULL,
+            data_type TEXT DEFAULT NULL,
             calories REAL DEFAULT 0, fat_total_g REAL DEFAULT 0,
             fat_saturated_g REAL DEFAULT 0, cholesterol_mg REAL DEFAULT 0,
             sodium_mg REAL DEFAULT 0, carbohydrates_total_g REAL DEFAULT 0,
