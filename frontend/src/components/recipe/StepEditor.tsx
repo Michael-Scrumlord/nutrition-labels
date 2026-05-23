@@ -1,5 +1,12 @@
 // recipe/StepEditor.tsx
 //
+// DEPRECATED — superseded by SlashStepEditor.tsx (Variant A — Slash Command
+// design). This file is kept un-deleted so a quick revert to the textarea +
+// modal flow is possible if the contentEditable approach proves brittle.
+// No live code path imports it as of the slash-command rollout. Safe to
+// delete in a follow-up cleanup once the new editor has settled.
+//
+// Original purpose:
 // Edit mode for a single step. Wraps a plain auto-growing textarea with
 // an "+ Insert variable" button that opens a popover. Cmd/Ctrl+K does the same.
 // Variables are inserted at the cursor position as {Label} tokens.

@@ -98,10 +98,17 @@ const styles = StyleSheet.create({
   caloriesRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-end",
+    // baseline aligns the typographic baselines of "Calories" (18pt) and the
+    // numeral (32pt) the way the FDA artwork shows. flex-end (a previous
+    // workaround) aligned line-box BOTTOMS instead, which pushed the giant
+    // numeral's bottom edge against the 3pt rule below this row.
+    alignItems: "baseline",
     borderBottomWidth: 3,
     borderBottomColor: INK,
-    paddingBottom: 2,
+    // 4pt of breathing room between the numeral baseline+descender and the
+    // 3pt rule. The original WeasyPrint template got this for free from the
+    // browser's default line-height (~1.2); react-pdf needs it explicit.
+    paddingBottom: 4,
     marginBottom: 2,
   },
   caloriesLabel: {
@@ -111,7 +118,10 @@ const styles = StyleSheet.create({
   caloriesValue: {
     fontSize: 32,
     fontWeight: "bold",
-    lineHeight: 1.0,
+    // Intentionally no `lineHeight: 1.0` here — the previous tight setting
+    // eliminated natural descender room and made the digits feel jammed
+    // against the rule below the row. Default line-height gives breathing
+    // room without affecting the row's overall height meaningfully.
   },
   dvHeader: {
     fontSize: 7,
@@ -210,7 +220,12 @@ export function LabelPdfDoc({
 
   return (
     <Document>
-      <Page size={pageSize} style={styles.page}>
+      {/* wrap={false}: keep the label on ONE page, even if content exceeds the
+          requested height. Without this, react-pdf paginates and the user
+          ends up with a label split across 2+ PDF pages — useless for a
+          sticker workflow. The existing in-app preview shows a clipping
+          warning when this is about to happen, so the user is informed. */}
+      <Page size={pageSize} style={styles.page} wrap={false}>
         {labelName ? <Text style={styles.labelName}>{labelName}</Text> : null}
 
         <View style={styles.box}>

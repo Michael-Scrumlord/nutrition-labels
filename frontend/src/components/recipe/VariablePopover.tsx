@@ -1,5 +1,11 @@
 // recipe/VariablePopover.tsx
 //
+// DEPRECATED — superseded by SlashMenu.tsx (Variant A — Slash Command).
+// Only the legacy StepEditor.tsx (also deprecated) imports this, and
+// nothing on the live edit path mounts StepEditor anymore. Keep alive for
+// a release or two in case a revert is needed; safe to delete after that.
+//
+// Original purpose:
 // Modal for inserting a variable into a step. Two tabs:
 //   • EXISTING — pick a previously-defined variable
 //   • NEW      — define a new one (label + default value + optional suffix)

@@ -7,7 +7,7 @@ import { useState } from "react";
 import type { RecipeStep } from "../../types";
 import { useRecipeActions } from "../../hooks/useRecipeActions";
 import { StepText } from "./StepText";
-import { StepEditor } from "./StepEditor";
+import { SlashStepEditor } from "./SlashStepEditor";
 
 interface StepRowProps {
   step:    RecipeStep;
@@ -53,11 +53,12 @@ export function StepRow({ step, index, total }: StepRowProps) {
       {/* Body */}
       <div style={{ flex: 1, minWidth: 0 }}>
         {editing ? (
-          <StepEditor
+          <SlashStepEditor
             stepId={step.id}
             initialText={step.text}
             onCommit={() => setEditing(false)}
             onRemove={() => removeStep(step.id)}
+            index={index}
           />
         ) : (
           <div
