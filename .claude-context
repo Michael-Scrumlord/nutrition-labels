@@ -354,7 +354,8 @@ removeIngredient(fdc_id: number): void
 updateIngredientName(fdc_id, name): void
 updateIngredientAmount(fdc_id, amount): void
 updateIngredientUnit(fdc_id, unit: UnitKey): void
-moveIngredient(fromIndex, toIndex): void
+updateIngredientPortion(fdc_id: number, portion: PortionRef | null): void
+moveIngredient(fdc_id: number, direction: -1 | 1): void
 setPortionDivisor(n: number): void
 setLabelName(name: string): void
 setDimensions(dims: Partial<LabelDimensions>): void
@@ -362,7 +363,7 @@ setHighlightedNutrients(set: HighlightSet): void
 addStep(afterId?: string) → string       // returns new step id
 updateStepText(id, text): void
 removeStep(id): void
-moveStep(fromIndex, toIndex): void
+moveStep(id: string, direction: -1 | 1): void
 addVariable(variable: RecipeVariable): void   // no-op if name already exists
 setVariableValue(name, value): void
 updateVariable(name, partial): void
@@ -386,16 +387,18 @@ deleteVersion(recipeId: string, versionId: string): void
 
 ### store/preferencesStore.ts  (Zustand + localStorage "nl_preferences")
 ```typescript
-state: { recents: SavedFood[]; favorites: SavedFood[] }
+state: { recents: SavedFood[]; favorites: SavedFood[]; isMethodExpanded: boolean }
 addRecent(food: SavedFood): void     // dedupe, prepend, trim to 15
 toggleFavorite(food: SavedFood): void
 isFavorite(fdc_id: number) → boolean
+toggleMethodExpanded(): void          // collapse/expand Method panel
 ```
 
 ### store/themeStore.ts  (Zustand + localStorage "nl-theme")
 ```typescript
 ThemeKey: "paper" | "overcast" | "twilight" | "midnight"
-useThemeStore: { theme: ThemeKey; setTheme(k: ThemeKey): void; ... }
+useThemeStore: { theme: ThemeKey; accentId: string;
+                 setTheme(t: ThemeKey): void; setAccent(id: string): void }
 useActiveTheme() → { theme: ThemeKey; def: ThemeDef; accent: AccentDef }
 themeVars(def: ThemeDef, accentHex: string) → Record<string, string>  // CSS custom props
 ```
@@ -408,14 +411,23 @@ useNutritionCalc() → MacroProfile
 useIngredientSearch(query: string) → { results: FoodSearchResult[]; isLoading: boolean; isError: boolean }
   // React Query; 300ms debounce; staleTime 30s; enabled when query.length >= 2
 
-useLabelResize() → { onMouseDown: MouseEventHandler }
-  // Drag resize; 96px/in; clamps [200,600]px → [2.08,6.25]in
+useDebounce<T>(value: T, delayMs: number) → T
+  // Generic setTimeout-based debouncer; underpins useIngredientSearch
+
+useLabelResize() → { onPointerDownCorner; onPointerDownEast; onPointerDownSouth: PointerEventHandler }
+  // Drag resize via pointer events; 96px/in; clamps [200,600]px → [2.08,6.25]in
 
 useAnimatedNumber(target: number, duration?: number=420) → number
   // cubic-ease-out rAF animation; returns Math.round of current value
 
 useRecipeActions() → all recipeStore actions
   // useShallow prevents re-renders when action refs are stable
+
+usePageMeta(meta: { title: string; description: string; canonical?: string }) → void
+  // Side-effect: updates document.title + <meta>/<link rel=canonical> tags
+
+useAdSenseBootstrap() → void
+  // Side-effect: injects AdSense script once per page load (no-op if disabled)
 ```
 
 ---
@@ -447,11 +459,14 @@ frontend/src/
   store/savedRecipesStore.ts   recipe catalog (localStorage v2, max 50 recipes × 20 versions)
   store/preferencesStore.ts    recents (max 15) + favorites (localStorage)
   store/themeStore.ts          theme + accent (localStorage)
-  hooks/useNutritionCalc.ts    live macro derivation
-  hooks/useIngredientSearch.ts debounced search with React Query
-  hooks/useLabelResize.ts      drag-resize label width
-  hooks/useAnimatedNumber.ts   animated counter
-  hooks/useRecipeActions.ts    stable store action refs
+  hooks/useNutritionCalc.ts       live macro derivation
+  hooks/useIngredientSearch.ts    debounced search with React Query
+  hooks/useDebounce.ts            generic value debouncer
+  hooks/useLabelResize.ts         pointer-drag resize (corner/east/south handles)
+  hooks/useAnimatedNumber.ts      animated counter
+  hooks/useRecipeActions.ts       stable store action refs
+  hooks/usePageMeta.ts            document.title + meta/canonical tags
+  hooks/useAdSenseBootstrap.ts    AdSense script injection
   components/recipe/RecipeBuilder.tsx     primary recipe UI
   components/label/LabelPreview.tsx       label preview + PDF trigger
   components/search/IngredientSearch.tsx  food search UI
