@@ -39,6 +39,7 @@ export function LabelDimensions() {
             decimals={2}
             onChange={setWidth}
             suffix="″"
+            ariaLabel="Label width in inches"
             style={{
               fontSize: 22,
               fontWeight: 700,
@@ -67,6 +68,7 @@ export function LabelDimensions() {
                 decimals={2}
                 onChange={setHeight}
                 suffix="″"
+                ariaLabel="Label height in inches"
                 style={{
                   fontSize: 22,
                   fontWeight: 700,

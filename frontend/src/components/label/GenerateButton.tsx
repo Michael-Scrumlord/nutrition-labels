@@ -70,6 +70,11 @@ export function GenerateButton() {
         className="sig-btn sig-primary"
         style={{
           width: "100%",
+          // `.sig-btn` carries `margin: 0 2px 2px 0` so adjacent buttons don't
+          // overlap each other's 2px hard-offset shadow. A full-width primary
+          // CTA has no neighbour to clear, and the margin pushes it past its
+          // container — null it out here.
+          margin: 0,
           justifyContent: "center",
           padding: "12px 14px",
           fontSize: 12,

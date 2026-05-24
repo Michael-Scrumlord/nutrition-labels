@@ -20,6 +20,13 @@ frontend/dist/
 # Vite cache files
 frontend/vite.config.ts.timestamp-*.mjs
 
+# Playwright artifacts — local + CI regenerate these every run, never commit.
+# The Chromium binary itself lives in ~/.cache/ms-playwright (outside the
+# repo), so no need to ignore it here.
+frontend/playwright-report/
+frontend/test-results/
+frontend/playwright/.cache/
+
 # OS / editor
 .DS_Store
 Thumbs.db

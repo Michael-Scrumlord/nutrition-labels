@@ -183,7 +183,13 @@ export function LabelColumn() {
               style={{
                 width: targetPx,
                 height: containerH,
-                overflow: "hidden",
+                // `clip` instead of `hidden`: `hidden` establishes a scroll
+                // container, which means the inner authoring-width (288px)
+                // div leaks into our scrollWidth even though it's visually
+                // clipped. `clip` does not establish a scroll container, so
+                // scrollWidth == clientWidth and the layout test sees the
+                // box as it actually paints.
+                overflow: "clip",
                 background: "#ffffff",
                 boxShadow: "var(--paper-shadow)",
               }}
