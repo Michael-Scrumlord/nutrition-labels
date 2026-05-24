@@ -36,26 +36,18 @@ export function VariablesPanel() {
   if (variables.length === 0) return null;
 
   return (
-    <section style={{ marginTop: 22, paddingTop: 16, borderTop: "1px solid var(--hair)" }}>
+    <section style={{ marginTop: 28, paddingTop: 18, borderTop: "1px solid var(--hair-strong)" }}>
       <button
         onClick={() => setOpen(!open)}
-        className="pl-meta"
-        style={{
-          background: "transparent",
-          border: "none",
-          cursor: "pointer",
-          padding: 0,
-          display: "flex",
-          alignItems: "baseline",
-          gap: 10,
-        }}
+        className="sig-btn"
+        style={{ marginBottom: 12 }}
       >
-        <span>{open ? "▾" : "▸"}</span>
-        <span>ALL VARIABLES · {variables.length}</span>
+        <span style={{ color: "var(--accent)", marginRight: 4 }}>{open ? "▾" : "▸"}</span>
+        Variables · {variables.length}
       </button>
 
       {open && (
-        <ul style={{ listStyle: "none", margin: "10px 0 0", padding: 0 }}>
+        <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
           {variables.map((v) => {
             const usage = usageMap.get(v.name) ?? [];
             return (
@@ -63,39 +55,27 @@ export function VariablesPanel() {
                 key={v.name}
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "minmax(140px, 1fr) 90px 110px auto auto",
-                  gap: 12,
+                  gridTemplateColumns: "minmax(180px, 1.3fr) 130px 110px 1fr auto",
+                  gap: 14,
                   alignItems: "center",
                   padding: "8px 0",
                   borderBottom: "1px solid var(--hair)",
                 }}
               >
-                {/* Label (editable) */}
+                {/* Label (editable groove) */}
                 <input
                   value={v.label}
                   onChange={(e) => updateVariable(v.name, { label: e.target.value })}
-                  className="pl-display"
+                  className="sig-editable sig-input pl-display"
                   style={{
-                    background: "transparent",
-                    border: "none",
-                    outline: "none",
+                    width: "100%",
                     fontSize: 19,
-                    color: "var(--ink)",
-                    padding: 0,
+                    padding: "4px 24px 4px 8px",
                   }}
                 />
 
-                {/* Value (scrub) */}
-                <span
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "baseline",
-                    padding: "2px 10px",
-                    background: "color-mix(in srgb, var(--accent) 12%, transparent)",
-                    borderRadius: 2,
-                    justifySelf: "start",
-                  }}
-                >
+                {/* Value (accent chip) */}
+                <span className="sig-chip" style={{ justifySelf: "start" }}>
                   <ScrubNumber
                     value={v.value}
                     onChange={(n) => setVariableValue(v.name, n)}
@@ -103,61 +83,55 @@ export function VariablesPanel() {
                     max={v.max}
                     step={v.step ?? 1}
                     ariaLabel={v.label}
+                    suffix={v.suffix ? ` ${v.suffix}` : ""}
                     style={{
-                      color: "var(--accent)",
-                      fontWeight: 800,
-                      fontFamily: "var(--f-mono)",
-                      fontSize: 14,
+                      color: "var(--bg)",
+                      cursor: "ew-resize",
+                      userSelect: "none",
                     }}
                   />
                 </span>
 
-                {/* Suffix (editable) */}
+                {/* Suffix (editable groove) */}
                 <input
                   value={v.suffix ?? ""}
                   onChange={(e) => updateVariable(v.name, { suffix: e.target.value || undefined })}
                   placeholder="suffix"
+                  className="sig-editable sig-input"
                   style={{
-                    background: "transparent",
-                    border: "1px solid var(--hair)",
-                    outline: "none",
+                    width: "100%",
                     fontFamily: "var(--f-mono)",
                     fontSize: 11,
-                    padding: "3px 6px",
-                    color: "var(--ink-2)",
+                    padding: "4px 24px 4px 8px",
                   }}
                 />
 
-                {/* Usage */}
+                {/* Usage (static anchor) */}
                 <span
-                  className="pl-meta"
-                  style={{ fontSize: 9, letterSpacing: "0.14em", textAlign: "right" }}
+                  className="sig-static pl-meta"
+                  style={{
+                    textAlign: "right",
+                    paddingRight: 8,
+                    display: "inline-flex",
+                    justifyContent: "flex-end",
+                    alignItems: "baseline",
+                    gap: 8,
+                  }}
                 >
+                  <span style={{ width: 2, height: 14, background: "var(--hair-strong)" }} />
                   {usage.length === 0 ? (
                     <span style={{ color: "var(--hair-strong)" }}>UNUSED</span>
                   ) : (
-                    `STEP ${usage.map((n) => String(n).padStart(2, "0")).join(", ")}`
+                    `USED IN STEP ${usage.map((n) => String(n).padStart(2, "0")).join(", ")}`
                   )}
                 </span>
 
-                {/* Remove */}
+                {/* Remove (sig-icon danger) */}
                 <button
                   onClick={() => removeVariable(v.name)}
-                  style={{
-                    background: "transparent",
-                    border: "none",
-                    cursor: "pointer",
-                    color: "var(--ink-3)",
-                    fontSize: 16,
-                    padding: "2px 6px",
-                    lineHeight: 1,
-                  }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "var(--color-danger)"; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "var(--ink-3)"; }}
+                  className="sig-btn sig-icon sig-danger"
                   aria-label={`Remove ${v.label}`}
-                >
-                  ×
-                </button>
+                >×</button>
               </li>
             );
           })}

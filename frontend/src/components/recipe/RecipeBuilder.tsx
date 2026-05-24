@@ -62,18 +62,18 @@ export function RecipeBuilder() {
         {/* ── Viewing older version banner ─────────────────────────────── */}
         {viewingVersionId && <VersionBanner onDismiss={exitVersionView} />}
 
-        {/* ── Recipe name (editorial hero — 56px) ──────────────────────── */}
+        {/* ── Recipe name (editorial hero — 56px, sig-editable groove) ── */}
         <div style={{ width: "100%", marginBottom: 18 }}>
           <input
             value={labelName}
             onChange={(e) => setLabelName(e.target.value)}
             placeholder="Name your recipe…"
-            className="pl-display"
+            className="sig-editable sig-input pl-display"
             style={{
-              background: "transparent", border: "none", outline: "none",
+              width: "100%", minWidth: 0,
               fontSize: 56,
               lineHeight: 1,
-              width: "100%", minWidth: 0, color: "var(--ink)", padding: 0,
+              padding: "8px 36px 10px 12px",
             }}
           />
         </div>
@@ -87,10 +87,12 @@ export function RecipeBuilder() {
         />
 
         {/* ── Ingredients section header ───────────────────────────────── */}
-        <div style={{ display: "flex", alignItems: "baseline", gap: 18, marginBottom: 8 }}>
-          <span className="pl-meta">INGREDIENTS —</span>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 14, marginBottom: 4 }}>
+          <span className="sig-static pl-meta">
+            <span style={{ color: "var(--accent)" }}>▾</span>  INGREDIENTS —
+          </span>
           <span style={{ flex: 1, height: 1, background: "var(--hair-strong)" }} />
-          <span className="pl-meta">
+          <span className="sig-static pl-meta">
             {ingredients.length} ITEM{ingredients.length !== 1 ? "S" : ""} · DRAFT
           </span>
         </div>
@@ -126,18 +128,16 @@ export function RecipeBuilder() {
         {/* ── Per-ingredient breakdown ─────────────────────────────────── */}
         <NutritionBreakdownTable />
 
-        {/* ── Add ingredient ───────────────────────────────────────────── */}
-        <button
-          onClick={() => setPickerOpen(true)}
-          className="pl-display"
-          style={{
-            marginTop: 18, background: "transparent", border: "none",
-            color: "var(--accent)",
-            fontSize: 20, cursor: "pointer", padding: 0,
-          }}
-        >
-          + add an ingredient
-        </button>
+        {/* ── Add ingredient (sig-btn plinth) ──────────────────────────── */}
+        <div style={{ paddingTop: 14, paddingBottom: 6, marginTop: 4 }}>
+          <button
+            onClick={() => setPickerOpen(true)}
+            className="sig-btn"
+          >
+            <span style={{ color: "var(--accent)" }}>▸</span>
+            Add Ingredient
+          </button>
+        </div>
 
         {/* ── Method (instructions + variables) ───────────────────────── */}
         <MethodSection />

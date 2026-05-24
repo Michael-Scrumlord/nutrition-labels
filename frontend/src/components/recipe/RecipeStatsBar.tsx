@@ -25,38 +25,40 @@ export function RecipeStatsBar({
     <div style={{
       display: "flex",
       alignItems: "baseline",
-      gap: 18,
+      gap: 20,
       flexWrap: "wrap",
-      marginBottom: 28,
-      paddingBottom: 20,
+      marginBottom: 26,
+      paddingBottom: 18,
       borderBottom: "1px solid var(--hair-strong)",
-      fontSize: 18,
+      fontSize: 17,
       color: "var(--ink-2)",
     }}>
-      <span>yields&nbsp;
+      <span className="sig-static">yields&nbsp;
         <ScrubNumber
           value={portionDivisor} min={1} max={96} step={1}
           onChange={onPortionDivisorChange}
           ariaLabel="servings per batch"
-          className="pl-scrub"
-          style={{ fontSize: 24 }}
+          className="sig-inline"
+          style={{ fontSize: 22, fontWeight: 700, color: "var(--ink)" }}
         />
         &nbsp;servings
       </span>
-      <span style={{ color: "var(--hair-strong)" }}>·</span>
-      <span>per serving&nbsp;
+      <span className="sig-static" style={{ color: "var(--hair-strong)" }}>·</span>
+      <span className="sig-static">per serving&nbsp;
         <span
           key={animatedCal}
-          className="pl-scrub"
-          style={{ fontSize: 24, display: "inline-block", animation: "popPulse 0.42s ease-out" }}
+          className="sig-calc"
+          style={{ fontSize: 22, fontWeight: 700, color: "var(--accent)", animation: "popPulse 0.42s ease-out" }}
         >
-          {animatedCal}
+          <span>{animatedCal}</span>
         </span>
         &nbsp;kcal
       </span>
-      <span style={{ color: "var(--hair-strong)" }}>·</span>
-      <span>batch&nbsp;
-        <span className="pl-scrub" style={{ fontSize: 24 }}>{Math.round(totalGrams)}</span>
+      <span className="sig-static" style={{ color: "var(--hair-strong)" }}>·</span>
+      <span className="sig-static">batch&nbsp;
+        <span className="sig-calc" style={{ fontSize: 22, fontWeight: 700, color: "var(--accent)" }}>
+          <span>{Math.round(totalGrams)}</span>
+        </span>
         &nbsp;g
       </span>
     </div>

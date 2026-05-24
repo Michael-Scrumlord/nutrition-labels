@@ -113,31 +113,14 @@ export function Header() {
         >
           <button
             onClick={() => setRecipesOpen(true)}
-            style={{
-              background: "transparent",
-              border: "none",
-              cursor: "pointer",
-              padding: 0,
-              display: "inline-flex",
-              alignItems: "baseline",
-              gap: 6,
-              color: "var(--ink-3)",
-              fontFamily: "var(--f-mono)",
-              fontSize: "var(--ms-mono-small)",
-              letterSpacing: "0.22em",
-              textTransform: "uppercase",
-              transition: "color 160ms ease",
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.color = "var(--accent)";
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.color = "var(--ink-3)";
-            }}
+            className="sig-btn sig-ghost"
+            aria-label="Open recipes"
           >
             RECIPES
             {recipeCount > 0 && (
-              <span style={{ color: "var(--accent)", fontWeight: 700 }}>·{recipeCount}</span>
+              <span style={{ color: "var(--accent)", fontWeight: 700, marginLeft: 4 }}>
+                ·{recipeCount}
+              </span>
             )}
           </button>
           <DonateButton />

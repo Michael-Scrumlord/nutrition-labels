@@ -31,6 +31,16 @@ export function ThemedFrame({ children, className, style }: ThemedFrameProps) {
     return undefined;
   }, [theme]);
 
+  // Mirror theme tokens onto :root so portaled UI (SlashMenu, modals that
+  // render into document.body) inherits the active theme. Without this they
+  // fall back to the Paper-default tokens defined in index.css and look
+  // wrong under any other theme.
+  useEffect(() => {
+    const vars = themeVars(def, accent.hex);
+    const root = document.documentElement;
+    for (const [k, v] of Object.entries(vars)) root.style.setProperty(k, v);
+  }, [def, accent.hex]);
+
   return (
     <div
       className={className}

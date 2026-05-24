@@ -67,30 +67,16 @@ export function GenerateButton() {
       <button
         onClick={handleGenerate}
         disabled={disabled || isLoading}
+        className="sig-btn sig-primary"
         style={{
-          background: disabled
-            ? "color-mix(in srgb, var(--ink) 8%, transparent)"
-            : "var(--accent)",
-          color: disabled ? "var(--ink-3)" : def.oled ? "#000" : "#fff",
-          border: "none",
-          padding: "16px 22px",
-          fontFamily: "var(--f-body)",
-          fontWeight: 800,
-          letterSpacing: "0.22em",
-          fontSize: 11,
-          cursor: disabled ? "default" : "pointer",
           width: "100%",
-          transition: "filter 0.15s",
-          boxShadow: disabled ? "none" : "var(--accent-glow)",
-        }}
-        onMouseEnter={(e) => {
-          if (!disabled) (e.currentTarget as HTMLButtonElement).style.filter = "brightness(1.08)";
-        }}
-        onMouseLeave={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.filter = "";
+          justifyContent: "center",
+          padding: "12px 14px",
+          fontSize: 12,
+          color: def.oled && !disabled ? "#000" : undefined,
         }}
       >
-        {isLoading ? "GENERATING…" : "↓ GENERATE PDF"}
+        {isLoading ? "GENERATING…" : "↳ GENERATE PDF"}
       </button>
 
       {error && (

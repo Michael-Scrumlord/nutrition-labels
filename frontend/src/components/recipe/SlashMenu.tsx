@@ -310,6 +310,9 @@ const rowStyle: React.CSSProperties = {
 };
 
 const inp: React.CSSProperties = {
+  width: "100%",
+  minWidth: 0,
+  boxSizing: "border-box",
   border: "1px solid var(--ink)",
   background: "var(--bg)",
   color: "var(--ink)",
