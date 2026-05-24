@@ -106,9 +106,11 @@ export function Header() {
 
         <div
           style={{
-            display: "inline-flex",
+            display: "flex",
+            flexWrap: "wrap",
             alignItems: "center",
             gap: "calc(var(--ms-gap) * 1.1)",
+            maxWidth: "100%",
           }}
         >
           <button

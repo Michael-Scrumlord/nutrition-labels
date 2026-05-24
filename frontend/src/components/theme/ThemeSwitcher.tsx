@@ -20,7 +20,7 @@ export function ThemeSwitcher({ compact = false }: ThemeSwitcherProps) {
   const sw = compact ? 24 : 26;
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: compact ? 10 : 14 }}>
+    <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: compact ? 10 : 14 }}>
       {/* Per-theme accent dots */}
       <div
         style={{ display: "flex", gap: 5, alignItems: "center" }}

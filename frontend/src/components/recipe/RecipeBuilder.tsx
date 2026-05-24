@@ -6,7 +6,7 @@
 //   • Ingredient rows on hairline rules
 //   • Method section below
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useLayoutEffect } from "react";
 import { useRecipeStore } from "../../store/recipeStore";
 import { useNutritionCalc } from "../../hooks/useNutritionCalc";
 import { useRecipeActions } from "../../hooks/useRecipeActions";
@@ -29,6 +29,15 @@ export function RecipeBuilder() {
 
   const [pickerOpen, setPickerOpen] = useState(false);
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+
+  const titleRef = useRef<HTMLTextAreaElement>(null);
+
+  useLayoutEffect(() => {
+    if (titleRef.current) {
+      titleRef.current.style.height = "auto";
+      titleRef.current.style.height = `${titleRef.current.scrollHeight}px`;
+    }
+  }, [labelName]);
 
   const macros      = useNutritionCalc();
   const totalGrams  = useMemo(
@@ -64,16 +73,20 @@ export function RecipeBuilder() {
 
         {/* ── Recipe name (editorial hero — 56px, sig-editable groove) ── */}
         <div style={{ width: "100%", marginBottom: 18 }}>
-          <input
+          <textarea
+            ref={titleRef}
             value={labelName}
             onChange={(e) => setLabelName(e.target.value)}
             placeholder="Name your recipe…"
             className="sig-editable sig-input pl-display"
+            rows={1}
             style={{
               width: "100%", minWidth: 0,
               fontSize: "var(--ms-hero)",
-              lineHeight: 1,
+              lineHeight: 1.1,
               padding: "8px 36px 10px 12px",
+              resize: "none",
+              overflow: "hidden",
             }}
           />
         </div>
