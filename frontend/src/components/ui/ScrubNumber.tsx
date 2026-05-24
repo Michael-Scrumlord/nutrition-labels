@@ -110,7 +110,17 @@ export function ScrubNumber({
       }}
       onWheel={(e) => { e.preventDefault(); emit(value - Math.sign(e.deltaY) * effectiveStep); }}
       className={className}
-      style={{ cursor: "ew-resize", userSelect: "none", touchAction: "none", ...style }}
+      style={{
+        cursor: "ew-resize",
+        userSelect: "none",
+        touchAction: "none",
+        minWidth: 24,
+        minHeight: 24,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        ...style,
+      }}
     >
       {formatted}{suffix}
     </span>

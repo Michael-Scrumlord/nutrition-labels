@@ -65,7 +65,9 @@ export function RecipesModal({ open, onClose }: RecipesModalProps) {
             style={{
               background: "transparent", border: "none",
               fontSize: 20, cursor: "pointer",
-              color: "var(--ink-3)", lineHeight: 1, padding: "0 0 0 12px",
+              color: "var(--ink-3)", lineHeight: 1, padding: "4px 0 4px 12px",
+              minHeight: 24, minWidth: 24,
+              display: "inline-flex", alignItems: "center", justifyContent: "center"
             }}
           >
             ×

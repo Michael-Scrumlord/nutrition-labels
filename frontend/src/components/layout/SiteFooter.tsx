@@ -18,6 +18,7 @@ const linkStyle = {
   textDecoration: "none",
   borderBottom: "1px solid transparent",
   transition: "color 160ms ease, border-color 160ms ease",
+  padding: "6px 0",
 } as const;
 
 function FootLink({ to, children }: { to: string; children: React.ReactNode }) {

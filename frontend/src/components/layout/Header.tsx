@@ -85,8 +85,9 @@ export function Header() {
           top: 0,
           zIndex: 20,
           borderBottom: "1px solid var(--hair-strong)",
-          display: "grid",
-          gridTemplateColumns: "auto 1fr auto",
+          display: "flex",
+          flexWrap: "wrap",
+          justifyContent: "space-between",
           alignItems: "center",
           gap: "var(--ms-gap)",
           background: "color-mix(in srgb, var(--bg) 88%, transparent)",
@@ -102,7 +103,6 @@ export function Header() {
         >
           <LedgerMark oled={oled} />
         </Link>
-        <span aria-hidden="true" />
 
         <div
           style={{

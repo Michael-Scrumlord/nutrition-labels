@@ -500,3 +500,41 @@ html, body {
   .pop-printable, .pop-printable * { visibility: visible !important; }
   .pop-printable { position: absolute; left: 0; top: 0; padding: 24px; }
 }
+
+/* ── Responsive Layout Classes ────────────────────────────────────────────── */
+.app-layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  font-family: var(--f-body);
+  container-type: inline-size;
+  container-name: app;
+}
+
+@media (min-width: 1024px) {
+  .app-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) var(--ms-label-w);
+    grid-template-rows: auto 1fr auto;
+    grid-template-areas: "head head" "body label" "site site";
+    height: 100vh;
+    overflow: hidden;
+  }
+}
+
+.label-column-layout {
+  grid-area: label;
+  background: var(--plinth-bg);
+  border-top: 1px solid var(--hair-strong);
+  border-left: none;
+  overflow: visible;
+}
+
+@media (min-width: 1024px) {
+  .label-column-layout {
+    height: 100%;
+    overflow: hidden;
+    border-top: none;
+    border-left: 1px solid var(--hair-strong);
+  }
+}

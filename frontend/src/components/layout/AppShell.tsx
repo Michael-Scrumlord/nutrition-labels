@@ -36,19 +36,7 @@ export function AppShell() {
 
   return (
     <ThemedFrame>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "minmax(0, 1fr) var(--ms-label-w)",
-          gridTemplateRows: "auto 1fr auto",
-          gridTemplateAreas: '"head head" "body label" "site site"',
-          height: "100vh",
-          overflow: "hidden",
-          fontFamily: "var(--f-body)",
-          containerType: "inline-size",
-          containerName: "app",
-        }}
-      >
+      <div className="app-layout">
         <Header />
         <RecipeBuilder />
         <LabelColumn />

@@ -26,6 +26,14 @@ function currentPickerValue(item: IngredientItem): PickerValue {
   return `unit:${item.unit}`;
 }
 
+// Label rendered next to the amount. Determines the chip's width — the
+// hidden <select> above sizes to *its widest option*, which would otherwise
+// shove the chip to the right on rows with long portion names. Driven by
+// the active value only, so width never depends on dropdown contents.
+function currentPickerLabel(item: IngredientItem): string {
+  return item.portionRef ? item.portionRef.modifier : item.unit;
+}
+
 interface IngredientRowProps {
   ingredient: IngredientItem;
   index: number;
@@ -60,9 +68,9 @@ export function IngredientRow({
     if (raw.startsWith("portion:")) {
       const modifier = raw.slice("portion:".length);
       const match = portions.find((p) => p.modifier === modifier);
-      if (match) updatePortion(ingredient.fdc_id, normalizePortion(match));
+      if (match) updatePortion(ingredient.instanceId, normalizePortion(match));
     } else if (raw.startsWith("unit:")) {
-      updateUnit(ingredient.fdc_id, raw.slice("unit:".length) as UnitKey);
+      updateUnit(ingredient.instanceId, raw.slice("unit:".length) as UnitKey);
     }
   }
 
@@ -133,45 +141,60 @@ export function IngredientRow({
           min={0.01}
           max={MAX_INGREDIENT_AMOUNT}
           decimals={2}
-          onChange={(n) => updateAmount(ingredient.fdc_id, n)}
+          onChange={(n) => updateAmount(ingredient.instanceId, n)}
           className="pl-scrub"
           style={{ fontSize: 22, fontWeight: 800 }}
           ariaLabel={`${ingredient.name} amount`}
         />
-        <select
-          aria-label={`${ingredient.name} unit`}
-          value={currentPickerValue(ingredient)}
-          onChange={(e) => handlePickerChange(e.target.value)}
+        <span
           style={{
-            background: "transparent",
-            border: "none",
-            color: "var(--ink)",
-            font: "inherit",
+            position: "relative",
+            display: "inline-block",
+            marginLeft: 2,
             fontSize: 14,
             fontWeight: 500,
-            padding: 0,
-            marginLeft: 2,
+            color: "var(--ink)",
             cursor: "pointer",
-            appearance: "none",
-            WebkitAppearance: "none",
-            MozAppearance: "none",
+            lineHeight: 1,
           }}
         >
-          {portions.length > 0 && (
-            <optgroup label="Food portions">
-              {portions.map((p) => (
-                <option key={`portion-${p.modifier}`} value={`portion:${p.modifier}`}>
-                  {p.modifier}
-                </option>
+          <span aria-hidden="true">{currentPickerLabel(ingredient)}</span>
+          <select
+            aria-label={`${ingredient.name} unit`}
+            value={currentPickerValue(ingredient)}
+            onChange={(e) => handlePickerChange(e.target.value)}
+            style={{
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              opacity: 0,
+              cursor: "pointer",
+              font: "inherit",
+              padding: 0,
+              border: "none",
+              background: "transparent",
+              appearance: "none",
+              WebkitAppearance: "none",
+              MozAppearance: "none",
+            }}
+          >
+            {portions.length > 0 && (
+              <optgroup label="Food portions">
+                {portions.map((p) => (
+                  <option key={`portion-${p.modifier}`} value={`portion:${p.modifier}`}>
+                    {p.modifier}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+            <optgroup label={portions.length > 0 ? "Standard units" : undefined}>
+              {UNIT_KEYS.map((u) => (
+                <option key={`unit-${u}`} value={`unit:${u}`}>{u}</option>
               ))}
             </optgroup>
-          )}
-          <optgroup label={portions.length > 0 ? "Standard units" : undefined}>
-            {UNIT_KEYS.map((u) => (
-              <option key={`unit-${u}`} value={`unit:${u}`}>{u}</option>
-            ))}
-          </optgroup>
-        </select>
+          </select>
+        </span>
       </span>
 
       {/* Row controls — hover only, stacked vertical (sig-btn sig-icon) */}
@@ -189,19 +212,19 @@ export function IngredientRow({
           className="sig-btn sig-icon"
           aria-label="Move up"
           title="Move up"
-          onClick={() => move(ingredient.fdc_id, -1)}
+          onClick={() => move(ingredient.instanceId, -1)}
         >↑</button>
         <button
           className="sig-btn sig-icon"
           aria-label="Move down"
           title="Move down"
-          onClick={() => move(ingredient.fdc_id, 1)}
+          onClick={() => move(ingredient.instanceId, 1)}
         >↓</button>
         <button
           className="sig-btn sig-icon sig-danger"
           aria-label={`Remove ${ingredient.name}`}
           title={`Remove ${ingredient.name}`}
-          onClick={() => remove(ingredient.fdc_id)}
+          onClick={() => remove(ingredient.instanceId)}
         >×</button>
       </span>
     </li>

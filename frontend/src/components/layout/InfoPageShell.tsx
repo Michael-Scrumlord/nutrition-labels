@@ -27,6 +27,7 @@ export function InfoPageShell({ title, kicker, children }: InfoPageShellProps) {
         style={{
           display: "grid",
           gridTemplateRows: "auto 1fr auto",
+          gridTemplateColumns: "minmax(0, 1fr)",
           gridTemplateAreas: '"head" "body" "site"',
           minHeight: "100vh",
           fontFamily: "var(--f-body)",
@@ -44,9 +45,10 @@ export function InfoPageShell({ title, kicker, children }: InfoPageShellProps) {
             justifyContent: "center",
             padding: "48px 24px 72px",
             color: "var(--ink)",
+            minWidth: 0,
           }}
         >
-          <article style={{ width: "100%", maxWidth: 760 }}>
+          <article style={{ width: "100%", maxWidth: 760, minWidth: 0, overflowWrap: "break-word" }}>
             {kicker && (
               <div
                 style={{

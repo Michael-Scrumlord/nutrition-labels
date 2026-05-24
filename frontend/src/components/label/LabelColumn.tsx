@@ -125,15 +125,7 @@ export function LabelColumn() {
   }, [canSave, snapshot, createRecipe, setCurrentRecipeId]);
 
   return (
-    <aside
-      style={{
-        gridArea: "label",
-        height: "100%",
-        overflow: "hidden", // glow is clipped here; inner scroller handles content
-        background: "var(--plinth-bg)",
-        borderLeft: "1px solid var(--hair-strong)",
-      }}
-    >
+    <aside className="label-column-layout">
       {/* Aurora plinth glow — only renders on Midnight per Final A direction. */}
       <AuroraGlow plinth />
 
