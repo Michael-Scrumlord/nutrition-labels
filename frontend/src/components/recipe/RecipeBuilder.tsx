@@ -32,11 +32,37 @@ export function RecipeBuilder() {
 
   const titleRef = useRef<HTMLTextAreaElement>(null);
 
+  // Auto-size the title textarea to fit its content. Three triggers:
+  //   1. `labelName` change       — user typed.
+  //   2. `document.fonts.ready`   — IBM Plex finishes loading; placeholder
+  //                                  width changes and may now wrap onto an
+  //                                  extra line. Without this, the textarea
+  //                                  was sized to the *fallback*-font height
+  //                                  on first paint and never resized,
+  //                                  clipping the placeholder on mobile.
+  //   3. ResizeObserver on parent — viewport / container width changes
+  //                                  re-wrap the placeholder.
   useLayoutEffect(() => {
-    if (titleRef.current) {
-      titleRef.current.style.height = "auto";
-      titleRef.current.style.height = `${titleRef.current.scrollHeight}px`;
-    }
+    const el = titleRef.current;
+    if (!el) return;
+    const resize = () => {
+      el.style.height = "auto";
+      el.style.height = `${el.scrollHeight}px`;
+    };
+    resize();
+
+    let cancelled = false;
+    document.fonts?.ready.then(() => {
+      if (!cancelled) resize();
+    });
+
+    const ro = new ResizeObserver(resize);
+    if (el.parentElement) ro.observe(el.parentElement);
+
+    return () => {
+      cancelled = true;
+      ro.disconnect();
+    };
   }, [labelName]);
 
   const macros      = useNutritionCalc();
@@ -164,6 +190,7 @@ export function RecipeBuilder() {
             onChange={setPortionDivisor}
             className="pl-scrub"
             style={{ fontWeight: 700 }}
+            ariaLabel="servings per batch"
           />
           {" "}servings. The label rounds per 21 CFR 101.9(c) — what you see is what would print.
         </p>

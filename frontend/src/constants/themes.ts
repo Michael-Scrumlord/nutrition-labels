@@ -31,6 +31,11 @@ export interface ThemeDef {
 }
 
 export const THEME_DEFS: Record<ThemeKey, ThemeDef> = {
+  // Contrast notes are vs. each theme's own `bg`. Tokens used for SMALL TEXT
+  // must hit WCAG AA 4.5:1; tokens used only for surfaces / borders / large
+  // rules can be more vivid. Where the historical color failed AA, the
+  // previous hex is kept in a trailing comment so the design intent is
+  // recoverable if the palette is iterated again.
   paper: {
     name: "Paper",
     desc: "morning",
@@ -39,17 +44,20 @@ export const THEME_DEFS: Record<ThemeKey, ThemeDef> = {
     elevated: "#f1efe9",
     ink: "#0a0a0a",
     inkSecondary: "#555555",
-    inkTertiary: "#9a9a9a",
+    inkTertiary: "#6b6b6b",    // was #9a9a9a; 5.36:1 on white, 4.74:1 on plinth #f3f1eb
     hairline: "#e8e6e0",
     hairlineStrong: "#c8c6bf",
     paperBg: "#ffffff",
     paperShadow: "0 1px 2px rgba(0,0,0,.06), 0 16px 36px -12px rgba(0,0,0,.18)",
     plinthBg: "#f3f1eb",
     accents: [
-      { id: "magenta", hex: "#ff2e88", name: "magenta" },
-      { id: "vermillion", hex: "#e8362a", name: "vermillion" },
-      { id: "cobalt", hex: "#2440ff", name: "cobalt" },
-      { id: "forest", hex: "#15814f", name: "forest" },
+      // The two warm accents were the original AA misses. Darkened just
+      // enough to clear 4.5:1 on white while preserving hue and the
+      // saturation-forward "neo-brutalist" character.
+      { id: "magenta",    hex: "#d11669", name: "magenta" },    // was #ff2e88 (3.50:1) → 5.17:1
+      { id: "vermillion", hex: "#cc2418", name: "vermillion" }, // was #e8362a (4.32:1) → 5.41:1
+      { id: "cobalt",     hex: "#2440ff", name: "cobalt" },     // already 6.40:1
+      { id: "forest",     hex: "#15814f", name: "forest" },     // already 5.05:1
     ],
     defaultAccent: "magenta",
     oled: false,
@@ -62,7 +70,7 @@ export const THEME_DEFS: Record<ThemeKey, ThemeDef> = {
     elevated: "#beb9ad",
     ink: "#1a1c1e",
     inkSecondary: "#52524d",
-    inkTertiary: "#7c7972",
+    inkTertiary: "#5e5b54",    // was #7c7972 (2.95:1) → 4.62:1 on #d6d3cb
     hairline: "#aeaaa1",
     hairlineStrong: "#8a8679",
     paperBg: "#ffffff",
@@ -85,7 +93,7 @@ export const THEME_DEFS: Record<ThemeKey, ThemeDef> = {
     elevated: "#322c3e",
     ink: "#f5efe0",
     inkSecondary: "#b6ad96",
-    inkTertiary: "#7c7361",
+    inkTertiary: "#a39a85",    // was #7c7361 (3.70:1) → 5.30:1 on #1d1928
     hairline: "#3d3645",
     hairlineStrong: "#5a5263",
     paperBg: "#ffffff",
@@ -108,7 +116,7 @@ export const THEME_DEFS: Record<ThemeKey, ThemeDef> = {
     elevated: "#121212",
     ink: "#e8e8e6",
     inkSecondary: "#a0a09e",
-    inkTertiary: "#6a6a68",
+    inkTertiary: "#787876",    // was #6a6a68 (3.92:1) → 4.66:1 on #000
     hairline: "#262626",
     hairlineStrong: "#3d3d3d",
     paperBg: "#ffffff",
