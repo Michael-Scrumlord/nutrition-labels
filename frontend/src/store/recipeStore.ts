@@ -7,11 +7,43 @@ import type {
 import { UNIT_CONVERSIONS, ingredientGrams } from "../utils/units";
 import { makeId } from "../utils/id";
 
+// ── Pure helpers ─────────────────────────────────────────────────────────────
+
 // Back-fill instanceId for ingredients loaded from older persisted recipes
 // (saved before per-row identity existed). Without this, two same-fdc_id rows
 // in a legacy recipe would share a key and edits would batch across them.
 function withInstanceIds(ingredients: IngredientItem[]): IngredientItem[] {
   return ingredients.map((i) => i.instanceId ? i : { ...i, instanceId: makeId() });
+}
+
+/** Swap the element at `idx` with `idx + direction`. Returns a new array, or
+ *  the original if the swap would go out of bounds. */
+function swapItem<T>(arr: T[], idx: number, direction: -1 | 1): T[] {
+  const to = idx + direction;
+  if (to < 0 || to >= arr.length) return arr;
+  const next = [...arr];
+  [next[idx], next[to]] = [next[to], next[idx]];
+  return next;
+}
+
+/** Produce a fresh slice of state from a recipe version, shared by loadRecipe
+ *  and loadVersion to keep both in sync with a single source of truth. */
+function stateFromVersion(
+  recipe: SavedRecipe,
+  version: RecipeVersion,
+  viewingVersionId: string | null,
+) {
+  return {
+    ingredients:          withInstanceIds(version.ingredients),
+    portionDivisor:       version.portionDivisor,
+    labelName:            version.labelName,
+    dimensions:           version.dimensions,
+    instructions:         version.instructions ?? [],
+    variables:            version.variables ?? [],
+    highlightedNutrients: new Set() as HighlightSet,
+    currentRecipeId:      recipe.id,
+    viewingVersionId,
+  };
 }
 
 interface RecipeState {
@@ -68,20 +100,23 @@ interface RecipeState {
   setCurrentRecipeId: (id: string) => void;
 }
 
-const DEFAULTS = {
-  ingredients:          [] as IngredientItem[],
-  portionDivisor:       8,
-  labelName:            "",
-  dimensions:           { widthInches: 2.75, heightInches: null } as LabelDimensions,
-  highlightedNutrients: new Set() as HighlightSet,
-  instructions:         [] as RecipeStep[],
-  variables:            [] as RecipeVariable[],
-  currentRecipeId:      null as string | null,
-  viewingVersionId:     null as string | null,
-};
+/** Factory so clearRecipe always gets fresh array/Set/object references. */
+function makeDefaultState() {
+  return {
+    ingredients:          [] as IngredientItem[],
+    portionDivisor:       8,
+    labelName:            "",
+    dimensions:           { widthInches: 2.75, heightInches: null } as LabelDimensions,
+    highlightedNutrients: new Set() as HighlightSet,
+    instructions:         [] as RecipeStep[],
+    variables:            [] as RecipeVariable[],
+    currentRecipeId:      null as string | null,
+    viewingVersionId:     null as string | null,
+  };
+}
 
 export const useRecipeStore = create<RecipeState>((set) => ({
-  ...DEFAULTS,
+  ...makeDefaultState(),
 
   // ── Ingredient actions ────────────────────────────────────────────────
   addIngredient: (ingredient) =>
@@ -145,11 +180,7 @@ export const useRecipeStore = create<RecipeState>((set) => ({
     set((state) => {
       const idx = state.ingredients.findIndex((i) => i.instanceId === instanceId);
       if (idx === -1) return state;
-      const to = idx + direction;
-      if (to < 0 || to >= state.ingredients.length) return state;
-      const next = [...state.ingredients];
-      [next[idx], next[to]] = [next[to], next[idx]];
-      return { ingredients: next };
+      return { ingredients: swapItem(state.ingredients, idx, direction) };
     }),
 
   // ── Recipe meta actions ───────────────────────────────────────────────
@@ -188,11 +219,7 @@ export const useRecipeStore = create<RecipeState>((set) => ({
     set((state) => {
       const idx = state.instructions.findIndex((s) => s.id === id);
       if (idx === -1) return state;
-      const to = idx + direction;
-      if (to < 0 || to >= state.instructions.length) return state;
-      const next = [...state.instructions];
-      [next[idx], next[to]] = [next[to], next[idx]];
-      return { instructions: next };
+      return { instructions: swapItem(state.instructions, idx, direction) };
     }),
 
   addVariable: (variable) =>
@@ -216,41 +243,15 @@ export const useRecipeStore = create<RecipeState>((set) => ({
     set((state) => ({ variables: state.variables.filter((v) => v.name !== name) })),
 
   // ── Recipe lifecycle ──────────────────────────────────────────────────
-  clearRecipe: () => set({
-    ...DEFAULTS,
-    dimensions: { widthInches: 2.75, heightInches: null },
-    highlightedNutrients: new Set(),
-  }),
+  clearRecipe: () => set(makeDefaultState()),
 
   loadRecipe: (recipe) => {
-    const latest = recipe.versions.length > 0
-      ? recipe.versions[recipe.versions.length - 1]
-      : undefined;
+    const latest = recipe.versions[recipe.versions.length - 1];
     if (!latest) return;
-    set({
-      ingredients:          withInstanceIds(latest.ingredients),
-      portionDivisor:       latest.portionDivisor,
-      labelName:            latest.labelName,
-      dimensions:           latest.dimensions,
-      instructions:         latest.instructions ?? [],
-      variables:            latest.variables ?? [],
-      highlightedNutrients: new Set(),
-      currentRecipeId:      recipe.id,
-      viewingVersionId:     null,
-    });
+    set(stateFromVersion(recipe, latest, null));
   },
 
-  loadVersion: (recipe, version) => set({
-    ingredients:          withInstanceIds(version.ingredients),
-    portionDivisor:       version.portionDivisor,
-    labelName:            version.labelName,
-    dimensions:           version.dimensions,
-    instructions:         version.instructions ?? [],
-    variables:            version.variables ?? [],
-    highlightedNutrients: new Set(),
-    currentRecipeId:      recipe.id,
-    viewingVersionId:     version.id,
-  }),
+  loadVersion: (recipe, version) => set(stateFromVersion(recipe, version, version.id)),
 
   exitVersionView: () => set({ viewingVersionId: null }),
 

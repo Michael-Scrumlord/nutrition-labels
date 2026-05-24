@@ -6,7 +6,7 @@
 // remove) appear on hover.
 
 import { useState } from "react";
-import { useRecipeStore } from "../../store/recipeStore";
+import { useRecipeActions } from "../../hooks/useRecipeActions";
 import { ScrubNumber } from "../ui/ScrubNumber";
 import { ingredientGrams, normalizePortion } from "../../utils/units";
 import { getHighlightKeys } from "../../utils/nutrition";
@@ -46,11 +46,13 @@ interface IngredientRowProps {
 export function IngredientRow({
   ingredient, index: _index, isHovered, totalGrams, onHoverEnter, onHoverLeave,
 }: IngredientRowProps) {
-  const updateAmount  = useRecipeStore((s) => s.updateIngredientAmount);
-  const updateUnit    = useRecipeStore((s) => s.updateIngredientUnit);
-  const updatePortion = useRecipeStore((s) => s.updateIngredientPortion);
-  const remove        = useRecipeStore((s) => s.removeIngredient);
-  const move          = useRecipeStore((s) => s.moveIngredient);
+  const {
+    updateIngredientAmount:  updateAmount,
+    updateIngredientUnit:    updateUnit,
+    updateIngredientPortion: updatePortion,
+    removeIngredient:        remove,
+    moveIngredient:          move,
+  } = useRecipeActions();
   const [actionsHover, setActionsHover] = useState(false);
 
   const grams   = ingredientGrams(ingredient);

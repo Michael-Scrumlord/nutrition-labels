@@ -23,34 +23,34 @@ from app.constants import NUTRIENT_FIELDS
 
 # ---------------------------------------------------------------------------
 # Known foods used throughout the tests
-# (fdc_id, description, calories, fat_total_g, fat_saturated_g, cholesterol_mg,
-#  sodium_mg, carbohydrates_total_g, fiber_g, sugar_g, protein_g,
-#  vitamin_d_mcg, calcium_mg, iron_mg, potassium_mg)
+# (fdc_id, description, data_type, calories, fat_total_g, fat_saturated_g,
+#  cholesterol_mg, sodium_mg, carbohydrates_total_g, fiber_g, sugar_g,
+#  protein_g, vitamin_d_mcg, calcium_mg, iron_mg, potassium_mg)
 # ---------------------------------------------------------------------------
 TEST_FOODS = [
     # Butter — all values per 100g
-    (1097512, "Butter, unsalted", "foundation_food",
+    (1097512, "Butter, unsalted", "sr_legacy_food",
      717, 81.1, 51.4, 215, 11, 0.1, 0.0, 0.1, 0.9, 1.5, 24, 0.02, 24),
     # Flour
-    (1100209, "All-purpose flour, white", "foundation_food",
+    (1100209, "All-purpose flour, white", "sr_legacy_food",
      364, 1.0, 0.2, 0, 2, 76.3, 2.7, 0.3, 10.3, 0.0, 15, 4.64, 107),
     # Sugar
-    (1104330, "Sugar, granulated white", "foundation_food",
+    (1104330, "Sugar, granulated white", "sr_legacy_food",
      387, 0.0, 0.0, 0, 1, 99.8, 0.0, 99.8, 0.0, 0.0, 1, 0.01, 2),
     # Eggs
-    (1097517, "Eggs, whole, raw", "foundation_food",
+    (1097517, "Eggs, whole, raw", "sr_legacy_food",
      143, 9.5, 3.1, 372, 142, 0.7, 0.0, 0.4, 12.6, 2.0, 56, 1.75, 138),
     # Chicken breast
-    (1105001, "Chicken breast, raw", "foundation_food",
+    (1105001, "Chicken breast, raw", "sr_legacy_food",
      120, 2.6, 0.7, 64, 74, 0.0, 0.0, 0.0, 22.5, 0.1, 11, 0.37, 256),
     # Olive oil
-    (1103301, "Olive oil", "foundation_food",
+    (1103301, "Olive oil", "sr_legacy_food",
      884, 100.0, 13.8, 0, 2, 0.0, 0.0, 0.0, 0.0, 0.0, 1, 0.56, 1),
     # Salt (edge case: almost all sodium)
-    (1102203, "Salt, table", "foundation_food",
+    (1102203, "Salt, table", "sr_legacy_food",
      0, 0.0, 0.0, 0, 38758, 0.0, 0.0, 0.0, 0.0, 0.0, 24, 0.33, 8),
     # Cocoa powder
-    (1100216, "Cocoa powder, unsweetened", "foundation_food",
+    (1100216, "Cocoa powder, unsweetened", "sr_legacy_food",
      228, 13.7, 8.1, 0, 21, 57.9, 33.2, 1.8, 19.6, 0.0, 128, 13.86, 1524),
 ]
 
@@ -96,6 +96,7 @@ def test_db_path(tmp_path_factory):
     """)
     # FTS5 index over food_macros.description — mirrors the production schema
     # in data/build_db_full.py so database.search_foods() works in tests.
+    # rowid maps to food_macros.fdc_id via the JOIN in database.search_foods().
     conn.execute("""
         CREATE VIRTUAL TABLE food_search USING fts5(
             description,
@@ -112,6 +113,7 @@ def test_db_path(tmp_path_factory):
         "INSERT INTO food_portions (fdc_id, amount, modifier, gram_weight) VALUES (?,?,?,?)",
         TEST_PORTIONS,
     )
+    # Populate the FTS5 index from food_macros so search tests work.
     conn.execute(
         "INSERT INTO food_search(rowid, description) SELECT fdc_id, description FROM food_macros"
     )
