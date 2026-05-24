@@ -13,7 +13,10 @@ from app.search import ranked_search
 
 def make_rows(names: list[str]) -> list[dict]:
     """Create minimal food row dicts for a list of food names."""
-    return [{"fdc_id": i + 1, "description": name} for i, name in enumerate(names)]
+    return [
+        {"fdc_id": i + 1, "description": name, "data_type": "foundation_food"}
+        for i, name in enumerate(names)
+    ]
 
 
 SAMPLE_FOODS = make_rows([

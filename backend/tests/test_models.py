@@ -189,10 +189,11 @@ class TestGenerateLabelRequestInvalid:
         with pytest.raises(ValidationError):
             GenerateLabelRequest(**valid_request(portion_divisor=MAX_PORTION_DIVISOR + 1))
 
-    def test_width_at_minimum_boundary_rejected(self):
-        # Field uses gt= (strictly greater than), so MIN_WIDTH itself is invalid
+    def test_width_below_minimum_rejected(self):
+        # Field uses ge=MIN_WIDTH, so values strictly below MIN_WIDTH are rejected
+        # while MIN_WIDTH itself is allowed (see test_width_at_minimum in valid cases).
         with pytest.raises(ValidationError):
-            GenerateLabelRequest(**valid_request(width_inches=MIN_WIDTH))
+            GenerateLabelRequest(**valid_request(width_inches=MIN_WIDTH - 0.01))
 
     def test_width_above_maximum_rejected(self):
         with pytest.raises(ValidationError):
