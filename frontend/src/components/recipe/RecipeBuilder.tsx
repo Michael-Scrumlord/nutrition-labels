@@ -52,7 +52,7 @@ export function RecipeBuilder() {
     resize();
 
     let cancelled = false;
-    document.fonts?.ready.then(() => {
+    document.fonts?.ready?.then(() => {
       if (!cancelled) resize();
     });
 
