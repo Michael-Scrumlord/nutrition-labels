@@ -74,6 +74,7 @@ export function RecipeBuilder() {
               fontSize: "var(--ms-hero)",
               lineHeight: 1,
               padding: "8px 36px 10px 12px",
+              textOverflow: "ellipsis",
             }}
           />
         </div>
