@@ -46,15 +46,16 @@ export function MethodSection() {
           style={{
             display: "inline-block",
             width: 10,
+            color: "var(--accent)",
             transition: "transform 200ms ease",
             transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)",
           }}
         >
           ▸
         </span>
-        <span className="pl-meta">METHOD —</span>
+        <span className="sig-static pl-meta">METHOD —</span>
         <span style={{ flex: 1, height: 1, background: "var(--hair-strong)" }} />
-        <span className="pl-meta">
+        <span className="sig-static pl-meta">
           {instructions.length} STEP{instructions.length !== 1 ? "S" : ""}
         </span>
       </button>
@@ -101,22 +102,13 @@ export function MethodSection() {
             ))}
           </ul>
 
-          {/* ── Add step ─────────────────────────────────────────────────── */}
-          <button
-            onClick={() => addStep()}
-            className="pl-display"
-            style={{
-              marginTop: 14,
-              background: "transparent",
-              border: "none",
-              color: "var(--accent)",
-              fontSize: 20,
-              cursor: "pointer",
-              padding: 0,
-            }}
-          >
-            + add a step
-          </button>
+          {/* ── Add step (sig-btn plinth) ────────────────────────────────── */}
+          <div style={{ paddingTop: 14, paddingBottom: 6 }}>
+            <button onClick={() => addStep()} className="sig-btn">
+              <span style={{ color: "var(--accent)" }}>▸</span>
+              Add a Step
+            </button>
+          </div>
 
           {/* ── Variables panel ──────────────────────────────────────────── */}
           <VariablesPanel />

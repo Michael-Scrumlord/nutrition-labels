@@ -77,47 +77,33 @@ export function StepRow({ step, index, total }: StepRowProps) {
         )}
       </div>
 
-      {/* Controls — visible on hover */}
+      {/* Controls — visible on hover (sig-btn sig-icon) */}
       {!editing && (
         <div style={{
-          display: "flex", flexDirection: "column", gap: 2,
+          display: "flex", flexDirection: "column", gap: 3,
           opacity: hovered ? 1 : 0,
           transition: "opacity 0.15s ease",
           flexShrink: 0,
         }}>
-          <CtrlBtn label="↑" disabled={index === 0}         onClick={() => moveStep(step.id, -1)} />
-          <CtrlBtn label="↓" disabled={index === total - 1} onClick={() => moveStep(step.id,  1)} />
-          <CtrlBtn label="×" danger                         onClick={() => removeStep(step.id)} />
+          <button
+            className="sig-btn sig-icon"
+            aria-label="Move step up"
+            disabled={index === 0}
+            onClick={() => moveStep(step.id, -1)}
+          >↑</button>
+          <button
+            className="sig-btn sig-icon"
+            aria-label="Move step down"
+            disabled={index === total - 1}
+            onClick={() => moveStep(step.id, 1)}
+          >↓</button>
+          <button
+            className="sig-btn sig-icon sig-danger"
+            aria-label="Remove step"
+            onClick={() => removeStep(step.id)}
+          >×</button>
         </div>
       )}
     </li>
-  );
-}
-
-function CtrlBtn({ label, onClick, disabled, danger }: { label: string; onClick: () => void; disabled?: boolean; danger?: boolean }) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      style={{
-        background: "transparent",
-        border: "none",
-        cursor: disabled ? "default" : "pointer",
-        color: disabled ? "var(--hair-strong)" : "var(--ink-3)",
-        fontSize: 14,
-        padding: "2px 6px",
-        lineHeight: 1,
-      }}
-      onMouseEnter={(e) => {
-        if (disabled) return;
-        (e.currentTarget as HTMLButtonElement).style.color = danger ? "var(--color-danger)" : "var(--ink)";
-      }}
-      onMouseLeave={(e) => {
-        if (disabled) return;
-        (e.currentTarget as HTMLButtonElement).style.color = "var(--ink-3)";
-      }}
-    >
-      {label}
-    </button>
   );
 }

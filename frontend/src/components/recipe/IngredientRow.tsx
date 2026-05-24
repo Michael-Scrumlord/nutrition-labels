@@ -172,56 +172,36 @@ export function IngredientRow({
         </select>
       </span>
 
-      {/* Row controls — hover only, stacked vertical */}
+      {/* Row controls — hover only, stacked vertical (sig-btn sig-icon) */}
       <span
         style={{
           display: "flex",
           flexDirection: "column",
-          gap: 0,
+          gap: 3,
           opacity: actionsHover ? 1 : 0,
           transition: "opacity .15s ease",
           flexShrink: 0,
         }}
       >
-        <CtrlBtn label="↑" ariaLabel="Move up"  onClick={() => move(ingredient.fdc_id, -1)} />
-        <CtrlBtn label="↓" ariaLabel="Move down" onClick={() => move(ingredient.fdc_id,  1)} />
-        <CtrlBtn label="×" ariaLabel={`Remove ${ingredient.name}`} danger onClick={() => remove(ingredient.fdc_id)} />
+        <button
+          className="sig-btn sig-icon"
+          aria-label="Move up"
+          title="Move up"
+          onClick={() => move(ingredient.fdc_id, -1)}
+        >↑</button>
+        <button
+          className="sig-btn sig-icon"
+          aria-label="Move down"
+          title="Move down"
+          onClick={() => move(ingredient.fdc_id, 1)}
+        >↓</button>
+        <button
+          className="sig-btn sig-icon sig-danger"
+          aria-label={`Remove ${ingredient.name}`}
+          title={`Remove ${ingredient.name}`}
+          onClick={() => remove(ingredient.fdc_id)}
+        >×</button>
       </span>
     </li>
-  );
-}
-
-function CtrlBtn({
-  label, ariaLabel, onClick, danger,
-}: {
-  label: string;
-  ariaLabel: string;
-  onClick: () => void;
-  danger?: boolean;
-}) {
-  return (
-    <button
-      aria-label={ariaLabel}
-      title={ariaLabel}
-      onClick={onClick}
-      style={{
-        background: "transparent",
-        border: "none",
-        cursor: "pointer",
-        color: "var(--ink-3)",
-        padding: "2px 6px",
-        lineHeight: 1,
-        fontSize: 14,
-        transition: "color 150ms ease",
-      }}
-      onMouseEnter={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.color = danger ? "var(--color-danger)" : "var(--accent)";
-      }}
-      onMouseLeave={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.color = "var(--ink-3)";
-      }}
-    >
-      {label}
-    </button>
   );
 }

@@ -19,17 +19,18 @@ export function LabelDimensions() {
       style={{
         display: "grid",
         gridTemplateColumns: "1fr 1fr",
-        gap: 14,
+        gap: 12,
         fontFamily: "var(--f-mono)",
         color: "var(--ink)",
       }}
     >
-      {/* Width */}
-      <label style={{ display: "grid", gap: 4 }}>
-        <span style={{ fontSize: 9, letterSpacing: "0.22em", textTransform: "uppercase", color: "var(--ink-2)" }}>
-          Width (in)
-        </span>
-        <span style={{ borderBottom: "1px solid var(--accent)", padding: "4px 0", fontSize: 22, fontWeight: 700 }}>
+      {/* Width — sig-inline grooved scrub */}
+      <div>
+        <div className="sig-static pl-meta" style={{ marginBottom: 4 }}>WIDTH (IN)</div>
+        <div
+          className="sig-inline"
+          style={{ display: "inline-block", padding: "4px 8px 5px", minWidth: 100 }}
+        >
           <ScrubNumber
             value={dimensions.widthInches}
             min={2}
@@ -38,20 +39,26 @@ export function LabelDimensions() {
             decimals={2}
             onChange={setWidth}
             suffix="″"
-            style={{ fontSize: 22, fontWeight: 700, color: "var(--ink)" }}
+            style={{
+              fontSize: 22,
+              fontWeight: 700,
+              color: "var(--ink)",
+              fontFamily: "var(--f-mono)",
+            }}
           />
-        </span>
-        <span style={{ fontSize: 9, color: "var(--ink-3)" }}>FDA min 2″</span>
-      </label>
+        </div>
+        <div className="sig-static pl-meta" style={{ marginTop: 4, fontSize: 9 }}>FDA min 2″</div>
+      </div>
 
-      {/* Height */}
-      <label style={{ display: "grid", gap: 4 }}>
-        <span style={{ fontSize: 9, letterSpacing: "0.22em", textTransform: "uppercase", color: "var(--ink-2)" }}>
-          Height (in)
-        </span>
-        <span style={{ borderBottom: "1px solid var(--hair-strong)", padding: "4px 0", fontSize: 22, fontWeight: 700 }}>
+      {/* Height — sig-inline grooved scrub, "auto" toggle */}
+      <div>
+        <div className="sig-static pl-meta" style={{ marginBottom: 4 }}>HEIGHT (IN)</div>
+        <div
+          className="sig-inline"
+          style={{ display: "inline-block", padding: "4px 8px 5px", minWidth: 100 }}
+        >
           {dimensions.heightInches != null ? (
-            <>
+            <span style={{ display: "inline-flex", alignItems: "baseline", gap: 8 }}>
               <ScrubNumber
                 value={dimensions.heightInches}
                 min={2}
@@ -60,26 +67,37 @@ export function LabelDimensions() {
                 decimals={2}
                 onChange={setHeight}
                 suffix="″"
-                style={{ fontSize: 22, fontWeight: 700, color: "var(--ink)" }}
+                style={{
+                  fontSize: 22,
+                  fontWeight: 700,
+                  color: "var(--ink)",
+                  fontFamily: "var(--f-mono)",
+                }}
               />
-              <span
+              <button
                 onClick={clearHeight}
-                style={{ marginLeft: 8, fontSize: 11, color: "var(--ink-3)", cursor: "pointer" }}
-              >
-                ↺
-              </span>
-            </>
+                className="sig-btn sig-icon"
+                aria-label="Reset to auto-fit"
+                title="Reset to auto-fit"
+              >↺</button>
+            </span>
           ) : (
             <span
               onClick={() => setHeight(4)}
-              style={{ cursor: "pointer", color: "var(--ink-3)" }}
+              style={{
+                fontSize: 22,
+                fontWeight: 700,
+                color: "var(--ink-3)",
+                cursor: "pointer",
+                fontFamily: "var(--f-mono)",
+              }}
             >
               auto
             </span>
           )}
-        </span>
-        <span style={{ fontSize: 9, color: "var(--ink-3)" }}>blank = auto-fit</span>
-      </label>
+        </div>
+        <div className="sig-static pl-meta" style={{ marginTop: 4, fontSize: 9 }}>blank = auto-fit</div>
+      </div>
     </div>
   );
 }

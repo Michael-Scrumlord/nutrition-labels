@@ -36,18 +36,25 @@ export function SaveControls({
     <div
       style={{
         width: "100%", maxWidth: 380,
-        display: "flex", flexDirection: "column", gap: 8,
-        padding: "12px 0 0",
+        display: "flex", flexDirection: "column", gap: 6,
+        padding: "14px 0 0",
         borderTop: "1px solid var(--hair)",
       }}
     >
-      {isLoaded && (
-        <div className="pl-meta" style={{ fontSize: 9, lineHeight: 1.5, color: "var(--ink-3)" }}>
-          EDITING — <span style={{ color: "var(--ink)", fontWeight: 700 }}>{savedRecipeName?.toUpperCase()}</span>
-          <br />
-          v{versionCount} {viewingVersionId ? "· VIEWING OLDER" : `· SAVED ${lastSavedRel?.toUpperCase()}`}
-        </div>
-      )}
+      <div className="sig-static pl-meta" style={{ marginBottom: 2, lineHeight: 1.5 }}>
+        EDITING ·{" "}
+        {isLoaded ? (
+          <span style={{ color: "var(--ink)", fontWeight: 700 }}>{savedRecipeName?.toUpperCase()}</span>
+        ) : (
+          "UNTITLED RECIPE"
+        )}
+        {isLoaded && (
+          <>
+            <br />
+            v{versionCount} {viewingVersionId ? "· VIEWING OLDER" : `· SAVED ${lastSavedRel?.toUpperCase()}`}
+          </>
+        )}
+      </div>
 
       {noteOpen && (
         <input
@@ -59,12 +66,9 @@ export function SaveControls({
           }}
           placeholder="what changed? (optional)"
           autoFocus
+          className="sig-editable sig-input"
           style={{
-            padding: "8px 10px",
-            border: "1px solid var(--ink)",
-            background: "var(--bg)",
-            color: "var(--ink)",
-            outline: "none",
+            width: "100%",
             fontFamily: "var(--f-display)",
             fontStyle: "var(--f-display-style)",
             fontSize: 13,
@@ -76,69 +80,37 @@ export function SaveControls({
         onClick={handleSave}
         onMouseEnter={() => { if (isLoaded && !feedback) setNoteOpen(true); }}
         disabled={!canSave}
+        className="sig-btn"
         style={{
-          background: feedback
-            ? "var(--color-success)"
-            : canSave
-            ? "transparent"
-            : "color-mix(in srgb, var(--ink) 6%, transparent)",
-          color: feedback
-            ? "#ffffff"
-            : canSave
-            ? "var(--ink)"
-            : "var(--ink-3)",
-          border: `1px solid ${canSave ? "var(--ink)" : "var(--hair)"}`,
-          padding: "10px 14px",
-          fontFamily: "var(--f-body)",
-          fontWeight: 700,
-          letterSpacing: "0.08em",
-          fontSize: 11,
-          textTransform: "uppercase",
-          cursor: canSave ? "pointer" : "not-allowed",
-          transition: "background 0.2s ease",
+          width: "100%",
+          justifyContent: "flex-start",
+          background: feedback ? "var(--color-success)" : undefined,
+          color: feedback ? "#ffffff" : undefined,
+          borderColor: feedback ? "var(--color-success)" : undefined,
+          boxShadow: feedback ? "2px 2px 0 0 var(--color-success)" : undefined,
           animation: feedback ? "popPulse 0.42s ease-out" : "none",
         }}
       >
-        {feedback ?? (isLoaded ? "SAVE NEW VERSION" : "SAVE RECIPE")}
+        {feedback ?? (isLoaded ? "Save new version" : "Save recipe")}
       </button>
 
       {isLoaded && (
         <button
           onClick={onSaveAsNew}
           disabled={!canSave}
-          style={{
-            background: "transparent",
-            border: "1px solid var(--hair-strong)",
-            padding: "8px 14px",
-            fontFamily: "var(--f-body)",
-            fontWeight: 600,
-            letterSpacing: "0.08em",
-            fontSize: 10,
-            cursor: canSave ? "pointer" : "not-allowed",
-            color: "var(--ink-2)",
-            textTransform: "uppercase",
-          }}
+          className="sig-btn"
+          style={{ width: "100%", justifyContent: "flex-start" }}
         >
-          SAVE AS NEW
+          Save as new
         </button>
       )}
 
       <button
         onClick={onReset}
-        style={{
-          background: "transparent",
-          border: "1px solid var(--hair-strong)",
-          padding: "8px 14px",
-          fontFamily: "var(--f-body)",
-          fontWeight: 600,
-          letterSpacing: "0.08em",
-          fontSize: 10,
-          textTransform: "uppercase",
-          cursor: "pointer",
-          color: "var(--ink-2)",
-        }}
+        className="sig-btn sig-ghost"
+        style={{ width: "100%", justifyContent: "flex-start" }}
       >
-        RESET RECIPE
+        Reset recipe
       </button>
     </div>
   );

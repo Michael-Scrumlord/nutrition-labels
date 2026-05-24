@@ -150,22 +150,32 @@ export function LabelColumn() {
           gap: 18,
         }}
       >
-        {/* Panel caption */}
-        <div style={{
-          display: "flex", justifyContent: "space-between", alignItems: "baseline",
-          width: "100%", maxWidth: 380,
-          fontFamily: "var(--f-mono)", fontSize: 10,
-          letterSpacing: "0.22em", textTransform: "uppercase",
-          color: "var(--ink-2)",
-        }}>
-          <span style={{ opacity: 0.85 }}>Label · proof</span>
+        {/* Panel caption — Label / Prep tabs + LIVE indicator */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "baseline",
+            width: "100%",
+            maxWidth: 380,
+            paddingBottom: 6,
+            borderBottom: "1px solid var(--hair)",
+          }}
+        >
+          <div style={{ display: "flex", gap: 4 }}>
+            {/* Prep tab is a placeholder for a future surface — only Label
+                renders today, so Prep is disabled. */}
+            <button className="sig-tab is-active" aria-current="page">Label</button>
+            <button className="sig-tab" disabled title="Coming soon">Prep</button>
+          </div>
           <span
+            className="sig-static pl-meta"
             style={{
               color: "var(--accent)",
               filter: themeDef.oled ? "drop-shadow(0 0 6px var(--accent))" : "none",
             }}
           >
-            ● live
+            ● LIVE
           </span>
         </div>
 
