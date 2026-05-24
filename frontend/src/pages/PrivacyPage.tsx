@@ -12,7 +12,7 @@
 import { InfoPageShell } from "../components/layout/InfoPageShell";
 import { usePageMeta } from "../hooks/usePageMeta";
 
-const LAST_UPDATED = "2026-05-17";
+const LAST_UPDATED = "2026-05-24";
 
 export function PrivacyPage() {
   usePageMeta({
@@ -92,6 +92,36 @@ export function PrivacyPage() {
         Google-certified Consent Management Platform. You can change or
         withdraw consent at any time using the privacy controls in that
         banner.
+      </p>
+
+      <h2>Users in the United States</h2>
+      <p>
+        Depending on the state you live in, you may have rights under laws
+        such as the California Consumer Privacy Act (CCPA/CPRA), the
+        Virginia Consumer Data Protection Act, the Colorado Privacy Act,
+        the Connecticut Data Privacy Act, and the Utah Consumer Privacy
+        Act. These can include the right to know what personal information
+        is collected about you, to request deletion or correction, and to
+        opt out of the "sale" or "sharing" of personal information for
+        targeted (cross-context behavioral) advertising.
+      </p>
+      <p>
+        We do not sell personal information for money. When advertising is
+        active, however, Google and its ad partners may receive identifiers
+        such as cookies, device information, and IP address in order to
+        serve and measure ads — activity that some US state laws define as
+        "sharing" or a "sale." Where required, we display a Google-provided
+        privacy message that lets you opt out of personalized advertising
+        in your jurisdiction; your choice is stored and respected on
+        subsequent visits. You can re-open this message at any time using
+        the "Privacy options" link in our consent banner.
+      </p>
+      <p>
+        To exercise any of the rights above, contact us at{" "}
+        <a href="mailto:inquiries@nutrition-label-generator.org">
+          inquiries@nutrition-label-generator.org
+        </a>
+        . We will not discriminate against you for exercising these rights.
       </p>
 
       <h2>Your choices</h2>
