@@ -6,6 +6,10 @@
 // ── One ingredient in the current recipe ──────────────────────────────────
 
 export interface IngredientItem {
+  // Stable per-row identity. Distinct from `fdc_id` so the same food can
+  // appear twice in a recipe and each row addresses, edits, and reorders
+  // independently. Assigned by `recipeStore.addIngredient`.
+  instanceId: string;
   fdc_id: number;
   name: string;       // Display name on the label (user can edit this)
   amount: number;

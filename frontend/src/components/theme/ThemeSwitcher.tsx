@@ -17,7 +17,7 @@ export function ThemeSwitcher({ compact = false }: ThemeSwitcherProps) {
   const setTheme = useThemeStore((s) => s.setTheme);
   const setAccent = useThemeStore((s) => s.setAccent);
   const accents = useThemeStore((s) => s.accents);
-  const sw = compact ? 22 : 26;
+  const sw = compact ? 24 : 26;
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: compact ? 10 : 14 }}>
@@ -35,17 +35,30 @@ export function ThemeSwitcher({ compact = false }: ThemeSwitcherProps) {
               aria-label={`accent ${a.name}`}
               title={a.name}
               style={{
-                width: active ? 14 : 10,
-                height: active ? 14 : 10,
-                borderRadius: 8,
-                background: a.hex,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 24,
+                height: 24,
                 padding: 0,
+                background: "transparent",
+                border: "none",
                 cursor: "pointer",
-                border: active ? "2px solid var(--ink)" : "1px solid transparent",
-                boxShadow: active && def.oled ? `0 0 8px ${a.hex}` : "none",
-                transition: "all 160ms ease",
               }}
-            />
+            >
+              <span
+                style={{
+                  display: "inline-block",
+                  width: active ? 14 : 10,
+                  height: active ? 14 : 10,
+                  borderRadius: 8,
+                  background: a.hex,
+                  border: active ? "2px solid var(--ink)" : "1px solid transparent",
+                  boxShadow: active && def.oled ? `0 0 8px ${a.hex}` : "none",
+                  transition: "all 160ms ease",
+                }}
+              />
+            </button>
           );
         })}
       </div>

@@ -16,8 +16,16 @@ const BUTTER_MACROS: MacroProfile = {
   vitamin_d_mcg: 1.5, calcium_mg: 24, iron_mg: 0.02, potassium_mg: 24,
 };
 
-function makeIngredient(fdc_id: number, name: string, amount = 100, unit: "g" | "oz" | "lb" | "kg" | "ml" = "g", macros = BUTTER_MACROS): IngredientItem {
+function makeIngredient(fdc_id: number, name: string, amount = 100, unit: "g" | "oz" | "lb" | "kg" | "ml" = "g", macros = BUTTER_MACROS): Omit<IngredientItem, "instanceId"> {
   return { fdc_id, name, amount, unit, baseMacros: macros };
+}
+
+// Add an ingredient and return its assigned instanceId — most tests need
+// a handle to the row just added so they can target store actions at it.
+function addAndGetId(ing: Omit<IngredientItem, "instanceId">): string {
+  useRecipeStore.getState().addIngredient(ing);
+  const list = useRecipeStore.getState().ingredients;
+  return list[list.length - 1].instanceId;
 }
 
 const STORE_DEFAULTS = {
@@ -57,100 +65,130 @@ describe("addIngredient", () => {
     useRecipeStore.getState().addIngredient(makeIngredient(1, "Butter"));
     expect(useRecipeStore.getState().ingredients).toHaveLength(2);
   });
+
+  it("assigns a distinct instanceId to each added ingredient", () => {
+    useRecipeStore.getState().addIngredient(makeIngredient(1, "Butter"));
+    useRecipeStore.getState().addIngredient(makeIngredient(1, "Butter"));
+    const [a, b] = useRecipeStore.getState().ingredients;
+    expect(a.instanceId).toBeTruthy();
+    expect(b.instanceId).toBeTruthy();
+    expect(a.instanceId).not.toBe(b.instanceId);
+  });
 });
 
 describe("removeIngredient", () => {
-  it("removes an ingredient by fdc_id", () => {
-    useRecipeStore.getState().addIngredient(makeIngredient(1, "Butter"));
-    useRecipeStore.getState().addIngredient(makeIngredient(2, "Flour"));
-    useRecipeStore.getState().removeIngredient(1);
+  it("removes only the targeted ingredient by instanceId", () => {
+    const butterId = addAndGetId(makeIngredient(1, "Butter"));
+    addAndGetId(makeIngredient(2, "Flour"));
+    useRecipeStore.getState().removeIngredient(butterId);
     const names = useRecipeStore.getState().ingredients.map((i) => i.name);
     expect(names).toEqual(["Flour"]);
   });
 
-  it("removes all instances with the same fdc_id", () => {
-    useRecipeStore.getState().addIngredient(makeIngredient(1, "Butter"));
-    useRecipeStore.getState().addIngredient(makeIngredient(1, "Butter 2"));
-    useRecipeStore.getState().removeIngredient(1);
-    expect(useRecipeStore.getState().ingredients).toHaveLength(0);
+  it("does not remove same-fdc_id siblings — instanceId scopes the removal", () => {
+    addAndGetId(makeIngredient(1, "Butter"));
+    const secondId = addAndGetId(makeIngredient(1, "Butter 2"));
+    useRecipeStore.getState().removeIngredient(secondId);
+    const names = useRecipeStore.getState().ingredients.map((i) => i.name);
+    expect(names).toEqual(["Butter"]);
   });
 
-  it("is a no-op for an fdc_id not in the list", () => {
-    useRecipeStore.getState().addIngredient(makeIngredient(1, "Butter"));
-    useRecipeStore.getState().removeIngredient(999);
+  it("is a no-op for an instanceId not in the list", () => {
+    addAndGetId(makeIngredient(1, "Butter"));
+    useRecipeStore.getState().removeIngredient("nope");
     expect(useRecipeStore.getState().ingredients).toHaveLength(1);
   });
 });
 
 describe("updateIngredientName", () => {
   it("changes the name of the matching ingredient", () => {
-    useRecipeStore.getState().addIngredient(makeIngredient(1, "Butter"));
-    useRecipeStore.getState().updateIngredientName(1, "Unsalted Butter");
+    const id = addAndGetId(makeIngredient(1, "Butter"));
+    useRecipeStore.getState().updateIngredientName(id, "Unsalted Butter");
     expect(useRecipeStore.getState().ingredients[0].name).toBe("Unsalted Butter");
   });
 
   it("does not mutate other ingredients", () => {
-    useRecipeStore.getState().addIngredient(makeIngredient(1, "Butter"));
-    useRecipeStore.getState().addIngredient(makeIngredient(2, "Flour"));
-    useRecipeStore.getState().updateIngredientName(1, "New Butter");
+    const butterId = addAndGetId(makeIngredient(1, "Butter"));
+    addAndGetId(makeIngredient(2, "Flour"));
+    useRecipeStore.getState().updateIngredientName(butterId, "New Butter");
     expect(useRecipeStore.getState().ingredients[1].name).toBe("Flour");
+  });
+
+  it("does not bleed across rows sharing the same fdc_id", () => {
+    const firstId  = addAndGetId(makeIngredient(1, "Butter"));
+    const secondId = addAndGetId(makeIngredient(1, "Butter"));
+    useRecipeStore.getState().updateIngredientName(secondId, "Brown Butter");
+    const [a, b] = useRecipeStore.getState().ingredients;
+    expect(a.instanceId).toBe(firstId);
+    expect(a.name).toBe("Butter");
+    expect(b.name).toBe("Brown Butter");
   });
 });
 
 describe("updateIngredientAmount", () => {
   it("updates the amount of the matching ingredient", () => {
-    useRecipeStore.getState().addIngredient(makeIngredient(1, "Butter", 100));
-    useRecipeStore.getState().updateIngredientAmount(1, 250);
+    const id = addAndGetId(makeIngredient(1, "Butter", 100));
+    useRecipeStore.getState().updateIngredientAmount(id, 250);
     expect(useRecipeStore.getState().ingredients[0].amount).toBe(250);
   });
 });
 
 describe("updateIngredientUnit", () => {
   it("updates the unit of the matching ingredient", () => {
-    useRecipeStore.getState().addIngredient(makeIngredient(1, "Butter", 100, "g"));
-    useRecipeStore.getState().updateIngredientUnit(1, "oz");
+    const id = addAndGetId(makeIngredient(1, "Butter", 100, "g"));
+    useRecipeStore.getState().updateIngredientUnit(id, "oz");
     expect(useRecipeStore.getState().ingredients[0].unit).toBe("oz");
   });
 });
 
 describe("moveIngredient", () => {
   it("moves an ingredient down (direction=1) by swapping with the next", () => {
-    useRecipeStore.getState().addIngredient(makeIngredient(1, "Butter"));
-    useRecipeStore.getState().addIngredient(makeIngredient(2, "Flour"));
-    useRecipeStore.getState().addIngredient(makeIngredient(3, "Sugar"));
-    useRecipeStore.getState().moveIngredient(1, 1);  // Butter at idx 0 → idx 1
+    const butterId = addAndGetId(makeIngredient(1, "Butter"));
+    addAndGetId(makeIngredient(2, "Flour"));
+    addAndGetId(makeIngredient(3, "Sugar"));
+    useRecipeStore.getState().moveIngredient(butterId, 1);  // Butter at idx 0 → idx 1
     const names = useRecipeStore.getState().ingredients.map((i) => i.name);
     expect(names).toEqual(["Flour", "Butter", "Sugar"]);
   });
 
   it("moves an ingredient up (direction=-1) by swapping with the previous", () => {
-    useRecipeStore.getState().addIngredient(makeIngredient(1, "Butter"));
-    useRecipeStore.getState().addIngredient(makeIngredient(2, "Flour"));
-    useRecipeStore.getState().moveIngredient(2, -1);  // Flour at idx 1 → idx 0
+    addAndGetId(makeIngredient(1, "Butter"));
+    const flourId = addAndGetId(makeIngredient(2, "Flour"));
+    useRecipeStore.getState().moveIngredient(flourId, -1);  // Flour at idx 1 → idx 0
     const names = useRecipeStore.getState().ingredients.map((i) => i.name);
     expect(names).toEqual(["Flour", "Butter"]);
   });
 
   it("does not move the first ingredient further up (boundary guard)", () => {
-    useRecipeStore.getState().addIngredient(makeIngredient(1, "Butter"));
-    useRecipeStore.getState().addIngredient(makeIngredient(2, "Flour"));
-    useRecipeStore.getState().moveIngredient(1, -1);  // Butter already at top
+    const butterId = addAndGetId(makeIngredient(1, "Butter"));
+    addAndGetId(makeIngredient(2, "Flour"));
+    useRecipeStore.getState().moveIngredient(butterId, -1);  // Butter already at top
     const names = useRecipeStore.getState().ingredients.map((i) => i.name);
     expect(names).toEqual(["Butter", "Flour"]);
   });
 
   it("does not move the last ingredient further down (boundary guard)", () => {
-    useRecipeStore.getState().addIngredient(makeIngredient(1, "Butter"));
-    useRecipeStore.getState().addIngredient(makeIngredient(2, "Flour"));
-    useRecipeStore.getState().moveIngredient(2, 1);   // Flour already at bottom
+    addAndGetId(makeIngredient(1, "Butter"));
+    const flourId = addAndGetId(makeIngredient(2, "Flour"));
+    useRecipeStore.getState().moveIngredient(flourId, 1);   // Flour already at bottom
     const names = useRecipeStore.getState().ingredients.map((i) => i.name);
     expect(names).toEqual(["Butter", "Flour"]);
   });
 
-  it("is a no-op for an unknown fdc_id", () => {
-    useRecipeStore.getState().addIngredient(makeIngredient(1, "Butter"));
-    useRecipeStore.getState().moveIngredient(999, 1);
+  it("is a no-op for an unknown instanceId", () => {
+    addAndGetId(makeIngredient(1, "Butter"));
+    useRecipeStore.getState().moveIngredient("nope", 1);
     expect(useRecipeStore.getState().ingredients).toHaveLength(1);
+  });
+
+  it("moves only the targeted row when two share the same fdc_id", () => {
+    const firstId  = addAndGetId(makeIngredient(1, "Butter"));
+    const secondId = addAndGetId(makeIngredient(1, "Butter"));
+    addAndGetId(makeIngredient(2, "Flour"));
+    useRecipeStore.getState().moveIngredient(secondId, 1);   // second Butter at idx 1 → idx 2
+    const order = useRecipeStore.getState().ingredients.map((i) => i.instanceId);
+    expect(order[0]).toBe(firstId);
+    expect(order[2]).toBe(secondId);
   });
 });
 
@@ -194,7 +232,7 @@ describe("setDimensions", () => {
 
 describe("clearRecipe", () => {
   it("resets ingredients to empty", () => {
-    useRecipeStore.getState().addIngredient(makeIngredient(1, "Butter"));
+    addAndGetId(makeIngredient(1, "Butter"));
     useRecipeStore.getState().clearRecipe();
     expect(useRecipeStore.getState().ingredients).toHaveLength(0);
   });
@@ -354,7 +392,9 @@ describe("loadRecipe", () => {
           labelName: "Cookie Dough v1",
           portionDivisor: 8,
           dimensions: { widthInches: 2.75, heightInches: null },
-          ingredients: [makeIngredient(1, "Butter")],
+          // Legacy version saved before per-row instanceId existed — loadRecipe
+          // should back-fill it on read.
+          ingredients: [makeIngredient(1, "Butter") as IngredientItem],
           instructions: [],
           variables: [],
         },
@@ -365,6 +405,7 @@ describe("loadRecipe", () => {
     const state = useRecipeStore.getState();
     expect(state.labelName).toBe("Cookie Dough v1");
     expect(state.ingredients).toHaveLength(1);
+    expect(state.ingredients[0].instanceId).toBeTruthy();
     expect(state.currentRecipeId).toBe("recipe-1");
     expect(state.viewingVersionId).toBeNull();
   });

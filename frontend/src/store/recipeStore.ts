@@ -7,6 +7,13 @@ import type {
 import { UNIT_CONVERSIONS, ingredientGrams } from "../utils/units";
 import { makeId } from "../utils/id";
 
+// Back-fill instanceId for ingredients loaded from older persisted recipes
+// (saved before per-row identity existed). Without this, two same-fdc_id rows
+// in a legacy recipe would share a key and edits would batch across them.
+function withInstanceIds(ingredients: IngredientItem[]): IngredientItem[] {
+  return ingredients.map((i) => i.instanceId ? i : { ...i, instanceId: makeId() });
+}
+
 interface RecipeState {
   // ── Recipe content ────────────────────────────────────────────────────
   ingredients: IngredientItem[];
@@ -22,15 +29,19 @@ interface RecipeState {
   viewingVersionId:  string | null;   // non-null when viewing an older version
 
   // ── Ingredient actions ────────────────────────────────────────────────
-  addIngredient:           (ingredient: IngredientItem) => void;
-  removeIngredient:        (fdc_id: number) => void;
-  updateIngredientName:    (fdc_id: number, name: string) => void;
-  updateIngredientAmount:  (fdc_id: number, amount: number) => void;
-  updateIngredientUnit:    (fdc_id: number, unit: UnitKey) => void;
+  // All actions key off `instanceId`, not `fdc_id`, so duplicate foods
+  // (e.g. agave added twice at different stages of a recipe) are independently
+  // editable, movable, and removable. `addIngredient` accepts an item without
+  // an instanceId and assigns one — callers should never set it themselves.
+  addIngredient:           (ingredient: Omit<IngredientItem, "instanceId">) => void;
+  removeIngredient:        (instanceId: string) => void;
+  updateIngredientName:    (instanceId: string, name: string) => void;
+  updateIngredientAmount:  (instanceId: string, amount: number) => void;
+  updateIngredientUnit:    (instanceId: string, unit: UnitKey) => void;
   // Switch the row to a food-specific portion ("1 tbsp"). Passing `null`
   // clears any active portionRef and falls back to the row's `unit`.
-  updateIngredientPortion: (fdc_id: number, portion: PortionRef | null) => void;
-  moveIngredient:          (fdc_id: number, direction: -1 | 1) => void;
+  updateIngredientPortion: (instanceId: string, portion: PortionRef | null) => void;
+  moveIngredient:          (instanceId: string, direction: -1 | 1) => void;
 
   // ── Recipe meta actions ───────────────────────────────────────────────
   setPortionDivisor:       (divisor: number) => void;
@@ -74,19 +85,21 @@ export const useRecipeStore = create<RecipeState>((set) => ({
 
   // ── Ingredient actions ────────────────────────────────────────────────
   addIngredient: (ingredient) =>
-    set((state) => ({ ingredients: [...state.ingredients, ingredient] })),
-
-  removeIngredient: (fdc_id) =>
-    set((state) => ({ ingredients: state.ingredients.filter((i) => i.fdc_id !== fdc_id) })),
-
-  updateIngredientName: (fdc_id, name) =>
     set((state) => ({
-      ingredients: state.ingredients.map((i) => i.fdc_id === fdc_id ? { ...i, name } : i),
+      ingredients: [...state.ingredients, { ...ingredient, instanceId: makeId() }],
     })),
 
-  updateIngredientAmount: (fdc_id, amount) =>
+  removeIngredient: (instanceId) =>
+    set((state) => ({ ingredients: state.ingredients.filter((i) => i.instanceId !== instanceId) })),
+
+  updateIngredientName: (instanceId, name) =>
     set((state) => ({
-      ingredients: state.ingredients.map((i) => i.fdc_id === fdc_id ? { ...i, amount } : i),
+      ingredients: state.ingredients.map((i) => i.instanceId === instanceId ? { ...i, name } : i),
+    })),
+
+  updateIngredientAmount: (instanceId, amount) =>
+    set((state) => ({
+      ingredients: state.ingredients.map((i) => i.instanceId === instanceId ? { ...i, amount } : i),
     })),
 
   // Changing the unit on an existing ingredient re-expresses the amount in
@@ -94,10 +107,10 @@ export const useRecipeStore = create<RecipeState>((set) => ({
   // butter, switched to oz, becomes 3.53 oz — not 100 oz. If the row was on
   // a portion ("1 tbsp"), that portion is cleared. Displayed amount rounds
   // to 2 decimals to match the row UI's precision.
-  updateIngredientUnit: (fdc_id, unit) =>
+  updateIngredientUnit: (instanceId, unit) =>
     set((state) => ({
       ingredients: state.ingredients.map((i) => {
-        if (i.fdc_id !== fdc_id) return i;
+        if (i.instanceId !== instanceId) return i;
         // No-op if neither unit nor portion would change.
         if (!i.portionRef && i.unit === unit) return i;
         const grams = ingredientGrams(i);
@@ -113,10 +126,10 @@ export const useRecipeStore = create<RecipeState>((set) => ({
 
   // Switch to a food-specific portion ("1 cup ≈ 227 g") while preserving
   // gram weight. Passing `null` clears portionRef without changing unit.
-  updateIngredientPortion: (fdc_id, portion) =>
+  updateIngredientPortion: (instanceId, portion) =>
     set((state) => ({
       ingredients: state.ingredients.map((i) => {
-        if (i.fdc_id !== fdc_id) return i;
+        if (i.instanceId !== instanceId) return i;
         const grams = ingredientGrams(i);
         if (portion === null) {
           // Falling back to the row's `unit` — re-express grams there.
@@ -128,9 +141,9 @@ export const useRecipeStore = create<RecipeState>((set) => ({
       }),
     })),
 
-  moveIngredient: (fdc_id, direction) =>
+  moveIngredient: (instanceId, direction) =>
     set((state) => {
-      const idx = state.ingredients.findIndex((i) => i.fdc_id === fdc_id);
+      const idx = state.ingredients.findIndex((i) => i.instanceId === instanceId);
       if (idx === -1) return state;
       const to = idx + direction;
       if (to < 0 || to >= state.ingredients.length) return state;
@@ -215,7 +228,7 @@ export const useRecipeStore = create<RecipeState>((set) => ({
       : undefined;
     if (!latest) return;
     set({
-      ingredients:          latest.ingredients,
+      ingredients:          withInstanceIds(latest.ingredients),
       portionDivisor:       latest.portionDivisor,
       labelName:            latest.labelName,
       dimensions:           latest.dimensions,
@@ -228,7 +241,7 @@ export const useRecipeStore = create<RecipeState>((set) => ({
   },
 
   loadVersion: (recipe, version) => set({
-    ingredients:          version.ingredients,
+    ingredients:          withInstanceIds(version.ingredients),
     portionDivisor:       version.portionDivisor,
     labelName:            version.labelName,
     dimensions:           version.dimensions,

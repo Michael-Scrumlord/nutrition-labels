@@ -51,7 +51,7 @@ export function RecipeBuilder() {
       <main
         style={{
           gridArea: "body",
-          padding: "40px 48px 48px",
+          padding: "var(--ms-pad-y) var(--ms-pad-x)",
           overflow: "auto",
           fontFamily: "var(--f-body)",
           color: "var(--ink)",
@@ -71,7 +71,7 @@ export function RecipeBuilder() {
             className="sig-editable sig-input pl-display"
             style={{
               width: "100%", minWidth: 0,
-              fontSize: 56,
+              fontSize: "var(--ms-hero)",
               lineHeight: 1,
               padding: "8px 36px 10px 12px",
             }}
@@ -114,7 +114,7 @@ export function RecipeBuilder() {
 
           {ingredients.map((ing, i) => (
             <IngredientRow
-              key={ing.fdc_id}
+              key={ing.instanceId}
               ingredient={ing}
               index={i}
               isHovered={hoveredIdx === i}
