@@ -123,6 +123,11 @@ services:
       - "443:443/udp"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Cloudflare Origin Certificate + key. Read-only so a container
+      # compromise cannot rewrite the cert. Files must be present on the
+      # host at ./caddy/certs/ (gitignored — never commit the private key).
+      # See the Caddyfile `tls` directive for the matching paths.
+      - ./caddy/certs:/etc/caddy/certs:ro
       - caddy_data:/data
       - caddy_config:/config
     security_opt:
