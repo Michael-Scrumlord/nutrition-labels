@@ -39,6 +39,7 @@ Thumbs.db
 .env
 .env.local
 *.local
+caddy/certs/
 
 # Planned Features
 plan/

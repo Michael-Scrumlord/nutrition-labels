@@ -17,6 +17,15 @@
 {$DOMAIN} {
     encode zstd gzip
 
+    # TLS via Cloudflare Origin Certificate (mounted read-only into the
+    # container at /etc/caddy/certs by docker-compose.yml). The cert is only
+    # trusted by Cloudflare's edge — direct browser connections will reject
+    # it, which is the point: clients should always reach us via the
+    # Cloudflare proxy. SSL/TLS mode at Cloudflare must be Full (strict).
+    # If you ever need to roll back to public Let's Encrypt, comment out
+    # this line and Caddy will resume auto-ACME using TLS-ALPN/HTTP-01.
+    tls /etc/caddy/certs/origin.pem /etc/caddy/certs/origin.key
+
     # HSTS — only enable once you're certain TLS works for your apex + www.
     # 1 year, include subdomains, eligible for preload.
     header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
