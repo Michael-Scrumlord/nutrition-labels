@@ -9,7 +9,7 @@ import os
 import sys
 from typing import Annotated
 
-from fastapi import FastAPI, HTTPException, Path, Request, Response
+from fastapi import FastAPI, HTTPException, Path, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import Limiter
@@ -129,7 +129,10 @@ def health() -> HealthResponse:
 
 @app.get("/api/search", response_model=list[FoodSearchResult])
 @limiter.limit(settings.rate_limit_search)
-def search(request: Request, query: str = "") -> list[dict]:
+def search(
+    request: Request,
+    query: str = Query("", max_length=100),
+) -> list[dict]:
     """
     Search foods by name. Returns up to 40 results ranked by relevance:
     prefix matches first (alphabetically), then contains matches (alphabetically).
@@ -137,8 +140,6 @@ def search(request: Request, query: str = "") -> list[dict]:
     """
     if len(query) < 2:
         return []
-    if len(query) > 100:
-        raise HTTPException(status_code=400, detail="query too long")
     rows = database.search_foods(query)
     return search_module.ranked_search(query, rows)
 
