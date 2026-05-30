@@ -131,13 +131,15 @@ def health() -> HealthResponse:
 @limiter.limit(settings.rate_limit_search)
 def search(
     request: Request,
-    query: str = Query("", max_length=100),
+    query: str = Query(""),
 ) -> list[dict]:
     """
     Search foods by name. Returns up to 40 results ranked by relevance:
     prefix matches first (alphabetically), then contains matches (alphabetically).
     Returns an empty list if the query is less than 2 characters.
     """
+    if len(query) > 100:
+        raise HTTPException(status_code=400, detail="Query string too long (maximum 100 characters)")
     if len(query) < 2:
         return []
     rows = database.search_foods(query)
