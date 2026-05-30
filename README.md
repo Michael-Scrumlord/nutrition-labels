@@ -44,7 +44,8 @@ The compiled SQLite database lives on the `nutrition_db` Docker volume — it is
 Search foods by name.
 
 - **Query params:** `query` (string) — minimum 2 characters; returns `[]` for shorter queries
-- **Returns:** `FoodSearchResult[]` — at most 40 results, ranked by FTS5 BM25; prefix matches surface ahead of contains matches, each group sorted alphabetically
+- **Returns:** `FoodSearchResult[]` — at most 40 results; prefix matches surface ahead of contains matches, each group sorted alphabetically
+- **400** if `query` exceeds 100 characters
 - **429** if more than 60 requests are made per minute from the same IP
 
 ```json
@@ -80,8 +81,10 @@ Calculate per-serving macros for a recipe, render an FDA Nutrition Facts label, 
 - **Body:** `GenerateLabelRequest` (JSON)
 - **Returns:** `application/pdf` binary download (`nutrition_label.pdf`)
 - **400** if an `fdc_id` is not in the database
+- **413** if the request body exceeds the server's maximum allowed size
 - **422** if request validation fails (e.g. `portion_divisor` out of range, `amount ≤ 0`)
 - **429** if more than 10 requests are made per minute from the same IP; includes a `Retry-After` header
+- **504** if PDF rendering exceeds the server timeout
 
 ```json
 {

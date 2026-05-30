@@ -41,12 +41,18 @@
 
 Each route follows the same pattern: **validate → fetch → calculate → return**. No business logic lives in routes.
 
+Three middleware layers run before any route handler:
+
+1. **`BodySizeLimitMiddleware`** — Rejects requests whose `Content-Length` header exceeds the configured maximum (default 1 MB) with a `413` response before FastAPI parses the body.
+2. **`TrustedHostMiddleware`** — Rejects requests with an unrecognized `Host` header (`400`).
+3. **`CORSMiddleware`** — Only active in local dev (when `CORS_ORIGINS` is set).
+
 | Route                    | Method | Delegates to                                              |
 |--------------------------|--------|-----------------------------------------------------------|
 | `/api/health`            | GET    | `database.get_connection` (DB probe); returns `{"status":"ok","release":"..."}` |
-| `/api/search`            | GET    | `search.ranked_search`                                    |
+| `/api/search`            | GET    | `search.ranked_search`; rejects queries > 100 chars with `400` |
 | `/api/food/{fdc_id}`     | GET    | `database.get_food_by_id`, `database.get_portions_by_id`  |
-| `/api/generate_label`    | POST   | `nutrition.calculate_recipe_macros` → `pdf.render_label_html` → `pdf.generate_pdf` |
+| `/api/generate_label`    | POST   | `nutrition.calculate_recipe_macros` → `pdf.render_label_html` → `pdf.generate_pdf`; `504` on render timeout |
 
 ### Module Responsibilities
 
@@ -73,9 +79,10 @@ Each route follows the same pattern: **validate → fetch → calculate → retu
 | `IngredientItem`      | Request   | One ingredient: `fdc_id`, `name`, `amount`, `unit`  |
 | `GenerateLabelRequest`| Request   | Full PDF generation payload                          |
 | `MacroProfile`        | Response  | 13 nutrient totals (per 100 g or per serving)        |
-| `FoodSearchResult`    | Response  | `fdc_id` + `name` for search results                 |
+| `FoodSearchResult`    | Response  | `fdc_id` + `name` + optional `data_type` for search results |
 | `PortionSize`         | Response  | A named portion (e.g. 1 tablespoon = 14.2 g)         |
 | `FoodDetail`          | Response  | One food: `macros` + `portions`                      |
+| `HealthResponse`      | Response  | `{"status": "ok", "release": "<sha>"}` from `/api/health` |
 
 **`constants.py`** — Single source of truth for numbers shared across modules.
 
@@ -237,8 +244,8 @@ Client
   pdf.render_label_html(macros, request)   ← Jinja2 template
         │
         ▼
-  pdf.generate_pdf(html)   ← WeasyPrint
-        │
+  pdf.generate_pdf(html)   ← WeasyPrint (bounded by semaphore + timeout)
+        │                      → 504 if render exceeds pdf_timeout_seconds
         ▼
   Response(content=pdf_bytes, media_type="application/pdf")
 ```
