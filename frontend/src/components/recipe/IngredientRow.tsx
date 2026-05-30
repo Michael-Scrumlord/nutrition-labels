@@ -36,7 +36,6 @@ function currentPickerLabel(item: IngredientItem): string {
 
 interface IngredientRowProps {
   ingredient: IngredientItem;
-  index: number;
   isHovered: boolean;
   totalGrams: number;
   onHoverEnter: () => void;
@@ -44,7 +43,7 @@ interface IngredientRowProps {
 }
 
 export function IngredientRow({
-  ingredient, index: _index, isHovered, totalGrams, onHoverEnter, onHoverLeave,
+  ingredient, isHovered, totalGrams, onHoverEnter, onHoverLeave,
 }: IngredientRowProps) {
   const {
     updateIngredientAmount:  updateAmount,
