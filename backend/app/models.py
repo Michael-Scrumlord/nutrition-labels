@@ -4,13 +4,18 @@
 # Request models describe what comes in from the client.
 # Response models describe what goes back out.
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.constants import UNIT_CONVERSIONS
 
 
 # Control chars (including newlines, tabs, RTL overrides) that would corrupt
 # the rendered PDF if smuggled into a user-supplied string field.
-_CONTROL_CHARS = set(chr(c) for c in range(0, 32)) | {chr(0x7F), "‮", "‭", "‎", "‏"}
+# frozenset signals immutability and is marginally faster for `in` lookups.
+_CONTROL_CHARS: frozenset[str] = frozenset(
+    chr(c) for c in range(0, 32)
+) | frozenset({chr(0x7F), "‮", "‭", "‎", "‏"})
 
 
 def _strip_control(value: str) -> str:
@@ -59,7 +64,7 @@ class IngredientItem(BaseModel):
     def unit_must_be_valid(cls, v: str) -> str:
         valid = set(UNIT_CONVERSIONS.keys())
         if v not in valid:
-            raise ValueError(f"unit must be one of {valid}")
+            raise ValueError(f"unit must be one of {sorted(valid)}")
         return v
 
 
@@ -136,5 +141,5 @@ class FoodDetail(BaseModel):
 
 class HealthResponse(BaseModel):
     """Response body for GET /api/health."""
-    status: str
+    status: Literal["ok"]
     release: str

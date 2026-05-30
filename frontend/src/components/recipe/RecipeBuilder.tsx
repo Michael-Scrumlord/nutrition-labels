@@ -6,7 +6,7 @@
 //   • Ingredient rows on hairline rules
 //   • Method section below
 
-import { useState, useMemo, useRef, useLayoutEffect } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useRecipeStore } from "../../store/recipeStore";
 import { useNutritionCalc } from "../../hooks/useNutritionCalc";
 import { useRecipeActions } from "../../hooks/useRecipeActions";
@@ -19,6 +19,7 @@ import { ingredientGrams } from "../../utils/units";
 import { RecipeStatsBar } from "./RecipeStatsBar";
 import { VersionBanner } from "./VersionBanner";
 import { getHighlightKeys } from "../../utils/nutrition";
+import { useTitleAutoResize } from "../../hooks/useTitleAutoResize";
 
 export function RecipeBuilder() {
   const ingredients      = useRecipeStore((s) => s.ingredients);
@@ -31,39 +32,7 @@ export function RecipeBuilder() {
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
 
   const titleRef = useRef<HTMLTextAreaElement>(null);
-
-  // Auto-size the title textarea to fit its content. Three triggers:
-  //   1. `labelName` change       — user typed.
-  //   2. `document.fonts.ready`   — IBM Plex finishes loading; placeholder
-  //                                  width changes and may now wrap onto an
-  //                                  extra line. Without this, the textarea
-  //                                  was sized to the *fallback*-font height
-  //                                  on first paint and never resized,
-  //                                  clipping the placeholder on mobile.
-  //   3. ResizeObserver on parent — viewport / container width changes
-  //                                  re-wrap the placeholder.
-  useLayoutEffect(() => {
-    const el = titleRef.current;
-    if (!el) return;
-    const resize = () => {
-      el.style.height = "auto";
-      el.style.height = `${el.scrollHeight}px`;
-    };
-    resize();
-
-    let cancelled = false;
-    document.fonts?.ready?.then(() => {
-      if (!cancelled) resize();
-    });
-
-    const ro = new ResizeObserver(resize);
-    if (el.parentElement) ro.observe(el.parentElement);
-
-    return () => {
-      cancelled = true;
-      ro.disconnect();
-    };
-  }, [labelName]);
+  useTitleAutoResize(titleRef, labelName);
 
   const macros      = useNutritionCalc();
   const totalGrams  = useMemo(
@@ -155,7 +124,6 @@ export function RecipeBuilder() {
             <IngredientRow
               key={ing.instanceId}
               ingredient={ing}
-              index={i}
               isHovered={hoveredIdx === i}
               totalGrams={totalGrams}
               onHoverEnter={() => handleHoverEnter(i)}
