@@ -8,18 +8,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.constants import UNIT_CONVERSIONS
-
-
-# Control chars (including newlines, tabs, RTL overrides) that would corrupt
-# the rendered PDF if smuggled into a user-supplied string field.
-# frozenset signals immutability and is marginally faster for `in` lookups.
-_CONTROL_CHARS: frozenset[str] = frozenset(
-    chr(c) for c in range(0, 32)
-) | frozenset({chr(0x7F), "‮", "‭", "‎", "‏"})
-
-
-def _strip_control(value: str) -> str:
-    return "".join(ch for ch in value if ch not in _CONTROL_CHARS)
+from app.utils import strip_control as _strip_control
 
 
 # ---------------------------------------------------------------------------

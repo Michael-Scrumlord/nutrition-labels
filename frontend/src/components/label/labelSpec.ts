@@ -3,6 +3,22 @@
 // Single source of truth for the FDA 2020 Nutrition Facts panel layout.
 // Both LabelPreview (DOM) and LabelPdfDoc (@react-pdf/renderer) iterate
 // over this array, so the two renderers can't drift.
+//
+// Also exports layout constants for the label column plinth so LabelColumn
+// and useLabelLayout share a single definition for scaling math.
+
+// The "canonical" unscaled label width. The user's chosen widthInches is
+// converted to pixels (× 96 dpi) and then divided by this base to get the
+// CSS transform scale factor applied to the paper container.
+export const LABEL_BASE_WIDTH_PX = 288;
+
+// Smallest rendered width regardless of the widthInches slider value.
+// Prevents the label from collapsing to an unreadable size.
+export const LABEL_MIN_TARGET_PX = 192;
+
+// Maximum content width for the controls column (dimensions, save buttons, etc.)
+// above and below the paper area.
+export const LABEL_COLUMN_MAX_WIDTH = 380;
 
 import type { MacroProfile } from "../../types";
 

@@ -38,6 +38,11 @@ export function normalizePortion(p: PortionSize): PortionRef {
 /** Single source of truth for "what does this ingredient weigh in grams?".
  *  Honors portionRef when set; falls back to the global unit conversion. */
 export function ingredientGrams(item: Pick<IngredientItem, "amount" | "unit" | "portionRef">): number {
-  if (item.portionRef) return item.amount * item.portionRef.gramsPerUnit;
+  if (item.portionRef) {
+    // Guard against corrupt FDC data where gram_weight / amount rounds to 0,
+    // which would make every downstream calculation return 0 or Infinity.
+    if (item.portionRef.gramsPerUnit <= 0) return 0;
+    return item.amount * item.portionRef.gramsPerUnit;
+  }
   return item.amount * UNIT_CONVERSIONS[item.unit];
 }

@@ -43,10 +43,6 @@ logger = logging.getLogger("nutritionlabels")
 
 limiter = Limiter(key_func=get_remote_address, default_limits=[])
 
-# Bounds concurrent WeasyPrint renders so a burst of /generate_label requests
-# can't exhaust memory or pin every worker.
-_pdf_semaphore = asyncio.Semaphore(settings.pdf_max_concurrency)
-
 
 class BodySizeLimitMiddleware(BaseHTTPMiddleware):
     """Reject oversized bodies before FastAPI parses them."""
@@ -71,6 +67,11 @@ class BodySizeLimitMiddleware(BaseHTTPMiddleware):
 
 app = FastAPI(title="NutritionLabels API", docs_url=None, redoc_url=None, openapi_url=None)
 app.state.limiter = limiter
+# Bounds concurrent WeasyPrint renders so a burst of /generate_label requests
+# can't exhaust memory or pin every worker. Stored on app.state (not as a
+# module-level global) so tests can substitute a fresh semaphore without
+# mutating shared state between test runs.
+app.state.pdf_semaphore = asyncio.Semaphore(settings.pdf_max_concurrency)
 
 app.add_middleware(BodySizeLimitMiddleware, max_bytes=settings.max_body_bytes)
 
@@ -177,10 +178,10 @@ def get_food(
     )
 
 
-async def _render_pdf_with_timeout(html: str) -> bytes:
+async def _render_pdf_with_timeout(semaphore: asyncio.Semaphore, html: str) -> bytes:
     """Run WeasyPrint in a thread, bounded by the semaphore and a timeout."""
     try:
-        async with _pdf_semaphore:
+        async with semaphore:
             return await asyncio.wait_for(
                 asyncio.to_thread(pdf.generate_pdf, html),
                 timeout=settings.pdf_timeout_seconds,
@@ -212,14 +213,14 @@ async def generate_label(request: Request, payload: GenerateLabelRequest) -> Res
         )
 
     try:
-        unrounded_macros, macros = nutrition.calculate_recipe_macros(
+        result = nutrition.calculate_recipe_macros(
             payload.ingredients, food_rows, payload.portion_divisor
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    html = pdf.render_label_html(macros, payload, unrounded_macros)
-    pdf_bytes = await _render_pdf_with_timeout(html)
+    html = pdf.render_label_html(result.rounded, payload, result.unrounded)
+    pdf_bytes = await _render_pdf_with_timeout(request.app.state.pdf_semaphore, html)
 
     return Response(
         content=pdf_bytes,

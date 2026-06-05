@@ -4,9 +4,21 @@
 # Given ingredient data and food rows, returns per-serving nutrient totals.
 
 from decimal import Decimal, ROUND_HALF_UP
+from typing import NamedTuple
 
 from app.models import IngredientItem, MacroProfile
 from app.constants import UNIT_CONVERSIONS, FDA_DAILY_VALUES, NUTRIENT_FIELDS
+
+
+class RecipeMacros(NamedTuple):
+    """Structured return value for calculate_recipe_macros.
+
+    ``unrounded`` holds per-serving values before label rounding — use these
+    for %DV calculations so rounding errors don't compound across nutrients.
+    ``rounded`` is the display-ready MacroProfile written to the PDF.
+    """
+    unrounded: dict[str, float]
+    rounded: MacroProfile
 
 
 def round_half_up(x: float, ndigits: int = 0) -> float:
@@ -23,7 +35,7 @@ def calculate_recipe_macros(
     ingredients: list[IngredientItem],
     food_rows: list,        # sqlite3.Row objects (or dicts) from database.get_foods_by_ids()
     portion_divisor: int,
-) -> tuple[dict[str, float], MacroProfile]:
+) -> RecipeMacros:
     """
     Scale each ingredient's macros to its actual weight, sum everything up,
     then divide by the number of servings.
@@ -80,7 +92,7 @@ def calculate_recipe_macros(
         if field != "calories":
             rounded_per_serving[field] = round_half_up(rounded_per_serving[field], 1)
 
-    return per_serving, MacroProfile(**rounded_per_serving)
+    return RecipeMacros(unrounded=per_serving, rounded=MacroProfile(**rounded_per_serving))
 
 
 def compute_daily_value_pct(value: float, nutrient: str) -> int | None:
@@ -93,6 +105,6 @@ def compute_daily_value_pct(value: float, nutrient: str) -> int | None:
     should display "<1%" rather than "0%".
     """
     daily_value = FDA_DAILY_VALUES.get(nutrient)
-    if daily_value is None:
+    if daily_value is None or daily_value <= 0:
         return None
     return int(round_half_up((value / daily_value) * 100))
