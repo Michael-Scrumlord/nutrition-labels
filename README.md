@@ -4,7 +4,7 @@ A full-stack web application that lets you build custom recipes from USDA food d
 
 ## Features
 
-- **Ingredient Search** — SQLite FTS5 full-text search across four USDA FoodData Central sub-datasets (Foundation Foods, FNDDS, SR Legacy, Branded Foods — ~200k+ total). Results re-ranked by data-quality tier, then by prefix match, then alphabetically. See [DATA_SOURCES.md](DATA_SOURCES.md).
+- **Ingredient Search** — SQLite FTS5 full-text search across three USDA FoodData Central sub-datasets (Foundation Foods, FNDDS, SR Legacy — ~17k foods total; Branded Foods is intentionally excluded). Results re-ranked by prefix match then alphabetically. See [DATA_SOURCES.md](DATA_SOURCES.md).
 - **Recipe Builder** — Add ingredients with custom amounts in g, ml, oz, lb, or kg. Drag to reorder. Adjust serving count with the portion divisor.
 - **Live Label Preview** — An FDA 2020-format Nutrition Facts panel updates in real time as you build your recipe.
 - **PDF Export** — Downloads a print-ready PDF label sized to your chosen dimensions (default 2.75 in wide).
@@ -171,12 +171,12 @@ nutrition-labels/
 ├── frontend/                   # React + TypeScript + Zustand
 │   ├── src/
 │   │   ├── components/         # React components
-│   │   │   ├── layout/         # AppShell, Header
-│   │   │   ├── recipe/         # RecipeBuilder, IngredientRow, MethodSection, VariablesPanel
-│   │   │   ├── label/          # LabelPreview, LabelDimensions, GenerateButton
-│   │   │   ├── search/         # IngredientSearch modal
+│   │   │   ├── layout/         # AppShell, Header, SiteFooter
+│   │   │   ├── recipe/         # RecipeBuilder, IngredientRow, MethodSection, VariablesPanel, RecipeStatsBar, VersionBanner, SlashMenu
+│   │   │   ├── label/          # LabelPreview, LabelDimensions, GenerateButton, SaveControls, AdSlot, GuidesCard
+│   │   │   ├── search/         # IngredientSearch modal, FoodTabs, SearchResults
 │   │   │   ├── recipes/        # RecipesModal, RecipeCard, VersionTimeline
-│   │   │   ├── theme/          # ThemeSwitcher, ThemedFrame
+│   │   │   ├── theme/          # ThemeSwitcher, ThemedFrame, AuroraGlow
 │   │   │   └── ui/             # Button, Card, Input, Select, Badge, Spinner, ScrubNumber
 │   │   ├── hooks/              # useNutritionCalc, useRecipeActions, useIngredientSearch, …
 │   │   ├── store/              # Zustand stores
