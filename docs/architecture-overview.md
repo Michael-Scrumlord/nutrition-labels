@@ -43,7 +43,7 @@ Each route follows the same pattern: **validate → fetch → calculate → retu
 
 Three middleware layers run before any route handler:
 
-1. **`BodySizeLimitMiddleware`** — Rejects requests whose `Content-Length` header exceeds the configured maximum (default **64 KB**) with a `413` response before FastAPI parses the body. A non-integer `Content-Length` value returns `400` instead.
+1. **`BodySizeLimitMiddleware`** — Rejects requests whose `Content-Length` header exceeds the configured maximum (default **64 KB**; set via `MAX_BODY_BYTES` env var) with a `413` response before FastAPI parses the body. A non-integer `Content-Length` value returns `400` instead.
 2. **`TrustedHostMiddleware`** — Rejects requests with an unrecognized `Host` header (`400`).
 3. **`CORSMiddleware`** — Only active in local dev (when `CORS_ORIGINS` is set).
 
@@ -172,13 +172,17 @@ Lifecycle actions: `clearRecipe`, `loadRecipe`, `loadVersion`, `exitVersionView`
 
 ### Custom Hooks
 
-| Hook                  | Purpose                                                                 |
-|-----------------------|-------------------------------------------------------------------------|
-| `useNutritionCalc`    | Derives per-serving `MacroProfile` from `recipeStore`; memoized with `useMemo` |
-| `useRecipeActions`    | Returns all `recipeStore` actions in one shallow-equal subscription (prevents unnecessary re-renders) |
-| `useIngredientSearch` | Manages search API calls and the search modal state                     |
-| `useLabelResize`      | Tracks label panel dimensions for the PDF size controls                 |
-| `useAnimatedNumber`   | Animates number transitions in the stats bar                            |
+| Hook                    | Purpose                                                                 |
+|-------------------------|-------------------------------------------------------------------------|
+| `useNutritionCalc`      | Derives per-serving `MacroProfile` from `recipeStore`; memoized with `useMemo` |
+| `useRecipeActions`      | Returns all `recipeStore` actions in one shallow-equal subscription (prevents unnecessary re-renders) |
+| `useIngredientSearch`   | Manages search API calls and the search modal state                     |
+| `useLabelResize`        | Tracks label panel dimensions for the PDF size controls                 |
+| `useAnimatedNumber`     | Animates number transitions in the stats bar                            |
+| `useDebounce`           | Debounces a value by a given delay (used by ingredient search input)    |
+| `useTitleAutoResize`    | Auto-resizes the label-name input to fit its content                    |
+| `usePageMeta`           | Sets `document.title`, `<meta name="description">`, and canonical link per page |
+| `useAdSenseBootstrap`   | Loads the Google AdSense script; no-op when publisher env vars are unset |
 
 ### Utilities (`src/utils/`)
 
@@ -193,7 +197,15 @@ Lifecycle actions: `clearRecipe`, `loadRecipe`, `loadVersion`, `exitVersionView`
 | `buildIngredientsString`    | Sorts by gram weight desc, uppercases, joins with commas, appends `.`    |
 | `round1`                    | Rounds to 1 decimal place using `roundHalfUp` (matches Python behavior)  |
 
-**`units.ts`** — `UNIT_CONVERSIONS` map and `convertToGrams(amount, unit)` helper. Must stay in sync with `backend/app/constants.py`.
+**`units.ts`** — Unit conversion utilities. Must stay in sync with `backend/app/constants.py`.
+
+| Function               | Purpose                                                                              |
+|------------------------|--------------------------------------------------------------------------------------|
+| `UNIT_CONVERSIONS`     | Grams-per-unit map for the 5 supported units (`g`, `ml`, `oz`, `lb`, `kg`)          |
+| `convertToGrams`       | `amount × UNIT_CONVERSIONS[unit]`                                                    |
+| `convertBetweenUnits`  | Re-expresses an amount in a new unit (preserves gram weight; used when the user changes the unit dropdown) |
+| `normalizePortion`     | Converts a FDC `PortionSize` (e.g. `0.5 cup = 113.5 g`) to a per-1-unit `PortionRef` |
+| `ingredientGrams`      | Single source of truth for ingredient weight: uses `portionRef.gramsPerUnit` when set, otherwise falls back to unit conversion |
 
 ---
 
