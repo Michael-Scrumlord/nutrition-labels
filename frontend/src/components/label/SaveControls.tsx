@@ -12,8 +12,8 @@ export interface SaveControlsProps {
   viewingVersionId: string | null;
   lastSavedRel: string | null;
   savedRecipeName: string | undefined;
-  onSaveVersion: () => void;
-  onSaveAsNew: () => void;
+  onSaveVersion: (note?: string) => void;
+  onSaveAsNew: (note?: string) => void;
   onReset: () => void;
   feedback: string | null;
 }
@@ -27,7 +27,7 @@ export function SaveControls({
   const [note, setNote]         = useState("");
 
   function handleSave() {
-    onSaveVersion();
+    onSaveVersion(note.trim() || undefined);
     setNote("");
     setNoteOpen(false);
   }
@@ -96,7 +96,7 @@ export function SaveControls({
 
       {isLoaded && (
         <button
-          onClick={onSaveAsNew}
+          onClick={() => onSaveAsNew()}
           disabled={!canSave}
           className="sig-btn"
           style={{ width: "100%", justifyContent: "flex-start" }}
