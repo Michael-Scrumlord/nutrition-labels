@@ -7,13 +7,13 @@
 //   • Save / Save-As-New / Reset controls (existing functionality)
 //   • Sponsored AdSlot anchored at the very bottom of the column
 
-import { useState, useCallback, useMemo, useRef, useLayoutEffect } from "react";
+import { useState, useRef, useLayoutEffect } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useRecipeStore } from "../../store/recipeStore";
-import { useSavedRecipesStore, type RecipeSnapshot } from "../../store/savedRecipesStore";
 import { useActiveTheme } from "../../store/themeStore";
 import { useRecipeActions } from "../../hooks/useRecipeActions";
 import { useNutritionCalc } from "../../hooks/useNutritionCalc";
+import { useLabelSave } from "../../hooks/useLabelSave";
 import { LabelPreview } from "./LabelPreview";
 import { LabelDimensions } from "./LabelDimensions";
 import { LabelResizeHandle } from "./LabelResizeHandle";
@@ -25,33 +25,26 @@ import { AuroraGlow } from "../theme/AuroraGlow";
 
 export function LabelColumn() {
   const {
-    ingredients, portionDivisor, labelName, dimensions,
-    highlightedNutrients, instructions, variables,
-    currentRecipeId, viewingVersionId,
+    ingredients, portionDivisor, dimensions,
+    highlightedNutrients, viewingVersionId,
   } = useRecipeStore(
     useShallow((s) => ({
       ingredients:          s.ingredients,
       portionDivisor:       s.portionDivisor,
-      labelName:            s.labelName,
       dimensions:           s.dimensions,
       highlightedNutrients: s.highlightedNutrients,
-      instructions:         s.instructions,
-      variables:            s.variables,
-      currentRecipeId:      s.currentRecipeId,
       viewingVersionId:     s.viewingVersionId,
     })),
   );
 
-  const { clearRecipe, setCurrentRecipeId } = useRecipeActions();
-  const createRecipe  = useSavedRecipesStore((s) => s.createRecipe);
-  const appendVersion = useSavedRecipesStore((s) => s.appendVersion);
-  const savedRecipe   = useSavedRecipesStore((s) =>
-    currentRecipeId ? s.recipes.find((r) => r.id === currentRecipeId) : undefined,
-  );
-  const macros        = useNutritionCalc();
+  const { clearRecipe } = useRecipeActions();
+  const macros = useNutritionCalc();
   const { def: themeDef } = useActiveTheme();
 
-  const [feedback, setFeedback] = useState<string | null>(null);
+  const {
+    canSave, isLoaded, versionCount, lastSavedRel, savedRecipeName,
+    feedback, handleSaveVersion, handleSaveAsNew,
+  } = useLabelSave();
 
   const baseWidthPx = 288;
   const targetPx    = Math.max(dimensions.widthInches * 96, 192);
@@ -72,57 +65,10 @@ export function LabelColumn() {
     return () => ro.disconnect();
   }, [ingredients, portionDivisor, dimensions.widthInches]);
 
-  const requestedH = dimensions.heightInches ? dimensions.heightInches * 96 : null;
+  const requestedH    = dimensions.heightInches ? dimensions.heightInches * 96 : null;
   const scaledNaturalH = naturalH * scale;
-  const containerH = requestedH ?? scaledNaturalH;
-  const isClipped  = requestedH != null && scaledNaturalH > requestedH + 1;
-
-  const canSave      = ingredients.length > 0;
-  const isLoaded     = !!currentRecipeId && !!savedRecipe;
-  const versionCount = savedRecipe?.versions.length ?? 0;
-  const lastSavedAt  = savedRecipe && savedRecipe.versions.length > 0
-    ? savedRecipe.versions[savedRecipe.versions.length - 1].savedAt
-    : undefined;
-
-  const lastSavedRel = useMemo(() => {
-    if (!lastSavedAt) return null;
-    const diff = Date.now() - lastSavedAt;
-    const mins = Math.round(diff / 60_000);
-    if (mins < 1) return "just now";
-    if (mins < 60) return `${mins} min ago`;
-    const hrs = Math.round(mins / 60);
-    if (hrs < 24) return `${hrs} hr ago`;
-    return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(new Date(lastSavedAt));
-  }, [lastSavedAt]);
-
-  const snapshot = useMemo<RecipeSnapshot>(
-    () => ({ ingredients, portionDivisor, labelName, dimensions, instructions, variables }),
-    [ingredients, portionDivisor, labelName, dimensions, instructions, variables],
-  );
-
-  function flash(msg: string) {
-    setFeedback(msg);
-    setTimeout(() => setFeedback(null), 1500);
-  }
-
-  const handleSaveVersion = useCallback(() => {
-    if (!canSave) return;
-    if (isLoaded) {
-      appendVersion(currentRecipeId!, snapshot);
-      flash("SAVED ✓");
-    } else {
-      const newId = createRecipe(snapshot);
-      setCurrentRecipeId(newId);
-      flash("SAVED ✓");
-    }
-  }, [canSave, isLoaded, currentRecipeId, snapshot, createRecipe, appendVersion, setCurrentRecipeId]);
-
-  const handleSaveAsNew = useCallback(() => {
-    if (!canSave) return;
-    const newId = createRecipe(snapshot);
-    setCurrentRecipeId(newId);
-    flash("SAVED AS NEW ✓");
-  }, [canSave, snapshot, createRecipe, setCurrentRecipeId]);
+  const containerH    = requestedH ?? scaledNaturalH;
+  const isClipped     = requestedH != null && scaledNaturalH > requestedH + 1;
 
   return (
     <aside className="label-column-layout">
@@ -242,7 +188,7 @@ export function LabelColumn() {
           versionCount={versionCount}
           viewingVersionId={viewingVersionId}
           lastSavedRel={lastSavedRel}
-          savedRecipeName={savedRecipe?.name}
+          savedRecipeName={savedRecipeName}
           onSaveVersion={handleSaveVersion}
           onSaveAsNew={handleSaveAsNew}
           onReset={() => {

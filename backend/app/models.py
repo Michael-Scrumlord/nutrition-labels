@@ -22,6 +22,17 @@ def _strip_control(value: str) -> str:
     return "".join(ch for ch in value if ch not in _CONTROL_CHARS)
 
 
+def _clean_string(v: str, *, allow_empty: bool = False) -> str:
+    """Strip control chars and surrounding whitespace from a string field.
+
+    Raises ValueError if the result is empty and allow_empty is False.
+    """
+    cleaned = _strip_control(v).strip()
+    if not allow_empty and not cleaned:
+        raise ValueError("must not be empty after stripping control characters")
+    return cleaned
+
+
 # ---------------------------------------------------------------------------
 # Validation constants
 # ---------------------------------------------------------------------------
@@ -54,10 +65,7 @@ class IngredientItem(BaseModel):
     @field_validator("name")
     @classmethod
     def name_no_control_chars(cls, v: str) -> str:
-        cleaned = _strip_control(v).strip()
-        if not cleaned:
-            raise ValueError("name must not be empty after stripping control characters")
-        return cleaned
+        return _clean_string(v, allow_empty=False)
 
     @field_validator("unit")
     @classmethod
@@ -81,7 +89,7 @@ class GenerateLabelRequest(BaseModel):
     @field_validator("label_name")
     @classmethod
     def label_name_no_control_chars(cls, v: str) -> str:
-        return _strip_control(v).strip()
+        return _clean_string(v, allow_empty=True)
 
     # Snap dimensions to 0.01" so float noise (e.g. 2.7500000001) can't drift
     # the WeasyPrint @page size between identical-looking client requests.
