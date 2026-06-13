@@ -43,7 +43,7 @@ Each route follows the same pattern: **validate → fetch → calculate → retu
 
 Three middleware layers run before any route handler:
 
-1. **`BodySizeLimitMiddleware`** — Rejects requests whose `Content-Length` header exceeds the configured maximum (default 1 MB) with a `413` response before FastAPI parses the body.
+1. **`BodySizeLimitMiddleware`** — Rejects requests whose `Content-Length` header exceeds the configured maximum (default **64 KB**) with a `413` response before FastAPI parses the body. A non-integer `Content-Length` value returns `400` instead.
 2. **`TrustedHostMiddleware`** — Rejects requests with an unrecognized `Host` header (`400`).
 3. **`CORSMiddleware`** — Only active in local dev (when `CORS_ORIGINS` is set).
 

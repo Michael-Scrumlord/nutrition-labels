@@ -178,7 +178,7 @@ nutrition-labels/
 │   │   │   ├── recipes/        # RecipesModal, RecipeCard, VersionTimeline
 │   │   │   ├── theme/          # ThemeSwitcher, ThemedFrame
 │   │   │   └── ui/             # Button, Card, Input, Select, Badge, Spinner, ScrubNumber
-│   │   ├── hooks/              # useNutritionCalc, useRecipeActions, useIngredientSearch, …
+│   │   ├── hooks/              # useNutritionCalc, useRecipeActions, useIngredientSearch, useTitleAutoResize, …
 │   │   ├── store/              # Zustand stores
 │   │   │   ├── recipeStore.ts      # Current recipe state + all actions
 │   │   │   ├── savedRecipesStore.ts# Recipe catalog with localStorage + versioning
@@ -218,4 +218,5 @@ npm test
 - **`<1%` rule** — When a nutrient's %DV rounds to 0 but its raw value is > 0, the label shows `<1%` rather than `0%`.
 - **Frontend DV permissiveness** — The frontend `calculateRecipeMacros` throws a `RangeError` for `portionDivisor` outside 1–999. In live preview the UI guards against passing 0.
 - **Rate limiting** — All three data routes are rate-limited per IP: `GET /api/search` at 60/min, `GET /api/food/{id}` at 120/min, and `POST /api/generate_label` at 10/min. Every `429` response includes a `Retry-After` header.
+- **Body size limit** — Requests whose `Content-Length` exceeds 64 KB are rejected with `413` before FastAPI parses the body. A non-integer `Content-Length` header returns `400`.
 - **Recipe versioning** — Recipes are saved to `localStorage` as a list of timestamped snapshots. Each recipe holds up to 20 versions; older ones are pruned automatically. Max 50 recipes total.
