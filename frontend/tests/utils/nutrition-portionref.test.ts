@@ -60,27 +60,27 @@ function makePortionIngredient(
 describe("calculateRecipeMacros — portionRef ingredient", () => {
   it("uses gramsPerUnit × amount instead of the unit conversion", () => {
     // 1 tablespoon of butter = 14.2 g of butter
-    // Calories = round(717 × (14.2 / 100) / 1) ≈ 102 kcal
+    // Calories = 717 × (14.2 / 100) / 1 ≈ 101.814 kcal (unrounded model)
     const ingredient = makePortionIngredient(1, 14.2);
     const result = calculateRecipeMacros([ingredient], 1);
-    const expected = Math.round(717 * 14.2 / 100);
-    expect(result.calories).toBe(expected);
+    const expected = 717 * 14.2 / 100;
+    expect(result.calories).toBeCloseTo(expected, 4);
   });
 
   it("scales correctly when amount > 1 portion", () => {
     // 3 tablespoons = 3 × 14.2 = 42.6 g
     const ingredient = makePortionIngredient(3, 14.2);
     const result = calculateRecipeMacros([ingredient], 1);
-    const expected = Math.round(717 * (3 * 14.2) / 100);
-    expect(result.calories).toBe(expected);
+    const expected = 717 * (3 * 14.2) / 100;
+    expect(result.calories).toBeCloseTo(expected, 4);
   });
 
   it("portionRef with divisor: per-serving values are divided correctly", () => {
     // 2 cups of butter (1 cup = 227 g → 454 g total), 8 servings
     const ingredient = makePortionIngredient(2, 227, BUTTER_MACROS, "cup");
     const result = calculateRecipeMacros([ingredient], 8);
-    const expected = Math.round(717 * (2 * 227) / 100 / 8);
-    expect(result.calories).toBe(expected);
+    const expected = 717 * (2 * 227) / 100 / 8;
+    expect(result.calories).toBeCloseTo(expected, 4);
   });
 
   it("portionRef overrides the unit field completely", () => {
@@ -118,8 +118,8 @@ describe("calculateRecipeMacros — portionRef ingredient", () => {
     const result = calculateRecipeMacros([portion, plain], 1);
 
     const totalGrams = 14.2 + 100;
-    const expected = Math.round(717 * totalGrams / 100);
-    expect(result.calories).toBe(expected);
+    const expected = 717 * totalGrams / 100;
+    expect(result.calories).toBeCloseTo(expected, 4);
   });
 
   it("all-zero macros via portionRef still returns zero for all nutrients", () => {
@@ -131,12 +131,16 @@ describe("calculateRecipeMacros — portionRef ingredient", () => {
   });
 
   it("divisor=999 with portionRef ingredient produces near-zero per-serving values", () => {
-    // 1 tablespoon (14.2 g) of butter ÷ 999 servings → tiny per-serving values
+    // 1 tablespoon (14.2 g) of butter ÷ 999 servings → tiny per-serving values.
+    // The model is unrounded, so these are small but non-zero; the FDA
+    // "< 5 kcal → 0" / "< 0.5 g → 0g" collapse happens in formatNutrientAmount.
     const ingredient = makePortionIngredient(1, 14.2);
     const result = calculateRecipeMacros([ingredient], 999);
-    // 717 × (14.2/100) / 999 ≈ 0.102 kcal → rounds to 0
-    expect(result.calories).toBe(0);
-    expect(result.fat_total_g).toBe(0);
+    expect(result.calories).toBeCloseTo(717 * 14.2 / 100 / 999, 4);    // ≈ 0.102
+    expect(result.fat_total_g).toBeCloseTo(81.1 * 14.2 / 100 / 999, 4); // ≈ 0.0115
+    // Still "near zero": below the FDA display threshold that renders as "0".
+    expect(result.calories).toBeGreaterThan(0);
+    expect(result.calories).toBeLessThan(5);
   });
 });
 
