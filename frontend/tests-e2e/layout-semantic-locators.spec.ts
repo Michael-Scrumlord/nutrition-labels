@@ -21,8 +21,9 @@ test.describe("semantic locators resolve on every primary view", () => {
     // Add-ingredient action.
     await expect(page.getByRole("button", { name: /add ingredient/i })).toBeVisible();
 
-    // Label panel tab.
-    await expect(page.getByRole("button", { name: /^label$/i })).toBeVisible();
+    // Label panel caption — a static caption now (the Prep tab placeholder
+    // was removed, so it is no longer a button/tab).
+    await expect(page.getByText("Label", { exact: true })).toBeVisible();
   });
 
   test("about page exposes a single h1 and prose region", async ({ readyPage: page }) => {

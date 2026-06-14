@@ -19,6 +19,17 @@ def round_half_up(x: float, ndigits: int = 0) -> float:
     return float(Decimal(x).quantize(q, rounding=ROUND_HALF_UP))
 
 
+def _round_macro_values(values: dict[str, float]) -> dict[str, float]:
+    """Apply FDA label rounding rules: calories to the nearest integer, all
+    other nutrients to one decimal place using ROUND_HALF_UP."""
+    result = values.copy()
+    result["calories"] = round_half_up(result["calories"])
+    for field in NUTRIENT_FIELDS:
+        if field != "calories":
+            result[field] = round_half_up(result[field], 1)
+    return result
+
+
 def calculate_recipe_macros(
     ingredients: list[IngredientItem],
     food_rows: list,        # sqlite3.Row objects (or dicts) from database.get_foods_by_ids()
@@ -71,16 +82,7 @@ def calculate_recipe_macros(
     # Divide everything by the number of servings
     per_serving = {field: value / portion_divisor for field, value in totals.items()}
 
-    # Create a copy for rounding
-    rounded_per_serving = per_serving.copy()
-
-    # Round to label-appropriate precision using consistent ROUND_HALF_UP
-    rounded_per_serving["calories"] = round_half_up(rounded_per_serving["calories"])
-    for field in NUTRIENT_FIELDS:
-        if field != "calories":
-            rounded_per_serving[field] = round_half_up(rounded_per_serving[field], 1)
-
-    return per_serving, MacroProfile(**rounded_per_serving)
+    return per_serving, MacroProfile(**_round_macro_values(per_serving))
 
 
 def compute_daily_value_pct(value: float, nutrient: str) -> int | None:

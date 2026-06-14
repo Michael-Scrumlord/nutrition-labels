@@ -1,38 +1,29 @@
 // label/LabelPdfDoc.tsx
 //
 // FDA 2020 Nutrition Facts panel rendered as a vector PDF via @react-pdf/renderer.
-// This is the canonical printable artifact — the DOM <LabelPreview> is a fast
-// scaffold for editing; THIS component is what the user downloads.
+// This is the canonical printable artifact the user downloads; the DOM
+// <LabelPreview> is a faithful live scaffold built from the SAME spec (GEO +
+// rowDisplay in labelSpec.ts), so the two cannot drift.
 //
 // Conformance with 21 CFR 101.9(d):
 //   • Type style: TeX Gyre Heros, a free Helvetica-metrics-compatible OTF
-//     embedded into every PDF (satisfies (d)(1)(ii)(A) "single easy-to-read
-//     type style"). Fonts are embedded — printers will not substitute.
-//   • Black ink on white background (d)(1)(i).
-//   • Bold required for: "Nutrition Facts" title, "Serving size", "Amount per
-//     serving" caption, "% Daily Value*" header, non-indented nutrient names,
-//     Calories numeral, %DV percentages — see (d)(1)(iv).
-//   • Point sizes match or exceed (d)(1)(iii): Calories ≥16pt label / ≥22pt
-//     numeral, body ≥6pt, "Amount per serving" ≥8pt.
-//   • Leading ≥1pt body, ≥4pt between vitamin/mineral lines per (d)(1)(ii)(C).
-//   • Hairline rules between rows per (d)(1)(v); thick bars at the boundaries
-//     called out in (d)(4), (d)(6), (d)(8), (d)(9).
+//     embedded into every PDF (satisfies (d)(1)(ii)(A)). Fonts are embedded —
+//     printers will not substitute.
+//   • Black ink on white (d)(1)(i). Bold for the title, "Serving size",
+//     "Amount per serving", "% Daily Value*", non-indented nutrient names,
+//     Calories numeral, %DV percentages (d)(1)(iv).
+//   • Point sizes from GEO meet/exceed (d)(1)(iii). Hairline rules between rows
+//     (d)(1)(v); thick bars at the (d)(4)/(d)(6)/(d)(8) boundaries.
 
 import { Document, Page, View, Text, Font, StyleSheet } from "@react-pdf/renderer";
 import type { MacroProfile, IngredientItem } from "../../types";
-import { formatDV, buildIngredientsString } from "../../utils/nutrition";
-import { MACRO_ROWS, MICRO_ROWS, type LabelRow } from "./labelSpec";
+import { buildIngredientsString, formatNutrientAmount } from "../../utils/nutrition";
+import { ingredientGrams } from "../../utils/units";
+import { MACRO_ROWS, MICRO_ROWS, GEO, INK, rowDisplay, type LabelRow } from "./labelSpec";
 
 // Register TeX Gyre Heros once at module load. The family name MUST NOT be
-// "Helvetica" — react-pdf reserves that for the PDF "standard 14" built-in,
-// which is NOT embedded in output (just referenced by name). Using the
-// built-in is a hard fail for printers that reject non-embedded fonts and
-// for any FDA review that audits typography. By registering under a unique
-// family name, react-pdf treats this as a real font and embeds (subsets) it
-// into every generated PDF.
-//
-// The files live under /public/fonts so Vite serves them directly without
-// bundling — react-pdf fetches them lazily on first PDF render.
+// "Helvetica" — react-pdf reserves that for the built-in "standard 14", which
+// is NOT embedded. A unique family name makes react-pdf embed (subset) it.
 Font.register({
   family: "TeXGyreHeros",
   fonts: [
@@ -41,160 +32,125 @@ Font.register({
   ],
 });
 
-// Per 101.9, text should not break across lines in awkward ways — disable
-// hyphenation so multi-word nutrient names ("Total Carbohydrate") never
-// hyphenate mid-word in a tight label.
+// Disable hyphenation so multi-word nutrient names never break mid-word.
 Font.registerHyphenationCallback((word) => [word]);
-
-const INK = "#000";
 
 const styles = StyleSheet.create({
   page: {
-    paddingTop:    "0.25in",
-    paddingBottom: "0.25in",
-    paddingLeft:   "0.25in",
-    paddingRight:  "0.25in",
-    fontFamily:    "TeXGyreHeros",
-    color:         INK,
+    padding: GEO.pagePadding,
+    fontFamily: "TeXGyreHeros",
+    color: INK,
     backgroundColor: "#fff",
   },
   labelName: {
-    fontSize: 9,
+    fontSize: GEO.labelName.fontSize,
     fontWeight: "bold",
     textAlign: "center",
-    marginBottom: 4,
-    letterSpacing: 0.5,
+    marginBottom: GEO.labelName.marginBottom,
+    letterSpacing: GEO.labelName.letterSpacing,
   },
   box: {
-    borderWidth: 1.5,
+    borderWidth: GEO.box.border,
     borderColor: INK,
-    paddingHorizontal: 6,
-    paddingVertical: 4,
+    paddingHorizontal: GEO.box.padH,
+    paddingVertical: GEO.box.padV,
   },
   title: {
-    fontSize: 28,
+    fontSize: GEO.title.fontSize,
     fontWeight: "bold",
     lineHeight: 1.0,
-    marginBottom: 2,
+    marginBottom: GEO.title.marginBottom,
   },
   servingsBlock: {
-    fontSize: 8,
-    paddingBottom: 2,
-    marginBottom: 2,
-    borderBottomWidth: 6,
+    fontSize: GEO.servings.fontSize,
+    paddingBottom: GEO.servings.padBottom,
+    marginBottom: GEO.servings.marginBottom,
+    borderBottomWidth: GEO.servings.rule,
     borderBottomColor: INK,
   },
   servingSizeRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    fontSize: 10,
+    fontSize: GEO.servingSize.fontSize,
     fontWeight: "bold",
-    marginTop: 2,
+    marginTop: GEO.servingSize.marginTop,
   },
-  amountLabel: {
-    fontSize: 8,
-    marginBottom: 0,
-  },
+  amountLabel: { fontSize: GEO.amountLabel.fontSize },
   caloriesRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    // baseline aligns the typographic baselines of "Calories" (18pt) and the
-    // numeral (32pt) the way the FDA artwork shows. flex-end (a previous
-    // workaround) aligned line-box BOTTOMS instead, which pushed the giant
-    // numeral's bottom edge against the 3pt rule below this row.
     alignItems: "baseline",
-    borderBottomWidth: 3,
+    borderBottomWidth: GEO.calories.rule,
     borderBottomColor: INK,
-    // 4pt of breathing room between the numeral baseline+descender and the
-    // 3pt rule. The original WeasyPrint template got this for free from the
-    // browser's default line-height (~1.2); react-pdf needs it explicit.
-    paddingBottom: 4,
-    marginBottom: 2,
+    paddingBottom: GEO.calories.padBottom,
+    marginBottom: GEO.calories.marginBottom,
   },
-  caloriesLabel: {
-    fontSize: 18,
-    fontWeight: "bold",
-  },
-  caloriesValue: {
-    fontSize: 32,
-    fontWeight: "bold",
-    // Intentionally no `lineHeight: 1.0` here — the previous tight setting
-    // eliminated natural descender room and made the digits feel jammed
-    // against the rule below the row. Default line-height gives breathing
-    // room without affecting the row's overall height meaningfully.
-  },
+  caloriesLabel: { fontSize: GEO.calories.label, fontWeight: "bold" },
+  caloriesValue: { fontSize: GEO.calories.value, fontWeight: "bold" },
   dvHeader: {
-    fontSize: 7,
+    fontSize: GEO.dvHeader.fontSize,
     fontWeight: "bold",
     textAlign: "right",
-    borderBottomWidth: 0.5,
+    borderBottomWidth: GEO.dvHeader.rule,
     borderBottomColor: INK,
-    paddingBottom: 1,
-    marginBottom: 1,
+    paddingBottom: GEO.dvHeader.padBottom,
+    marginBottom: GEO.dvHeader.marginBottom,
   },
   row: {
     flexDirection: "row",
     justifyContent: "space-between",
-    fontSize: 8,
-    borderBottomWidth: 0.5,
+    fontSize: GEO.row.fontSize,
+    borderBottomWidth: GEO.row.rule,
     borderBottomColor: INK,
-    paddingVertical: 1.25,
+    paddingVertical: GEO.row.padV,
   },
-  rowFaded:    { color: "#666" },
-  rowDV:       { fontSize: 8, fontWeight: "bold" },
-  rowLabel:    { fontSize: 8 },
-  rowLabelBold: { fontSize: 8, fontWeight: "bold" },
+  rowDV:        { fontSize: GEO.row.fontSize, fontWeight: "bold" },
+  rowLabel:     { fontSize: GEO.row.fontSize },
+  rowLabelBold: { fontSize: GEO.row.fontSize, fontWeight: "bold" },
   proteinRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    fontSize: 8,
-    borderBottomWidth: 6,
+    fontSize: GEO.row.fontSize,
+    borderBottomWidth: GEO.proteinRule,
     borderBottomColor: INK,
-    paddingVertical: 1.25,
+    paddingVertical: GEO.row.padV,
   },
   microRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    fontSize: 8,
-    borderBottomWidth: 0.5,
+    fontSize: GEO.row.fontSize,
+    borderBottomWidth: GEO.row.rule,
     borderBottomColor: INK,
-    paddingVertical: 1.25,
+    paddingVertical: GEO.row.padV,
   },
   microRowLast: {
     flexDirection: "row",
     justifyContent: "space-between",
-    fontSize: 8,
-    paddingVertical: 1.25,
+    fontSize: GEO.row.fontSize,
+    paddingVertical: GEO.row.padV,
   },
   footnote: {
-    fontSize: 6,
-    lineHeight: 1.3,
-    marginTop: 3,
+    fontSize: GEO.footnote.fontSize,
+    lineHeight: GEO.footnote.lineHeight,
+    marginTop: GEO.footnote.marginTop,
   },
   ingredientsBlock: {
-    fontSize: 7,
-    lineHeight: 1.4,
-    marginTop: 6,
+    fontSize: GEO.ingredients.fontSize,
+    lineHeight: GEO.ingredients.lineHeight,
+    marginTop: GEO.ingredients.marginTop,
   },
-  ingredientsLabel: {
-    fontWeight: "bold",
-  },
+  ingredientsLabel: { fontWeight: "bold" },
 });
 
-// Indent widths chosen to match (d)(7)'s nested nutrient layout — subnutrients
-// roughly twice the indent of the row separator hairline.
-const INDENT = { 0: 0, 1: 8, 2: 16 } as const;
-
-function NutrientRow({ row, macros }: { row: LabelRow; macros: MacroProfile }) {
-  const value = row.fixedValue ?? (row.nutrient ? (macros[row.nutrient] as number) : 0);
-  const dv = !row.noDV && row.nutrient ? formatDV(row.nutrient, macros) : null;
-
+function NutrientRow({
+  row, macros, transFatG, addedSugarsG,
+}: { row: LabelRow; macros: MacroProfile; transFatG: number; addedSugarsG: number }) {
+  const { label, amount, boldLabel, dv } = rowDisplay(row, macros, transFatG, addedSugarsG);
   return (
-    <View style={row.faded ? [styles.row, styles.rowFaded] : styles.row}>
-      <Text style={[row.bold ? styles.rowLabelBold : styles.rowLabel, { paddingLeft: INDENT[row.indent] }]}>
-        {row.bold ? <Text style={{ fontWeight: "bold" }}>{row.label}</Text> : row.label}
-        {" "}
-        {value}{row.unit}
+    <View style={styles.row}>
+      <Text style={[boldLabel ? styles.rowLabelBold : styles.rowLabel, { paddingLeft: GEO.indent[row.indent] }]}>
+        {boldLabel ? <Text style={{ fontWeight: "bold" }}>{label}</Text> : label}
+        {amount ? ` ${amount}` : ""}
       </Text>
       {dv !== null ? <Text style={styles.rowDV}>{dv}</Text> : <Text style={styles.rowDV}> </Text>}
     </View>
@@ -208,23 +164,27 @@ interface LabelPdfDocProps {
   labelName: string;
   widthInches: number;
   heightInches: number;
+  servingHousehold: string;
+  addedSugarsG: number;
+  transFatG: number;
 }
 
 export function LabelPdfDoc({
   macros, portionDivisor, ingredients, labelName, widthInches, heightInches,
+  servingHousehold, addedSugarsG, transFatG,
 }: LabelPdfDocProps) {
-  // react-pdf measures Page size in points (72pt = 1 inch). Pre-rounded to
-  // 2dp upstream — we just multiply.
+  // react-pdf measures Page size in points (72pt = 1 inch).
   const pageSize: [number, number] = [widthInches * 72, heightInches * 72];
   const ingredientsString = buildIngredientsString(ingredients);
 
+  const totalGrams = ingredients.reduce((sum, ing) => sum + ingredientGrams(ing), 0);
+  const servingGrams = Math.round(totalGrams / portionDivisor);
+  const servingLabel = servingHousehold.trim() || "1 portion";
+
   return (
     <Document>
-      {/* wrap={false}: keep the label on ONE page, even if content exceeds the
-          requested height. Without this, react-pdf paginates and the user
-          ends up with a label split across 2+ PDF pages — useless for a
-          sticker workflow. The existing in-app preview shows a clipping
-          warning when this is about to happen, so the user is informed. */}
+      {/* wrap={false}: keep the label on ONE page even if content exceeds the
+          requested height — the in-app preview warns before that happens. */}
       <Page size={pageSize} style={styles.page} wrap={false}>
         {labelName ? <Text style={styles.labelName}>{labelName}</Text> : null}
 
@@ -235,7 +195,7 @@ export function LabelPdfDoc({
             <Text>{portionDivisor} servings per container</Text>
             <View style={styles.servingSizeRow}>
               <Text>Serving size</Text>
-              <Text>1 portion</Text>
+              <Text>{servingLabel} ({servingGrams}g)</Text>
             </View>
           </View>
 
@@ -247,26 +207,25 @@ export function LabelPdfDoc({
 
           <Text style={styles.dvHeader}>% Daily Value*</Text>
 
-          {MACRO_ROWS.map((row) => <NutrientRow key={row.label} row={row} macros={macros} />)}
+          {MACRO_ROWS.map((row) => (
+            <NutrientRow key={row.label} row={row} macros={macros} transFatG={transFatG} addedSugarsG={addedSugarsG} />
+          ))}
 
-          {/* Protein gets the regulatory 6pt rule below it per (d)(8). */}
+          {/* Protein closes the macro block with the regulatory 6pt rule (d)(8). */}
           <View style={styles.proteinRow}>
             <Text style={styles.rowLabelBold}>
-              <Text style={{ fontWeight: "bold" }}>Protein</Text> {macros.protein_g}g
+              <Text style={{ fontWeight: "bold" }}>Protein</Text> {formatNutrientAmount("protein_g", macros.protein_g)}
             </Text>
             <Text style={styles.rowDV}> </Text>
           </View>
 
           {MICRO_ROWS.map((row, i) => {
+            const { label, amount, dv } = rowDisplay(row, macros, transFatG, addedSugarsG);
             const isLast = i === MICRO_ROWS.length - 1;
             return (
               <View key={row.label} style={isLast ? styles.microRowLast : styles.microRow}>
-                <Text style={styles.rowLabel}>
-                  {row.label} {row.nutrient ? macros[row.nutrient] : 0}{row.unit}
-                </Text>
-                <Text style={styles.rowLabel}>
-                  {row.nutrient ? formatDV(row.nutrient, macros) : ""}
-                </Text>
+                <Text style={styles.rowLabel}>{label} {amount}</Text>
+                <Text style={styles.rowLabel}>{dv}</Text>
               </View>
             );
           })}

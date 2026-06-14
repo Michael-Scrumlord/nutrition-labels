@@ -3,7 +3,11 @@
 // Tests for the frontend nutrition math — mirrors the backend test_nutrition.py.
 
 import { describe, it, expect } from "vitest";
-import { calculateRecipeMacros, computeDailyValues, buildIngredientsString, formatDV } from "../../src/utils/nutrition";
+import {
+  calculateRecipeMacros, computeDailyValues, buildIngredientsString, formatDV,
+  formatNutrientAmount, formatTransFatAmount, formatAddedSugarsAmount, formatDVFromAmount,
+  ADDED_SUGARS_DV,
+} from "../../src/utils/nutrition";
 import type { IngredientItem, MacroProfile } from "../../src/types";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -55,8 +59,10 @@ describe("calculateRecipeMacros", () => {
   it("converts oz to grams correctly (1 oz = 28.3495g)", () => {
     const ingredient = makeIngredient(1, 1, "oz");
     const result = calculateRecipeMacros([ingredient], 1);
-    const expected = Math.round(717 * 28.3495 / 100);
-    expect(result.calories).toBe(expected);
+    // calculateRecipeMacros returns UNROUNDED per-serving values now; FDA
+    // rounding happens at display time (formatNutrientAmount).
+    const expected = 717 * 28.3495 / 100;
+    expect(result.calories).toBeCloseTo(expected, 5);
   });
 
   it("accumulates multiple ingredients correctly", () => {
@@ -144,5 +150,79 @@ describe("formatDV", () => {
   it("returns '100%' for fat at the daily value", () => {
     const profile: MacroProfile = { ...BUTTER_MACROS, fat_total_g: 78 };
     expect(formatDV("fat_total_g", profile)).toBe("100%");
+  });
+});
+
+// ── FDA increment rounding (21 CFR 101.9(c)) ───────────────────────────────
+describe("formatNutrientAmount — FDA rounding", () => {
+  it("calories: <5 → 0, ≤50 → nearest 5, >50 → nearest 10", () => {
+    expect(formatNutrientAmount("calories", 4)).toBe("0");
+    expect(formatNutrientAmount("calories", 23)).toBe("25");
+    expect(formatNutrientAmount("calories", 57)).toBe("60");   // the flour case
+    expect(formatNutrientAmount("calories", 230)).toBe("230");
+  });
+
+  it("total fat: <0.5 → 0g, <5 → nearest 0.5g, ≥5 → nearest 1g", () => {
+    expect(formatNutrientAmount("fat_total_g", 0.2)).toBe("0g");   // the flour case
+    expect(formatNutrientAmount("fat_total_g", 1.2)).toBe("1g");
+    expect(formatNutrientAmount("fat_total_g", 1.3)).toBe("1.5g");
+    expect(formatNutrientAmount("fat_total_g", 8.2)).toBe("8g");
+  });
+
+  it("cholesterol: <2 → 0, 2–5 → 'less than 5mg', >5 → nearest 5mg", () => {
+    expect(formatNutrientAmount("cholesterol_mg", 1)).toBe("0mg");
+    expect(formatNutrientAmount("cholesterol_mg", 3)).toBe("less than 5mg");
+    expect(formatNutrientAmount("cholesterol_mg", 27)).toBe("25mg");
+  });
+
+  it("sodium: <5 → 0, ≤140 → nearest 5, >140 → nearest 10", () => {
+    expect(formatNutrientAmount("sodium_mg", 0.3)).toBe("0mg");    // the flour case
+    expect(formatNutrientAmount("sodium_mg", 137)).toBe("135mg");
+    expect(formatNutrientAmount("sodium_mg", 162)).toBe("160mg");
+  });
+
+  it("carb/fiber/sugars: <0.5 → 0g, <1 → 'less than 1g', ≥1 → nearest 1g", () => {
+    expect(formatNutrientAmount("carbohydrates_total_g", 11.9)).toBe("12g"); // flour
+    expect(formatNutrientAmount("fiber_g", 0.4)).toBe("0g");
+    expect(formatNutrientAmount("fiber_g", 0.6)).toBe("less than 1g");
+    expect(formatNutrientAmount("sugar_g", 0.2)).toBe("0g");
+  });
+
+  it("protein: rounds to the nearest gram (1.6 → 2g)", () => {
+    expect(formatNutrientAmount("protein_g", 1.6)).toBe("2g");
+    expect(formatNutrientAmount("protein_g", 0.3)).toBe("0g");
+  });
+
+  it("micronutrients: Vitamin D/Iron nearest 0.1, Calcium/Potassium nearest 10", () => {
+    expect(formatNutrientAmount("vitamin_d_mcg", 2.04)).toBe("2mcg");
+    expect(formatNutrientAmount("iron_mg", 0.74)).toBe("0.7mg");
+    expect(formatNutrientAmount("calcium_mg", 2.3)).toBe("0mg");   // flour: <5mg → 0
+    expect(formatNutrientAmount("potassium_mg", 16.7)).toBe("20mg");
+  });
+});
+
+describe("formatTransFatAmount / formatAddedSugarsAmount", () => {
+  it("trans fat uses fat increments", () => {
+    expect(formatTransFatAmount(0)).toBe("0g");
+    expect(formatTransFatAmount(0.3)).toBe("0g");
+    expect(formatTransFatAmount(1.3)).toBe("1.5g");
+  });
+
+  it("added sugars uses sugar increments", () => {
+    expect(formatAddedSugarsAmount(0)).toBe("0g");
+    expect(formatAddedSugarsAmount(10)).toBe("10g");
+    expect(formatAddedSugarsAmount(0.6)).toBe("less than 1g");
+  });
+});
+
+describe("formatDVFromAmount — added sugars %DV + micronutrient increments", () => {
+  it("added sugars: 10g of DV 50g → 20%", () => {
+    expect(formatDVFromAmount(10, ADDED_SUGARS_DV)).toBe("20%");
+    expect(formatDVFromAmount(0, ADDED_SUGARS_DV)).toBe("0%");
+  });
+
+  it("micronutrient %DV uses coarser increments (nearest 2 below 10%)", () => {
+    // 0.9 mcg vit D / 20 = 4.5% → nearest 2 → 4%
+    expect(formatDVFromAmount(0.9, 20, true)).toBe("4%");
   });
 });

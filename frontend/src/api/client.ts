@@ -1,11 +1,12 @@
 // api/client.ts
 //
-// Typed fetch wrappers for all three backend endpoints.
+// Typed fetch wrappers for the backend data endpoints (search + food detail).
+// PDF generation is fully client-side now (see components/label/LabelPdfDoc),
+// so there is no label-generation request here.
 // All functions throw ApiError on non-2xx responses, preserving the HTTP
 // status code so callers can handle 429 vs 4xx vs 5xx distinctly.
 
-import type { FoodDetail, FoodSearchResult, IngredientItem, LabelDimensions } from "../types";
-import { ingredientGrams } from "../utils/units";
+import type { FoodDetail, FoodSearchResult } from "../types";
 
 const BASE = "/api";
 
@@ -47,57 +48,6 @@ export async function getFoodDetail(fdc_id: number): Promise<FoodDetail> {
     throw new ApiError(detail, res.status);
   }
   return res.json();
-}
-
-/** Generate a PDF label and return it as a Blob for download. */
-export async function generateLabel(
-  ingredients: IngredientItem[],
-  portionDivisor: number,
-  labelName: string,
-  dimensions: LabelDimensions,
-): Promise<Blob> {
-  const body = {
-    portion_divisor: portionDivisor,
-    label_name: labelName,
-    width_inches: dimensions.widthInches,
-    height_inches: dimensions.heightInches,
-    // Portion-based ingredients ("2 tablespoons") are flattened to grams
-    // before sending — the backend's Pydantic model only validates global
-    // UnitKeys, and macro math is the same either way. Round to 2 decimals
-    // so we don't ship 28.349500000001 to the server.
-    ingredients: ingredients.map((ing) => {
-      if (ing.portionRef) {
-        return {
-          fdc_id: ing.fdc_id,
-          name:   ing.name,
-          amount: Math.round(ingredientGrams(ing) * 100) / 100,
-          unit:   "g" as const,
-        };
-      }
-      return {
-        fdc_id: ing.fdc_id,
-        name:   ing.name,
-        amount: ing.amount,
-        unit:   ing.unit,
-      };
-    }),
-  };
-
-  const res = await fetch(`${BASE}/generate_label`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-
-  if (!res.ok) {
-    const detail = await parseErrorDetail(res);
-    const retryAfter = res.status === 429
-      ? parseInt(res.headers.get("Retry-After") ?? "60", 10)
-      : undefined;
-    throw new ApiError(detail, res.status, retryAfter);
-  }
-
-  return res.blob();
 }
 
 /** Trigger a browser download from a Blob. */

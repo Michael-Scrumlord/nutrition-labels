@@ -3,13 +3,12 @@
 # Creates the FastAPI app and registers routes.
 # Wires CORS, rate limiting, body-size enforcement, and a /api/health probe.
 
-import asyncio
 import logging
 import os
 import sys
 from typing import Annotated
 
-from fastapi import FastAPI, HTTPException, Path, Query, Request, Response
+from fastapi import FastAPI, HTTPException, Path, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import Limiter
@@ -18,7 +17,7 @@ from slowapi.util import get_remote_address
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
-from app import database, search as search_module, nutrition, pdf
+from app import database, search as search_module
 from app.config import settings
 from app.models import (
     FoodSearchResult,
@@ -26,7 +25,6 @@ from app.models import (
     HealthResponse,
     MacroProfile,
     PortionSize,
-    GenerateLabelRequest,
 )
 from app.constants import NUTRIENT_FIELDS
 
@@ -42,10 +40,6 @@ logging.basicConfig(
 logger = logging.getLogger("nutritionlabels")
 
 limiter = Limiter(key_func=get_remote_address, default_limits=[])
-
-# Bounds concurrent WeasyPrint renders so a burst of /generate_label requests
-# can't exhaust memory or pin every worker.
-_pdf_semaphore = asyncio.Semaphore(settings.pdf_max_concurrency)
 
 
 class BodySizeLimitMiddleware(BaseHTTPMiddleware):
@@ -131,15 +125,13 @@ def health() -> HealthResponse:
 @limiter.limit(settings.rate_limit_search)
 def search(
     request: Request,
-    query: str = Query(""),
+    query: str = Query("", max_length=100),
 ) -> list[dict]:
     """
     Search foods by name. Returns up to 40 results ranked by relevance:
     prefix matches first (alphabetically), then contains matches (alphabetically).
     Returns an empty list if the query is less than 2 characters.
     """
-    if len(query) > 100:
-        raise HTTPException(status_code=400, detail="Query string too long (maximum 100 characters)")
     if len(query) < 2:
         return []
     rows = database.search_foods(query)
@@ -177,55 +169,8 @@ def get_food(
     )
 
 
-async def _render_pdf_with_timeout(html: str) -> bytes:
-    """Run WeasyPrint in a thread, bounded by the semaphore and a timeout."""
-    try:
-        async with _pdf_semaphore:
-            return await asyncio.wait_for(
-                asyncio.to_thread(pdf.generate_pdf, html),
-                timeout=settings.pdf_timeout_seconds,
-            )
-    except asyncio.TimeoutError:
-        logger.warning("PDF generation timed out after %.1fs", settings.pdf_timeout_seconds)
-        raise HTTPException(status_code=504, detail="PDF generation timed out")
-
-
-@app.post("/api/generate_label")
-@limiter.limit(settings.rate_limit_generate)
-async def generate_label(request: Request, payload: GenerateLabelRequest) -> Response:
-    """
-    Calculate macros for the recipe, render the FDA label as HTML,
-    convert to PDF, and return the binary PDF as a download.
-
-    The backend recalculates macros independently — this is intentional.
-    It catches any drift between frontend and backend constants.
-    """
-    fdc_ids = [ing.fdc_id for ing in payload.ingredients]
-    food_rows = database.get_foods_by_ids(fdc_ids)
-
-    found_ids = {row["fdc_id"] for row in food_rows}
-    missing = [fid for fid in fdc_ids if fid not in found_ids]
-    if missing:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unknown ingredient fdc_id(s): {missing}",
-        )
-
-    try:
-        unrounded_macros, macros = nutrition.calculate_recipe_macros(
-            payload.ingredients, food_rows, payload.portion_divisor
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-    html = pdf.render_label_html(macros, payload, unrounded_macros)
-    pdf_bytes = await _render_pdf_with_timeout(html)
-
-    return Response(
-        content=pdf_bytes,
-        media_type="application/pdf",
-        headers={
-            "Content-Disposition": 'attachment; filename="nutrition_label.pdf"',
-            "Cache-Control": "no-store",
-        },
-    )
+# NOTE: PDF generation now happens entirely client-side via @react-pdf/renderer
+# (see frontend/src/components/label/LabelPdfDoc.tsx). The former
+# POST /api/generate_label WeasyPrint endpoint was retired so the label has a
+# single source of truth (frontend labelSpec.ts) and the in-app preview matches
+# the downloaded PDF exactly.

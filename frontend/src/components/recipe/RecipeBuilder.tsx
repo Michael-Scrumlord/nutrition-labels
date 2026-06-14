@@ -7,6 +7,7 @@
 //   • Method section below
 
 import { useState, useMemo, useRef } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { useRecipeStore } from "../../store/recipeStore";
 import { useNutritionCalc } from "../../hooks/useNutritionCalc";
 import { useRecipeActions } from "../../hooks/useRecipeActions";
@@ -22,10 +23,14 @@ import { getHighlightKeys } from "../../utils/nutrition";
 import { useTitleAutoResize } from "../../hooks/useTitleAutoResize";
 
 export function RecipeBuilder() {
-  const ingredients      = useRecipeStore((s) => s.ingredients);
-  const portionDivisor   = useRecipeStore((s) => s.portionDivisor);
-  const labelName        = useRecipeStore((s) => s.labelName);
-  const viewingVersionId = useRecipeStore((s) => s.viewingVersionId);
+  const { ingredients, portionDivisor, labelName, viewingVersionId } = useRecipeStore(
+    useShallow((s) => ({
+      ingredients:      s.ingredients,
+      portionDivisor:   s.portionDivisor,
+      labelName:        s.labelName,
+      viewingVersionId: s.viewingVersionId,
+    })),
+  );
   const { setLabelName, setPortionDivisor, setHighlightedNutrients, exitVersionView } = useRecipeActions();
 
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -89,7 +94,7 @@ export function RecipeBuilder() {
         {/* ── Stats — single typographic line (editorial mode) ─────────── */}
         <RecipeStatsBar
           portionDivisor={portionDivisor}
-          calories={macros.calories}
+          calories={Math.round(macros.calories)}
           totalGrams={totalGrams}
           onPortionDivisorChange={setPortionDivisor}
         />
@@ -158,7 +163,7 @@ export function RecipeBuilder() {
             onChange={setPortionDivisor}
             className="pl-scrub"
             style={{ fontWeight: 700 }}
-            ariaLabel="servings per batch"
+            ariaLabel="number of servings"
           />
           {" "}servings. The label rounds per 21 CFR 101.9(c) — what you see is what would print.
         </p>

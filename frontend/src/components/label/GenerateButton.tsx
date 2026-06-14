@@ -1,10 +1,9 @@
 // label/GenerateButton.tsx — primary CTA.
 //
-// Client-side PDF generation: dynamically imports @react-pdf/renderer +
-// LabelPdfDoc only on click, so the ~450 KB library stays out of the
-// initial bundle. The server's /api/generate_label endpoint is still
-// available as a fallback for API consumers but the browser path is the
-// default now.
+// PDF generation is entirely client-side: this dynamically imports
+// @react-pdf/renderer + LabelPdfDoc only on click, so the ~450 KB library
+// stays out of the initial bundle. LabelPdfDoc and the in-app LabelPreview
+// share one spec (labelSpec.ts), so the download matches the preview exactly.
 
 import { useState } from "react";
 import { useRecipeStore } from "../../store/recipeStore";
@@ -18,11 +17,14 @@ import { downloadBlob } from "../../api/client";
 const AUTO_HEIGHT_INCHES = 11;
 
 export function GenerateButton() {
-  const ingredients    = useRecipeStore((s) => s.ingredients);
-  const portionDivisor = useRecipeStore((s) => s.portionDivisor);
-  const labelName      = useRecipeStore((s) => s.labelName);
-  const dimensions     = useRecipeStore((s) => s.dimensions);
-  const macros         = useNutritionCalc();
+  const ingredients     = useRecipeStore((s) => s.ingredients);
+  const portionDivisor  = useRecipeStore((s) => s.portionDivisor);
+  const labelName       = useRecipeStore((s) => s.labelName);
+  const dimensions      = useRecipeStore((s) => s.dimensions);
+  const servingHousehold = useRecipeStore((s) => s.servingHousehold);
+  const addedSugarsG    = useRecipeStore((s) => s.addedSugarsG);
+  const transFatG       = useRecipeStore((s) => s.transFatG);
+  const macros          = useNutritionCalc();
   const { def }        = useActiveTheme();
 
   const [isLoading, setIsLoading] = useState(false);
@@ -48,6 +50,9 @@ export function GenerateButton() {
           labelName={labelName}
           widthInches={dimensions.widthInches}
           heightInches={dimensions.heightInches ?? AUTO_HEIGHT_INCHES}
+          servingHousehold={servingHousehold}
+          addedSugarsG={addedSugarsG}
+          transFatG={transFatG}
         />,
       ).toBlob();
 

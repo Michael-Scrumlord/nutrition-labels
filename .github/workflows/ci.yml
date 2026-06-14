@@ -25,15 +25,6 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements.txt
 
-      # WeasyPrint needs Pango/Cairo at import time, even for tests that
-      # don't render PDFs. apt-installing here is faster than building from source.
-      - name: Install WeasyPrint system deps
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            libpango-1.0-0 libpangocairo-1.0-0 libcairo2 libcairo-gobject2 \
-            libgdk-pixbuf-2.0-0 shared-mime-info
-
       - name: Install Python deps
         run: pip install -r backend/requirements.txt
 

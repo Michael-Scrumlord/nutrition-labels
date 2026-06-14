@@ -33,15 +33,6 @@ class Settings(BaseSettings):
     # Rate limits (slowapi syntax). Per client IP.
     rate_limit_search: str = "60/minute"
     rate_limit_food: str = "120/minute"
-    rate_limit_generate: str = "10/minute"
-
-    # PDF generation concurrency cap (in-process semaphore).
-    # Dropped from 4 → 2 because WeasyPrint can spike 150–250 MB per render;
-    # at 4 concurrent + 2 gunicorn workers we were within OOM range of the
-    # 1g container limit. Two is the comfortable steady-state value.
-    pdf_max_concurrency: int = 2
-    # Per-request PDF generation timeout (seconds).
-    pdf_timeout_seconds: float = 10.0
 
     # Reported by /api/health for release tracking.
     release_sha: str = "dev"

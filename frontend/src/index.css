@@ -2,6 +2,24 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── TeXGyreHeros — Helvetica-metrics font embedded in the PDF (LabelPdfDoc).
+   The DOM label preview (LabelPreview) loads the same files so its line breaks
+   and proportions match the downloaded PDF exactly. Served from /public/fonts. */
+@font-face {
+  font-family: "TeXGyreHeros";
+  src: url("/fonts/TeXGyreHeros-Regular.otf") format("opentype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "TeXGyreHeros";
+  src: url("/fonts/TeXGyreHeros-Bold.otf") format("opentype");
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* ── Design tokens — 4-theme system (Paper default) ──────────────────────────
    The four runtime themes (paper / overcast / twilight / midnight) overwrite
    these via inline style on <ThemedFrame>. Values below are the Paper
