@@ -84,7 +84,7 @@ class GenerateLabelRequest(BaseModel):
         return _strip_control(v).strip()
 
     # Snap dimensions to 0.01" so float noise (e.g. 2.7500000001) can't drift
-    # the WeasyPrint @page size between identical-looking client requests.
+    # the rendered page size between identical-looking client requests.
     @field_validator("width_inches")
     @classmethod
     def round_width(cls, v: float) -> float:

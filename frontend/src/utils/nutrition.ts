@@ -22,6 +22,17 @@ export const FDA_DAILY_VALUES: Partial<Record<keyof MacroProfile, number>> = {
   potassium_mg:           4700,
 };
 
+// Added Sugars is a mandatory line with its own DV (50g). It is NOT part of
+// MacroProfile (not in the USDA DB / not summed from ingredients) — it's a
+// user-supplied label override — so its DV lives outside FDA_DAILY_VALUES.
+export const ADDED_SUGARS_DV = 50;
+
+// Vitamins/minerals use coarser %DV rounding increments than macros, and their
+// quantitative amounts round to their own increments (see formatNutrientAmount).
+const MICRO_KEYS = new Set<keyof MacroProfile>([
+  "vitamin_d_mcg", "calcium_mg", "iron_mg", "potassium_mg",
+]);
+
 /** All nutrient keys in label order. */
 export const NUTRIENT_FIELDS: (keyof MacroProfile)[] = [
   "calories", "fat_total_g", "fat_saturated_g", "cholesterol_mg",
@@ -42,7 +53,7 @@ export const NUTRIENT_FIELDS: (keyof MacroProfile)[] = [
  * Py 0.1) because the EPSILON nudge crosses the half-mark in one
  * direction but not the other.
  */
-function roundHalfUp(x: number, ndigits: number = 0): number {
+export function roundHalfUp(x: number, ndigits: number = 0): number {
   if (!Number.isFinite(x)) return x;
   return Number(x.toFixed(Math.max(0, ndigits)));
 }
@@ -50,12 +61,17 @@ function roundHalfUp(x: number, ndigits: number = 0): number {
 /**
  * Calculate per-serving nutrient totals for a recipe.
  *
+ * Returns **unrounded** full-precision per-serving values. FDA rounding
+ * (21 CFR 101.9(c)) is increment-based and differs per nutrient, so it is
+ * applied at the presentation layer (`formatNutrientAmount`) instead of here.
+ * Keeping the model unrounded also means %DV is computed from the true amount,
+ * not a lossy display value.
+ *
  * Step by step:
  *  1. For each ingredient, convert its amount to grams.
  *  2. Scale from per-100g to actual grams: multiplier = grams / 100.
  *  3. Multiply each nutrient by the multiplier and accumulate.
  *  4. Divide all totals by portionDivisor to get per-serving values.
- *  5. Round: calories → integer, all others → 1 decimal place.
  */
 export function calculateRecipeMacros(
   ingredients: IngredientItem[],
@@ -82,21 +98,12 @@ export function calculateRecipeMacros(
     }
   }
 
-  return {
-    calories:               roundHalfUp(totals.calories / portionDivisor),
-    fat_total_g:            roundHalfUp(totals.fat_total_g / portionDivisor, 1),
-    fat_saturated_g:        roundHalfUp(totals.fat_saturated_g / portionDivisor, 1),
-    cholesterol_mg:         roundHalfUp(totals.cholesterol_mg / portionDivisor, 1),
-    sodium_mg:              roundHalfUp(totals.sodium_mg / portionDivisor, 1),
-    carbohydrates_total_g:  roundHalfUp(totals.carbohydrates_total_g / portionDivisor, 1),
-    fiber_g:                roundHalfUp(totals.fiber_g / portionDivisor, 1),
-    sugar_g:                roundHalfUp(totals.sugar_g / portionDivisor, 1),
-    protein_g:              roundHalfUp(totals.protein_g / portionDivisor, 1),
-    vitamin_d_mcg:          roundHalfUp(totals.vitamin_d_mcg / portionDivisor, 1),
-    calcium_mg:             roundHalfUp(totals.calcium_mg / portionDivisor, 1),
-    iron_mg:                roundHalfUp(totals.iron_mg / portionDivisor, 1),
-    potassium_mg:           roundHalfUp(totals.potassium_mg / portionDivisor, 1),
-  };
+  // Per-serving, unrounded. Presentation applies FDA rounding.
+  const out = {} as MacroProfile;
+  for (const field of NUTRIENT_FIELDS) {
+    out[field] = totals[field] / portionDivisor;
+  }
+  return out;
 }
 
 /** Round to 1 decimal place using consistent ROUND_HALF_UP. */
@@ -119,9 +126,10 @@ export function getHighlightKeys(baseMacros: MacroProfile): HighlightSet {
 }
 
 /**
- * Compute %DV for each nutrient that has a daily value.
- * Returns a partial MacroProfile where each value is the %DV (0–100+).
- * Nutrients without a DV are omitted from the result.
+ * Compute the whole-percent %DV for each nutrient that has a daily value.
+ * Returns a partial MacroProfile keyed by nutrient. Nutrients without a DV are
+ * omitted. (Display uses `formatDV`, which also applies the FDA micronutrient
+ * %DV increments and the "<1%" rule; this helper is the plain numeric form.)
  */
 export function computeDailyValues(
   profile: MacroProfile,
@@ -133,11 +141,102 @@ export function computeDailyValues(
   return result;
 }
 
+/** Round a value to the nearest multiple of `increment` (half away from zero). */
+function roundToIncrement(value: number, increment: number): number {
+  return roundHalfUp(value / increment, 0) * increment;
+}
+
+/** Clean numeric → string: drops float noise and trailing ".0" (e.g. 0.7000001 → "0.7"). */
+function fmtNum(n: number): string {
+  const cleaned = Math.round(n * 10) / 10;
+  return Number.isInteger(cleaned) ? String(cleaned) : cleaned.toString();
+}
+
 /**
- * Format a %DV for display on the label.
+ * Format a nutrient's per-serving amount for the label per the FDA
+ * increment-rounding rules in 21 CFR 101.9(c). Returns the full display token
+ * INCLUDING the unit, e.g. "8g", "0g", "less than 1g", "less than 5mg",
+ * "160mg", "2mcg". `calories` returns a bare numeric string ("60").
+ *
+ * `value` is the unrounded per-serving amount from `calculateRecipeMacros`.
+ */
+export function formatNutrientAmount(nutrient: keyof MacroProfile, value: number): string {
+  switch (nutrient) {
+    case "calories":
+      if (value < 5) return "0";
+      return String(roundToIncrement(value, value <= 50 ? 5 : 10));
+
+    case "fat_total_g":
+    case "fat_saturated_g":
+      if (value < 0.5) return "0g";
+      return `${fmtNum(roundToIncrement(value, value < 5 ? 0.5 : 1))}g`;
+
+    case "cholesterol_mg":
+      if (value < 2) return "0mg";
+      if (value <= 5) return "less than 5mg";
+      return `${roundToIncrement(value, 5)}mg`;
+
+    case "sodium_mg":
+      if (value < 5) return "0mg";
+      return `${roundToIncrement(value, value <= 140 ? 5 : 10)}mg`;
+
+    case "carbohydrates_total_g":
+    case "fiber_g":
+    case "sugar_g":
+    case "protein_g":
+      if (value < 0.5) return "0g";
+      if (value < 1) return "less than 1g";
+      return `${roundToIncrement(value, 1)}g`;
+
+    case "vitamin_d_mcg":
+      return `${fmtNum(roundToIncrement(value, 0.1))}mcg`;
+    case "iron_mg":
+      return `${fmtNum(roundToIncrement(value, 0.1))}mg`;
+    case "calcium_mg":
+    case "potassium_mg":
+      return `${roundToIncrement(value, 10)}mg`;
+
+    default:
+      return fmtNum(value);
+  }
+}
+
+/** FDA amount string for Added Sugars (g) — same increment rules as sugars. */
+export function formatAddedSugarsAmount(value: number): string {
+  if (value < 0.5) return "0g";
+  if (value < 1) return "less than 1g";
+  return `${roundToIncrement(value, 1)}g`;
+}
+
+/** FDA amount string for Trans Fat (g) — same increment rules as total fat. */
+export function formatTransFatAmount(value: number): string {
+  if (value < 0.5) return "0g";
+  return `${fmtNum(roundToIncrement(value, value < 5 ? 0.5 : 1))}g`;
+}
+
+/** Round a raw %DV to FDA increments: vitamins/minerals are coarser than macros. */
+function roundDvPct(pctRaw: number, isMicro: boolean): number {
+  if (!isMicro) return roundHalfUp(pctRaw, 0);
+  if (pctRaw <= 10) return roundToIncrement(pctRaw, 2);
+  if (pctRaw <= 50) return roundToIncrement(pctRaw, 5);
+  return roundToIncrement(pctRaw, 10);
+}
+
+/**
+ * Format a %DV string from an amount and its Daily Value.
+ *   - computed value is 0 but the amount > 0 → "<1%"
+ *   - otherwise → "12%"
+ */
+export function formatDVFromAmount(amount: number, dv: number, isMicro = false): string {
+  const pct = roundDvPct((amount / dv) * 100, isMicro);
+  if (pct === 0 && amount > 0) return "<1%";
+  return `${pct}%`;
+}
+
+/**
+ * Format a %DV for display on the label, computed from the unrounded amount.
  *   - If no DV exists: return "—"
- *   - If computed value is 0 but raw value > 0: return "<1%"
- *   - Otherwise: return "12%"
+ *   - Otherwise defer to `formatDVFromAmount`.
  */
 export function formatDV(
   nutrient: keyof MacroProfile,
@@ -145,9 +244,7 @@ export function formatDV(
 ): string {
   const dv = FDA_DAILY_VALUES[nutrient];
   if (dv === undefined) return "—";
-  const pct = roundHalfUp((profile[nutrient] / dv) * 100);
-  if (pct === 0 && profile[nutrient] > 0) return "<1%";
-  return `${pct}%`;
+  return formatDVFromAmount(profile[nutrient], dv, MICRO_KEYS.has(nutrient));
 }
 
 /**

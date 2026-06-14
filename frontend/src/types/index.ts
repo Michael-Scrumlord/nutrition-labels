@@ -133,6 +133,13 @@ export interface RecipeVersion {
   dimensions: LabelDimensions;
   instructions: RecipeStep[];
   variables: RecipeVariable[];
+  // ── Label-meta overrides (FDA fields not derivable from the USDA DB) ──
+  // Household description of one serving, e.g. "2/3 cup". Empty → "1 portion".
+  servingHousehold?: string;
+  // Added Sugars (g) — mandatory FDA line with its own %DV (DV 50g).
+  addedSugarsG?: number;
+  // Trans Fat (g) — mandatory FDA line (no %DV).
+  transFatG?: number;
 }
 
 export interface SavedRecipe {

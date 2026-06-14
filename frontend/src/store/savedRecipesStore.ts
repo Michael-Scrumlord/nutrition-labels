@@ -15,12 +15,15 @@ const MAX_RECIPES          = 50;
 const MAX_VERSIONS_PER     = 20;
 
 export type RecipeSnapshot = {
-  ingredients:    IngredientItem[];
-  portionDivisor: number;
-  labelName:      string;
-  dimensions:     LabelDimensions;
-  instructions:   RecipeStep[];
-  variables:      RecipeVariable[];
+  ingredients:      IngredientItem[];
+  portionDivisor:   number;
+  labelName:        string;
+  dimensions:       LabelDimensions;
+  instructions:     RecipeStep[];
+  variables:        RecipeVariable[];
+  servingHousehold: string;
+  addedSugarsG:     number;
+  transFatG:        number;
 };
 
 interface SavedRecipesState {
