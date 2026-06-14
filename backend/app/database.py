@@ -89,7 +89,7 @@ def get_portions_by_id(fdc_id: int, db_path: str | None = None) -> list[sqlite3.
 def get_foods_by_ids(fdc_ids: list[int], db_path: str | None = None) -> list[sqlite3.Row]:
     """
     Return macro rows for multiple foods in a single query.
-    Used by the PDF generation route, which needs all ingredients at once.
+    Batch lookup helper for recipe-level macro math (see app/nutrition.py).
     The caller should verify that len(result) == len(fdc_ids) to catch unknown IDs.
     """
     if not fdc_ids:

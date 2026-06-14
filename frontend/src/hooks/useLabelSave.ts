@@ -26,16 +26,20 @@ function formatRelativeTime(timestamp: number): string {
 export function useLabelSave() {
   const {
     ingredients, portionDivisor, labelName, dimensions,
-    instructions, variables, currentRecipeId,
+    instructions, variables, servingHousehold, addedSugarsG, transFatG,
+    currentRecipeId,
   } = useRecipeStore(
     useShallow((s) => ({
-      ingredients:     s.ingredients,
-      portionDivisor:  s.portionDivisor,
-      labelName:       s.labelName,
-      dimensions:      s.dimensions,
-      instructions:    s.instructions,
-      variables:       s.variables,
-      currentRecipeId: s.currentRecipeId,
+      ingredients:      s.ingredients,
+      portionDivisor:   s.portionDivisor,
+      labelName:        s.labelName,
+      dimensions:       s.dimensions,
+      instructions:     s.instructions,
+      variables:        s.variables,
+      servingHousehold: s.servingHousehold,
+      addedSugarsG:     s.addedSugarsG,
+      transFatG:        s.transFatG,
+      currentRecipeId:  s.currentRecipeId,
     })),
   );
 
@@ -61,8 +65,12 @@ export function useLabelSave() {
   );
 
   const snapshot = useMemo<RecipeSnapshot>(
-    () => ({ ingredients, portionDivisor, labelName, dimensions, instructions, variables }),
-    [ingredients, portionDivisor, labelName, dimensions, instructions, variables],
+    () => ({
+      ingredients, portionDivisor, labelName, dimensions, instructions, variables,
+      servingHousehold, addedSugarsG, transFatG,
+    }),
+    [ingredients, portionDivisor, labelName, dimensions, instructions, variables,
+     servingHousehold, addedSugarsG, transFatG],
   );
 
   function flash(msg: string) {

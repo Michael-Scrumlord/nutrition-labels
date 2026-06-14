@@ -10,7 +10,9 @@ import {
   getHighlightKeys,
   computeDailyValues,
   formatDV,
+  formatNutrientAmount,
   round1,
+  roundHalfUp,
   buildIngredientsString,
   NUTRIENT_FIELDS,
 } from "../../src/utils/nutrition";
@@ -92,28 +94,9 @@ describe("round1", () => {
 describe("roundHalfUp parity with backend", () => {
   for (const { input, ndigits, expected } of PARITY_VECTORS) {
     it(`${input} @ ${ndigits} decimal place(s) → ${expected}`, () => {
-      // round1 covers ndigits=1; for ndigits=0 use Math.round equivalent via the
-      // exported round1 multiplied/divided path is not exposed, so we round-trip
-      // through calculateRecipeMacros indirectly here is overkill — instead we
-      // re-derive via a tiny adapter that mirrors what the helper does.
-      // To keep this test focused on the helper itself, we import it via the
-      // public round1 alias for ndigits=1 and assert directly otherwise.
-      if (ndigits === 1) {
-        expect(round1(input)).toBe(expected);
-      } else {
-        // For ndigits=0 the public surface is `calories` rounding inside
-        // calculateRecipeMacros. Mirror that by feeding a single-ingredient
-        // recipe whose per-serving calories equals `input`.
-        const ingredient: IngredientItem = {
-          fdc_id: 1,
-          name: "Test",
-          amount: 100, // 100g, multiplier = 1.0
-          unit: "g",
-          baseMacros: { ...ZERO_MACROS, calories: input },
-        };
-        const result = calculateRecipeMacros([ingredient], 1);
-        expect(result.calories).toBe(expected);
-      }
+      // roundHalfUp is now exported, so the parity vector tests the helper
+      // directly for every ndigits (round1 is just roundHalfUp(_, 1)).
+      expect(roundHalfUp(input, ndigits)).toBe(expected);
     });
   }
 });
@@ -124,8 +107,8 @@ describe("calculateRecipeMacros — unit conversions", () => {
   it("handles lb unit correctly (1 lb = 453.592 g)", () => {
     const ingredient = makeIngredient(1, 1, "lb");
     const result = calculateRecipeMacros([ingredient], 1);
-    const expected = Math.round(717 * UNIT_CONVERSIONS["lb"] / 100);
-    expect(result.calories).toBe(expected); // ~3252 kcal
+    const expected = 717 * UNIT_CONVERSIONS["lb"] / 100;
+    expect(result.calories).toBeCloseTo(expected, 5); // ~3252 kcal, unrounded
   });
 
   it("handles kg unit correctly (1 kg = 1000 g)", () => {
@@ -149,8 +132,8 @@ describe("calculateRecipeMacros — unit conversions", () => {
     const butter_oz = makeIngredient(1, 1,   "oz");      // 28.3495 g
     const result = calculateRecipeMacros([butter_g, butter_oz], 1);
     const totalGrams = 100 + UNIT_CONVERSIONS["oz"];
-    const expected = Math.round(717 * totalGrams / 100);
-    expect(result.calories).toBe(expected);
+    const expected = 717 * totalGrams / 100;
+    expect(result.calories).toBeCloseTo(expected, 5);
   });
 });
 
@@ -182,12 +165,14 @@ describe("calculateRecipeMacros — portion divisor", () => {
 // ── calculateRecipeMacros — amount edge cases ────────────────────────────
 
 describe("calculateRecipeMacros — extreme amounts", () => {
-  it("returns zero calories for a trace amount (0.001 g)", () => {
-    // 717 * 0.001 / 100 = 0.00717 → rounds to 0
+  it("a trace amount (0.001 g) is below the FDA display floor → shows 0", () => {
+    // 717 * 0.001 / 100 = 0.00717 (unrounded). The model keeps the tiny value;
+    // the FDA display rounds it to zero.
     const ingredient = makeIngredient(1, 0.001, "g");
     const result = calculateRecipeMacros([ingredient], 1);
-    expect(result.calories).toBe(0);
-    expect(result.fat_total_g).toBe(0);
+    expect(result.calories).toBeCloseTo(0.00717, 6);
+    expect(formatNutrientAmount("calories", result.calories)).toBe("0");
+    expect(formatNutrientAmount("fat_total_g", result.fat_total_g)).toBe("0g");
   });
 
   it("a zero-macro ingredient does not change recipe totals", () => {

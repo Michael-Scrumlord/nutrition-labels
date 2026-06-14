@@ -16,6 +16,7 @@ import { useNutritionCalc } from "../../hooks/useNutritionCalc";
 import { useLabelSave } from "../../hooks/useLabelSave";
 import { LabelPreview } from "./LabelPreview";
 import { LabelDimensions } from "./LabelDimensions";
+import { LabelDetails } from "./LabelDetails";
 import { LabelResizeHandle } from "./LabelResizeHandle";
 import { GenerateButton } from "./GenerateButton";
 import { SaveControls } from "./SaveControls";
@@ -26,13 +27,17 @@ import { AuroraGlow } from "../theme/AuroraGlow";
 export function LabelColumn() {
   const {
     ingredients, portionDivisor, dimensions,
-    highlightedNutrients, viewingVersionId,
+    highlightedNutrients, servingHousehold, addedSugarsG, transFatG,
+    viewingVersionId,
   } = useRecipeStore(
     useShallow((s) => ({
       ingredients:          s.ingredients,
       portionDivisor:       s.portionDivisor,
       dimensions:           s.dimensions,
       highlightedNutrients: s.highlightedNutrients,
+      servingHousehold:     s.servingHousehold,
+      addedSugarsG:         s.addedSugarsG,
+      transFatG:            s.transFatG,
       viewingVersionId:     s.viewingVersionId,
     })),
   );
@@ -46,9 +51,14 @@ export function LabelColumn() {
     feedback, handleSaveVersion, handleSaveAsNew,
   } = useLabelSave();
 
-  const baseWidthPx = 288;
-  const targetPx    = Math.max(dimensions.widthInches * 96, 192);
-  const scale       = targetPx / baseWidthPx;
+  // The preview authors the label in points-as-pixels (1pt = 1px) at the page's
+  // true point width (widthInches*72), matching LabelPdfDoc's geometry. We then
+  // scale uniformly to the on-screen display width so the preview is an exact
+  // scale of the PDF. targetPx == widthInches*96 for any width ≥ 2in, so the
+  // scale resolves to 96/72 (i.e. render the 72dpi artwork at 96dpi).
+  const authoredWidth = dimensions.widthInches * 72;
+  const targetPx      = Math.max(dimensions.widthInches * 96, 192);
+  const scale         = targetPx / authoredWidth;
 
   // Measure the unscaled LabelPreview so the proof container hugs real content
   // instead of relying on a 560px estimate. Transforms don't affect layout, so
@@ -63,7 +73,7 @@ export function LabelColumn() {
     const ro = new ResizeObserver(update);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [ingredients, portionDivisor, dimensions.widthInches]);
+  }, [ingredients, portionDivisor, dimensions.widthInches, servingHousehold, addedSugarsG, transFatG]);
 
   const requestedH    = dimensions.heightInches ? dimensions.heightInches * 96 : null;
   const scaledNaturalH = naturalH * scale;
@@ -100,12 +110,11 @@ export function LabelColumn() {
             borderBottom: "1px solid var(--hair)",
           }}
         >
-          <div style={{ display: "flex", gap: 4 }}>
-            {/* Prep tab is a placeholder for a future surface — only Label
-                renders today, so Prep is disabled. */}
-            <button className="sig-tab is-active" aria-current="page">Label</button>
-            <button className="sig-tab" disabled title="Coming soon">Prep</button>
-          </div>
+          {/* Panel label. (A second "Prep" tab used to live here but went
+              nowhere — removed; the label is the only surface in this column.) */}
+          <span className="sig-static pl-meta" style={{ fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase" }}>
+            Label
+          </span>
           <span
             className="sig-static pl-meta"
             style={{
@@ -140,12 +149,15 @@ export function LabelColumn() {
                 boxShadow: "var(--paper-shadow)",
               }}
             >
-              <div ref={measureRef} style={{ width: baseWidthPx, transform: `scale(${scale})`, transformOrigin: "top left" }}>
+              <div ref={measureRef} style={{ width: authoredWidth, transform: `scale(${scale})`, transformOrigin: "top left" }}>
                 <LabelPreview
                   macros={macros}
                   portionDivisor={portionDivisor}
                   ingredients={ingredients}
-                  widthPx={baseWidthPx}
+                  widthInches={dimensions.widthInches}
+                  servingHousehold={servingHousehold}
+                  addedSugarsG={addedSugarsG}
+                  transFatG={transFatG}
                   highlightSet={highlightedNutrients}
                 />
               </div>
@@ -176,6 +188,7 @@ export function LabelColumn() {
               ⚠ Content clipped — increase height or set to auto
             </div>
           )}
+          <LabelDetails />
         </div>
 
         <div style={{ width: "100%", maxWidth: 380 }}>

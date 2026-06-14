@@ -40,6 +40,9 @@ function stateFromVersion(
     dimensions:           version.dimensions,
     instructions:         version.instructions ?? [],
     variables:            version.variables ?? [],
+    servingHousehold:     version.servingHousehold ?? "",
+    addedSugarsG:         version.addedSugarsG ?? 0,
+    transFatG:            version.transFatG ?? 0,
     highlightedNutrients: new Set() as HighlightSet,
     currentRecipeId:      recipe.id,
     viewingVersionId,
@@ -55,6 +58,11 @@ interface RecipeState {
   highlightedNutrients: HighlightSet;
   instructions: RecipeStep[];
   variables: RecipeVariable[];
+
+  // ── Label-meta overrides (FDA fields not derivable from the USDA DB) ──
+  servingHousehold: string;   // household serving description, e.g. "2/3 cup"
+  addedSugarsG: number;       // Added Sugars (g) — has its own %DV (DV 50g)
+  transFatG: number;          // Trans Fat (g) — no %DV
 
   // ── Version tracking ──────────────────────────────────────────────────
   currentRecipeId:   string | null;   // null = unsaved/new recipe
@@ -80,6 +88,9 @@ interface RecipeState {
   setLabelName:            (name: string) => void;
   setDimensions:           (dimensions: Partial<LabelDimensions>) => void;
   setHighlightedNutrients: (nutrients: HighlightSet) => void;
+  setServingHousehold:     (value: string) => void;
+  setAddedSugarsG:         (value: number) => void;
+  setTransFatG:            (value: number) => void;
 
   // ── Method actions ────────────────────────────────────────────────────
   addStep:           (afterId?: string) => string;
@@ -110,6 +121,9 @@ function makeDefaultState() {
     highlightedNutrients: new Set() as HighlightSet,
     instructions:         [] as RecipeStep[],
     variables:            [] as RecipeVariable[],
+    servingHousehold:     "",
+    addedSugarsG:         0,
+    transFatG:            0,
     currentRecipeId:      null as string | null,
     viewingVersionId:     null as string | null,
   };
@@ -191,6 +205,11 @@ export const useRecipeStore = create<RecipeState>((set) => ({
     set((state) => ({ dimensions: { ...state.dimensions, ...partial } })),
 
   setHighlightedNutrients: (nutrients) => set({ highlightedNutrients: nutrients }),
+
+  setServingHousehold: (servingHousehold) => set({ servingHousehold }),
+  // Clamp to non-negative; NaN (empty input) coerces to 0.
+  setAddedSugarsG: (value) => set({ addedSugarsG: Number.isFinite(value) ? Math.max(0, value) : 0 }),
+  setTransFatG:    (value) => set({ transFatG:    Number.isFinite(value) ? Math.max(0, value) : 0 }),
 
   // ── Method actions ────────────────────────────────────────────────────
   addStep: (afterId) => {
