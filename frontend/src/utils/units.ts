@@ -41,3 +41,11 @@ export function ingredientGrams(item: Pick<IngredientItem, "amount" | "unit" | "
   if (item.portionRef) return item.amount * item.portionRef.gramsPerUnit;
   return item.amount * UNIT_CONVERSIONS[item.unit];
 }
+
+/** Parse a raw amount string from a form input.
+ *  Returns the value rounded to 2 decimal places, or null if invalid (NaN / ≤ 0). */
+export function parseIngredientAmount(raw: string): number | null {
+  const parsed = parseFloat(raw);
+  if (isNaN(parsed) || parsed <= 0) return null;
+  return Math.round(parsed * 100) / 100;
+}

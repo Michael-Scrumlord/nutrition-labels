@@ -38,6 +38,10 @@ export interface PortionRef {
 
 export type UnitKey = "g" | "ml" | "oz" | "lb" | "kg";
 
+// Encoded value for the unit/portion <select> used in IngredientRow and AddForm.
+// "unit:g" → global UnitKey; "portion:tablespoon" → food-specific portion modifier.
+export type PickerValue = `unit:${UnitKey}` | `portion:${string}`;
+
 export const UNIT_LABELS: Record<UnitKey, string> = {
   g:  "Grams (g)",
   ml: "Milliliters (ml)",

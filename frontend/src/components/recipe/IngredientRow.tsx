@@ -8,18 +8,12 @@
 import { useState } from "react";
 import { useRecipeActions } from "../../hooks/useRecipeActions";
 import { ScrubNumber } from "../ui/ScrubNumber";
+import { PortionUnitOptions } from "../ui/PortionUnitOptions";
 import { ingredientGrams, normalizePortion } from "../../utils/units";
 import { getHighlightKeys } from "../../utils/nutrition";
-import { UNIT_LABELS } from "../../types";
-import type { IngredientItem, UnitKey } from "../../types";
+import type { IngredientItem, PickerValue, UnitKey } from "../../types";
 
-const UNIT_KEYS = Object.keys(UNIT_LABELS) as UnitKey[];
 const MAX_INGREDIENT_AMOUNT = 1_000_000;  // matches backend validation
-
-// Picker option encoding:
-//   "unit:g", "unit:oz", ...        → global UnitKey
-//   "portion:tablespoon", ...       → portion modifier (looked up in availablePortions)
-type PickerValue = `unit:${UnitKey}` | `portion:${string}`;
 
 function currentPickerValue(item: IngredientItem): PickerValue {
   if (item.portionRef) return `portion:${item.portionRef.modifier}`;
@@ -63,7 +57,7 @@ export function IngredientRow({
   // type a clean integer count.
   const portions = ingredient.availablePortions ?? [];
 
-  function handlePickerChange(raw: string) {
+  function handlePickerChange(raw: PickerValue) {
     if (raw.startsWith("portion:")) {
       const modifier = raw.slice("portion:".length);
       const match = portions.find((p) => p.modifier === modifier);
@@ -161,7 +155,7 @@ export function IngredientRow({
           <select
             aria-label={`${ingredient.name} unit`}
             value={currentPickerValue(ingredient)}
-            onChange={(e) => handlePickerChange(e.target.value)}
+            onChange={(e) => handlePickerChange(e.target.value as PickerValue)}
             style={{
               position: "absolute",
               inset: 0,
@@ -178,20 +172,7 @@ export function IngredientRow({
               MozAppearance: "none",
             }}
           >
-            {portions.length > 0 && (
-              <optgroup label="Food portions">
-                {portions.map((p) => (
-                  <option key={`portion-${p.modifier}`} value={`portion:${p.modifier}`}>
-                    {p.modifier}
-                  </option>
-                ))}
-              </optgroup>
-            )}
-            <optgroup label={portions.length > 0 ? "Standard units" : undefined}>
-              {UNIT_KEYS.map((u) => (
-                <option key={`unit-${u}`} value={`unit:${u}`}>{u}</option>
-              ))}
-            </optgroup>
+            <PortionUnitOptions portions={portions} />
           </select>
         </span>
       </span>
