@@ -12,12 +12,10 @@ import { getFoodDetail } from "../../api/client";
 import { useRecipeStore } from "../../store/recipeStore";
 import { useActiveTheme } from "../../store/themeStore";
 import { Spinner } from "../ui/Spinner";
+import { PortionUnitOptions } from "../ui/PortionUnitOptions";
 import { COMMON_FOODS } from "../../constants/commonFoods";
-import { normalizePortion } from "../../utils/units";
-import { UNIT_LABELS } from "../../types";
-import type { FoodSearchResult, SavedFood, UnitKey, PortionRef, PortionSize } from "../../types";
-
-const UNIT_KEYS = Object.keys(UNIT_LABELS) as UnitKey[];
+import { normalizePortion, parseIngredientAmount } from "../../utils/units";
+import type { FoodSearchResult, SavedFood, UnitKey, PickerValue, PortionRef, PortionSize } from "../../types";
 
 type TabId = "search" | "common" | "recent" | "favorites";
 
@@ -29,7 +27,7 @@ function AddForm({ food, onClose }: { food: FoodSearchResult; onClose: () => voi
   // Default flips between "1 of the first portion" (e.g. 1 tbsp) when the
   // food has known portions, and "100 g" when it doesn't.
   const [amount, setAmount] = useState("1");
-  const [picker, setPicker] = useState<string>("unit:g");
+  const [picker, setPicker] = useState<PickerValue>("unit:g");
   const [defaulted, setDefaulted] = useState(false);
   const addIngredient = useRecipeStore((s) => s.addIngredient);
   const addRecent     = usePreferencesStore((s) => s.addRecent);
@@ -64,9 +62,8 @@ function AddForm({ food, onClose }: { food: FoodSearchResult; onClose: () => voi
 
   function handleAdd() {
     if (!detail) return;
-    const parsed = parseFloat(amount);
-    if (isNaN(parsed) || parsed <= 0) return;
-    const rounded = Math.round(parsed * 100) / 100;
+    const rounded = parseIngredientAmount(amount);
+    if (rounded === null) return;
 
     let unit: UnitKey = "g";
     let portionRef: PortionRef | null = null;
@@ -127,7 +124,7 @@ function AddForm({ food, onClose }: { food: FoodSearchResult; onClose: () => voi
           <span style={{ fontSize: 10, letterSpacing: "0.14em", color: "var(--ink-3)", fontFamily: "var(--f-mono)" }}>UNIT</span>
           <select
             value={picker}
-            onChange={(e) => setPicker(e.target.value)}
+            onChange={(e) => setPicker(e.target.value as PickerValue)}
             aria-label="Unit"
             disabled={!detail}
             style={{
@@ -143,20 +140,7 @@ function AddForm({ food, onClose }: { food: FoodSearchResult; onClose: () => voi
               cursor: detail ? "pointer" : "default",
             }}
           >
-            {portions.length > 0 && (
-              <optgroup label="Food portions">
-                {portions.map((p) => (
-                  <option key={`portion-${p.modifier}`} value={`portion:${p.modifier}`}>
-                    {p.modifier}
-                  </option>
-                ))}
-              </optgroup>
-            )}
-            <optgroup label={portions.length > 0 ? "Standard units" : undefined}>
-              {UNIT_KEYS.map((u) => (
-                <option key={`unit-${u}`} value={`unit:${u}`}>{u}</option>
-              ))}
-            </optgroup>
+            <PortionUnitOptions portions={portions} />
           </select>
         </label>
 
