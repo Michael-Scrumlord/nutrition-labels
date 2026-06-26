@@ -7,6 +7,7 @@ import { useRecipeStore } from "../store/recipeStore";
 export function useRecipeActions() {
   return useRecipeStore(
     useShallow((s) => ({
+      // Ingredient actions
       addIngredient:            s.addIngredient,
       removeIngredient:         s.removeIngredient,
       updateIngredientName:     s.updateIngredientName,
@@ -14,11 +15,16 @@ export function useRecipeActions() {
       updateIngredientUnit:     s.updateIngredientUnit,
       updateIngredientPortion:  s.updateIngredientPortion,
       moveIngredient:           s.moveIngredient,
+
+      // Recipe meta actions
       setPortionDivisor:       s.setPortionDivisor,
       setLabelName:            s.setLabelName,
       setDimensions:           s.setDimensions,
       clearRecipe:             s.clearRecipe,
       setHighlightedNutrients: s.setHighlightedNutrients,
+      setServingHousehold:     s.setServingHousehold,
+      setAddedSugarsG:         s.setAddedSugarsG,
+      setTransFatG:            s.setTransFatG,
 
       // Method actions
       addStep:          s.addStep,

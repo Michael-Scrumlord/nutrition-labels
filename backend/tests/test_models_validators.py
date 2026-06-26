@@ -1,13 +1,13 @@
 # test_models_validators.py
 #
 # Tests for the Pydantic field validators in models.py that aren't
-# covered by test_models.py: control-character stripping, dimension
-# snapping, and boundary conditions for all validated string fields.
+# covered by test_models.py: control-character stripping and boundary
+# conditions for all validated string fields on IngredientItem.
 
 import pytest
 from pydantic import ValidationError
 
-from app.models import IngredientItem, GenerateLabelRequest
+from app.models import IngredientItem
 
 
 # ---------------------------------------------------------------------------
@@ -16,17 +16,6 @@ from app.models import IngredientItem, GenerateLabelRequest
 
 def valid_ingredient(**overrides) -> dict:
     base = {"fdc_id": 1097512, "name": "Butter", "amount": 100.0, "unit": "g"}
-    return {**base, **overrides}
-
-
-def valid_request(**overrides) -> dict:
-    base = {
-        "portion_divisor": 8,
-        "label_name": "My Recipe",
-        "width_inches": 2.75,
-        "height_inches": None,
-        "ingredients": [valid_ingredient()],
-    }
     return {**base, **overrides}
 
 
@@ -76,66 +65,6 @@ class TestIngredientNameControlChars:
         """Non-ASCII but printable characters (e.g. accented) must be preserved."""
         ing = IngredientItem(**valid_ingredient(name="Crème fraîche"))
         assert ing.name == "Crème fraîche"
-
-
-# ---------------------------------------------------------------------------
-# GenerateLabelRequest.label_name — control-character stripping
-# ---------------------------------------------------------------------------
-
-class TestLabelNameControlChars:
-    def test_newline_stripped_from_label_name(self):
-        req = GenerateLabelRequest(**valid_request(label_name="Cook\nies"))
-        assert "\n" not in req.label_name
-        assert req.label_name == "Cookies"
-
-    def test_rtl_override_stripped_from_label_name(self):
-        req = GenerateLabelRequest(**valid_request(label_name="Cook‮ies"))
-        assert "‮" not in req.label_name
-
-    def test_empty_label_name_remains_empty(self):
-        """An already-empty label_name stays empty (no rejection)."""
-        req = GenerateLabelRequest(**valid_request(label_name=""))
-        assert req.label_name == ""
-
-    def test_label_name_only_control_chars_becomes_empty(self):
-        """label_name that is entirely stripped becomes an empty string (allowed)."""
-        req = GenerateLabelRequest(**valid_request(label_name="\n\t"))
-        assert req.label_name == ""
-
-
-# ---------------------------------------------------------------------------
-# GenerateLabelRequest — dimension rounding (round_width / round_height)
-# ---------------------------------------------------------------------------
-
-class TestDimensionRounding:
-    def test_width_rounds_to_two_decimal_places(self):
-        """Float noise beyond 2 decimal places is snapped to 0.01'' precision."""
-        req = GenerateLabelRequest(**valid_request(width_inches=2.7500000001))
-        assert req.width_inches == 2.75
-
-    def test_width_rounds_down_at_third_decimal(self):
-        req = GenerateLabelRequest(**valid_request(width_inches=3.124))
-        assert req.width_inches == 3.12
-
-    def test_width_rounds_at_third_decimal(self):
-        # round(v, 2) is used; 3.126 rounds up to 3.13
-        req = GenerateLabelRequest(**valid_request(width_inches=3.126))
-        assert req.width_inches == 3.13
-
-    def test_height_rounds_to_two_decimal_places(self):
-        req = GenerateLabelRequest(**valid_request(height_inches=5.0000000001))
-        assert req.height_inches == 5.0
-
-    def test_height_none_stays_none_after_rounding(self):
-        req = GenerateLabelRequest(**valid_request(height_inches=None))
-        assert req.height_inches is None
-
-    def test_identical_float_noise_produces_same_rounded_value(self):
-        """Two requests that look the same must round to the same dimensions."""
-        req_a = GenerateLabelRequest(**valid_request(width_inches=2.7500000001))
-        req_b = GenerateLabelRequest(**valid_request(width_inches=2.7499999999))
-        # Both are within rounding distance of 2.75
-        assert req_a.width_inches == req_b.width_inches == 2.75
 
 
 # ---------------------------------------------------------------------------

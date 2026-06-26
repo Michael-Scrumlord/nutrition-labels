@@ -6,16 +6,20 @@
 //   • Added sugars (g)     — mandatory FDA line with its own %DV (DV 50g).
 //   • Trans fat (g)        — mandatory FDA line (no %DV).
 
+import { useShallow } from "zustand/react/shallow";
 import { useRecipeStore } from "../../store/recipeStore";
+import { useRecipeActions } from "../../hooks/useRecipeActions";
 import { ScrubNumber } from "../ui/ScrubNumber";
 
 export function LabelDetails() {
-  const servingHousehold    = useRecipeStore((s) => s.servingHousehold);
-  const addedSugarsG        = useRecipeStore((s) => s.addedSugarsG);
-  const transFatG           = useRecipeStore((s) => s.transFatG);
-  const setServingHousehold = useRecipeStore((s) => s.setServingHousehold);
-  const setAddedSugarsG      = useRecipeStore((s) => s.setAddedSugarsG);
-  const setTransFatG        = useRecipeStore((s) => s.setTransFatG);
+  const { servingHousehold, addedSugarsG, transFatG } = useRecipeStore(
+    useShallow((s) => ({
+      servingHousehold: s.servingHousehold,
+      addedSugarsG:     s.addedSugarsG,
+      transFatG:        s.transFatG,
+    })),
+  );
+  const { setServingHousehold, setAddedSugarsG, setTransFatG } = useRecipeActions();
 
   return (
     <div style={{ marginTop: 12, fontFamily: "var(--f-mono)", color: "var(--ink)" }}>

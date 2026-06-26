@@ -23,10 +23,7 @@ from app.models import (
     FoodSearchResult,
     FoodDetail,
     HealthResponse,
-    MacroProfile,
-    PortionSize,
 )
-from app.constants import NUTRIENT_FIELDS
 
 # One JSON object per log line. Pipe `docker compose logs backend` through
 # `jq` for filtering, or ship straight to an aggregator without reformatting.
@@ -152,21 +149,7 @@ def get_food(
     if food is None:
         raise HTTPException(status_code=404, detail=f"Food with fdc_id {fdc_id} not found")
 
-    portions = database.get_portions_by_id(fdc_id)
-
-    return FoodDetail(
-        fdc_id=food["fdc_id"],
-        name=food["description"],
-        macros=MacroProfile(**{field: food[field] or 0.0 for field in NUTRIENT_FIELDS}),
-        portions=[
-            PortionSize(
-                amount=p["amount"],
-                modifier=p["modifier"],
-                gram_weight=p["gram_weight"],
-            )
-            for p in portions
-        ],
-    )
+    return FoodDetail.from_db_rows(food, database.get_portions_by_id(fdc_id))
 
 
 # NOTE: PDF generation now happens entirely client-side via @react-pdf/renderer
