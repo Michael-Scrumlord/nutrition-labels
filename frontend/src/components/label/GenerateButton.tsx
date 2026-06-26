@@ -6,6 +6,7 @@
 // share one spec (labelSpec.ts), so the download matches the preview exactly.
 
 import { useState } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { useRecipeStore } from "../../store/recipeStore";
 import { useActiveTheme } from "../../store/themeStore";
 import { useNutritionCalc } from "../../hooks/useNutritionCalc";
@@ -17,15 +18,22 @@ import { downloadBlob } from "../../api/client";
 const AUTO_HEIGHT_INCHES = 11;
 
 export function GenerateButton() {
-  const ingredients     = useRecipeStore((s) => s.ingredients);
-  const portionDivisor  = useRecipeStore((s) => s.portionDivisor);
-  const labelName       = useRecipeStore((s) => s.labelName);
-  const dimensions      = useRecipeStore((s) => s.dimensions);
-  const servingHousehold = useRecipeStore((s) => s.servingHousehold);
-  const addedSugarsG    = useRecipeStore((s) => s.addedSugarsG);
-  const transFatG       = useRecipeStore((s) => s.transFatG);
-  const macros          = useNutritionCalc();
-  const { def }        = useActiveTheme();
+  const {
+    ingredients, portionDivisor, labelName, dimensions,
+    servingHousehold, addedSugarsG, transFatG,
+  } = useRecipeStore(
+    useShallow((s) => ({
+      ingredients:      s.ingredients,
+      portionDivisor:   s.portionDivisor,
+      labelName:        s.labelName,
+      dimensions:       s.dimensions,
+      servingHousehold: s.servingHousehold,
+      addedSugarsG:     s.addedSugarsG,
+      transFatG:        s.transFatG,
+    })),
+  );
+  const macros   = useNutritionCalc();
+  const { def } = useActiveTheme();
 
   const [isLoading, setIsLoading] = useState(false);
   const [error,     setError]     = useState<string | null>(null);
