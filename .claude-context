@@ -1,26 +1,33 @@
 # .claude-context — nutrition-labels repo map (token-optimized)
 
 ## Stack
-- **Frontend**: React 18 + TypeScript, Vite, Zustand (recipe/saved/prefs/theme), React Query, Tailwind
-- **Backend**: FastAPI + SQLite (read-only, FTS5), Jinja2, WeasyPrint, slowapi
+- **Frontend**: React 18 + TypeScript, Vite, Zustand (recipe/saved/prefs/theme), React Query, Tailwind, `@react-pdf/renderer` (client-side PDF), `@dnd-kit/core`, react-router-dom 7
+- **Backend**: FastAPI + SQLite (read-only, FTS5), slowapi. **No PDF engine**: backend only serves search + food data.
 - **Infra**: docker-compose — db-init → backend(:8000) + frontend(nginx) behind Caddy TLS
 
 ## Tree (essentials)
 ```
-backend/app/{main,config,constants,database,models,nutrition,pdf,search}.py
-backend/templates/label.html         FDA Jinja2 template (rendered by pdf.render_label_html)
+backend/app/{main,config,constants,database,models,nutrition,search}.py    # NO pdf.py
 backend/data/build_db_full.py        one-time DB builder (USDA FDC CSVs)
 frontend/src/
   utils/{nutrition,units,stepText,id}.ts
-  api/client.ts          HTTP client (search / food detail / generate label / downloadBlob)
-  types/index.ts         all TS interfaces (UNIT_LABELS dropdown map lives here too)
+  api/client.ts                       searchFoods / getFoodDetail / downloadBlob (no PDF endpoint)
+  types/index.ts                      all TS interfaces (UNIT_LABELS dropdown map lives here)
   store/{recipeStore,savedRecipesStore,preferencesStore,themeStore}.ts
-  hooks/                 useNutritionCalc, useIngredientSearch, useDebounce, useLabelResize,
-                         useAnimatedNumber, useRecipeActions, usePageMeta, useAdSenseBootstrap,
-                         useTitleAutoResize
-  components/{recipe,label,search,layout,recipes,theme,ui,donate}/
-  pages/                 AboutPage, PrivacyPage, TermsPage, guides/
-  constants/             commonFoods, theme, themes
+  hooks/                              useNutritionCalc, useIngredientSearch, useDebounce, useLabelResize,
+                                      useLabelSave, useAnimatedNumber, useRecipeActions, usePageMeta,
+                                      useAdSenseBootstrap, useTitleAutoResize
+  components/
+    label/{LabelPreview,LabelPdfDoc,labelSpec,LabelColumn,LabelDetails,LabelDimensions,
+           LabelResizeHandle,GenerateButton,SaveControls,GuidesCard,AdSlot}.tsx
+    recipe/{RecipeBuilder,IngredientRow,MethodSection,StepRow,StepEditor,StepText,
+            SlashStepEditor,SlashMenu,NutritionBreakdownTable,RecipeStatsBar,
+            VariablesPanel,VariablePopover,VersionBanner}.tsx
+    recipes/{RecipesModal,RecipeCard,VersionTimeline}.tsx
+    search/{IngredientSearch,SearchResults,FoodTabs,AddIngredientForm}.tsx
+    layout/  theme/  ui/  donate/
+  pages/                              AboutPage, PrivacyPage, TermsPage, guides/
+  constants/                          commonFoods, theme, themes
   config/adsense.ts
 ```
 
@@ -28,45 +35,45 @@ frontend/src/
 
 ## Primary Data Flow: Recipe Input → PDF Output
 
+PDF generation is **fully client-side**. The backend only provides ingredient lookup data.
+
 1. User searches → `GET /api/search?query=` → ranked list (top 40)
 2. Selects food → `GET /api/food/{fdc_id}` → `MacroProfile` (per 100g) + `PortionSize[]`
 3. `recipeStore.addIngredient(Omit<IngredientItem,"instanceId">)` — assigns UUID `instanceId`
    - `baseMacros` cached per row (raw per-100g, never scaled)
    - `availablePortions` cached so unit picker still works after food detail query is gone
-4. `useNutritionCalc()` → `calculateRecipeMacros(ingredients, portionDivisor)` → live `MacroProfile` for label preview
-5. "Generate Label" → `POST /api/generate_label` → backend re-fetches DB, recalculates, Jinja2 → WeasyPrint → PDF bytes → browser download
+4. `useNutritionCalc()` → `calculateRecipeMacros(ingredients, portionDivisor)` → **unrounded** `MacroProfile` (FDA increment rounding deferred to presentation)
+5. `LabelPreview` (DOM) and `LabelPdfDoc` (`@react-pdf/renderer`) both consume the **same** `labelSpec.ts` (GEO + `rowDisplay`) so they cannot drift
+6. "Generate PDF" → `LabelPdfDoc` is rendered to a Blob via `@react-pdf/renderer`'s `pdf().toBlob()` → `downloadBlob(blob, "nutrition_label.pdf")` — no network call
 
-### Backend POST `/api/generate_label` sequence
-a. Validate body (≤64 KB; 1–100 ingredients; valid `fdc_id`s; client already flattened portionRef → grams)
-b. `database.get_foods_by_ids(fdc_ids)` — batch fetch; 400 if any missing
-c. `nutrition.calculate_recipe_macros(...)` → `(unrounded_dict, rounded_MacroProfile)`
-d. `pdf.render_label_html(macros, request, unrounded_macros)` — %DV uses **unrounded** (avoid rounding error)
-e. `_render_pdf_with_timeout(html)` — `asyncio.Semaphore(2)` + `asyncio.to_thread(generate_pdf)` → bytes (504 on timeout)
+### Why client-side PDF
+Single source of truth: `labelSpec.ts` drives both the in-app preview and the downloaded PDF, so what you see is exactly what you get. TeX Gyre Heros (Helvetica-metrics OTF) is embedded in every PDF for 21 CFR 101.9(d)(1)(ii)(A) compliance.
 
 ---
 
 ## Architectural Rules
 
 - **All DB nutrient values are per 100g.** Scaling: `multiplier = grams / 100`.
-- **Nutrition math is duplicated** in `backend/app/nutrition.py` ↔ `frontend/src/utils/nutrition.ts`. **Change BOTH.**
-- **`calculate_recipe_macros` returns a tuple**: `(unrounded_per_serving: dict, rounded: MacroProfile)`. %DV is **always** computed from unrounded. Frontend returns rounded `MacroProfile` only (no unrounded tuple).
-- **Rounding (21 CFR 101.9(c), ROUND_HALF_UP)**: calories → int; all others → 1 decimal.
-  - Python: `Decimal(x).quantize(..., ROUND_HALF_UP)`. JS: `Number(x.toFixed(n))` (same semantic — see `roundHalfUp` comment in nutrition.ts).
-- **Ingredients string**: sorted by gram weight desc, ALL CAPS, period-terminated. Empty list → `""`.
-- **Search ranking**: prefix matches (`name_lower.startswith(q)`) before contains matches, alphabetical within each group; top **40** returned. No data-type tier (BM25 pre-filters 200).
+- **Nutrition math is duplicated** in `backend/app/nutrition.py` ↔ `frontend/src/utils/nutrition.ts`. **Change BOTH.** Frontend is the primary path (PDF + preview); backend still ships the math for future server use.
+- **Frontend `calculateRecipeMacros` returns UNROUNDED** per-serving values. FDA 21 CFR 101.9(c) **increment** rounding (not just decimal) is applied at the presentation layer via `formatNutrientAmount`, `formatTransFatAmount`, `formatAddedSugarsAmount` (e.g. sodium snaps to 5/10 mg, fat to 0.5/1 g, "<1g" threshold).
+- **Backend `calculate_recipe_macros` returns a tuple** `(unrounded_per_serving_dict, rounded_MacroProfile)` (calories→int, others→1 decimal). Kept for completeness/tests; not on the user request path.
+- **`round_half_up`**: Python `Decimal.quantize(..., ROUND_HALF_UP)`; JS `Number(x.toFixed(n))` — same semantic (see `roundHalfUp` comment in `nutrition.ts`).
+- **%DV** is always computed from unrounded amounts. Micro %DV uses coarser increments (≤10→2, ≤50→5, else 10); macro %DV is whole percent. `formatDV*` renders `"<1%"` when result rounds to 0 but value > 0, `"—"` when nutrient has no DV.
+- **Ingredients string**: sorted by gram weight desc (`ingredientGrams`), ALL CAPS, comma-separated, period-terminated. Empty list → `""`.
+- **Search ranking**: prefix matches (`name_lower.startswith(q)`) before contains matches, alphabetical within each group; top **40** returned. FTS5 BM25 pre-filters 200.
 - **DB is read-only at runtime** — SQLite URI `mode=ro&nolock=1`; writes happen only in `data/build_db_full.py`.
-- **SSRF guard**: `pdf._no_external_fetch` raises `ValueError` for **all** URLs (incl. `file://`); WeasyPrint cannot fetch anything external.
-- **PDF concurrency**: `asyncio.Semaphore(2)`; 10s timeout per request → 504.
-- **Rate limits** (slowapi, per IP, env-configurable): search 60/min, food 120/min, generate 10/min. 429 → JSON `detail` + `Retry-After` header.
-- **savedRecipesStore**: max 50 recipes, max 20 versions each; `versions.at(-1)` = latest. v1→v2 migration wraps legacy flat snapshots as a single version.
+- **Rate limits** (slowapi, per IP, env-configurable): search 60/min, food 120/min. No `generate` limit (no server endpoint). 429 → JSON `detail` + `Retry-After` header.
+- **savedRecipesStore**: max **50 recipes**, max **20 versions** each; `versions.at(-1)` = latest. Legacy flat snapshots (no `versions[]`) migrate to a single-version recipe at hydration.
 - **`RecipeStep.text`** may contain `{Variable Label}` tokens parsed by `utils/stepText.ts`.
 - **Frontend `baseMacros`** on `IngredientItem` is the raw per-100g API response — never scaled in store.
-- **`portionRef`**: when set on `IngredientItem`, `amount` means "N portions"; `ingredientGrams()` honors this. Client flattens to grams (`unit="g"`) before POST.
+- **`portionRef`**: when set on `IngredientItem`, `amount` means "N portions"; `ingredientGrams()` honors this and is the **single source of truth** for ingredient weight.
 - **Per-row identity = `instanceId`** (Zustand-assigned UUID). Same `fdc_id` can appear twice as independent rows. **All `recipeStore` ingredient actions key off `instanceId`, not `fdc_id`.** Legacy persisted recipes get back-filled via `withInstanceIds`.
 - **Unit swap preserves gram weight**: `updateIngredientUnit` re-expresses amount in new unit (100 g → 3.53 oz). Clears active `portionRef`. `updateIngredientPortion(null)` falls back to row's unit. Both round display amount to 2 decimals.
+- **Label-meta overrides** (FDA fields not derivable from USDA DB) live on `recipeStore`/`RecipeVersion`: `servingHousehold` (e.g. "2/3 cup"; empty → "1 portion"), `addedSugarsG` (DV 50g), `transFatG` (no %DV).
 - **CORS only enabled when `settings.cors_origins` is non-empty** (dev). In prod, nginx/Caddy proxies same-origin.
 - **`TrustedHostMiddleware`** rejects requests whose Host header isn't in `allowed_hosts`.
-- **`width_inches`/`height_inches`** snapped to 0.01" precision in Pydantic validator (prevents float noise drifting `@page` size).
+- **`BodySizeLimitMiddleware`** rejects > `max_body_bytes` (64 KB) before parsing.
+- **`width_inches`/`height_inches`** snapped to 0.01" precision in Pydantic validator on `GenerateLabelRequest` model (model is retained for type sharing but no longer wired to a route).
 - **Schema divergence (intentional)**: backend `FoodSearchResult` includes `data_type: str | None`; frontend type omits it (unused on client).
 
 ---
@@ -84,7 +91,8 @@ fat_total_g: 78       fat_saturated_g: 20    cholesterol_mg: 300    sodium_mg: 2
 carbohydrates_total_g: 275    fiber_g: 28    vitamin_d_mcg: 20      calcium_mg: 1300
 iron_mg: 18           potassium_mg: 4700
 ```
-`calories`, `sugar_g`, `protein_g` → **no %DV** (render dash).
+`calories`, `sugar_g`, `protein_g` → **no %DV** (render `"—"`).
+`ADDED_SUGARS_DV = 50` (g) — frontend only, lives outside `FDA_DAILY_VALUES` (not in `MacroProfile`).
 
 ### NUTRIENT_FIELDS — 13 keys, FDA label order
 ```
@@ -93,7 +101,12 @@ carbohydrates_total_g, fiber_g, sugar_g, protein_g,
 vitamin_d_mcg, calcium_mg, iron_mg, potassium_mg
 ```
 
-### Validation limits  (`models.py` / `api/client.ts`)
+### Micronutrient set (frontend, `nutrition.ts`)
+```
+MICRO_KEYS = {vitamin_d_mcg, calcium_mg, iron_mg, potassium_mg}   // coarser %DV + amount increments
+```
+
+### Validation limits  (`models.py`)
 ```
 name length: 120 chars         ingredient amount: >0 ≤ 1,000,000
 ingredients per request: 1–100     portion_divisor: 1–999
@@ -102,7 +115,8 @@ width: 2–12 in   height: 2–20 in (null = auto)   max_body_bytes: 64 KB
 
 ### Label defaults
 ```
-widthInches: 2.75  |  heightInches: null  |  portionDivisor: 8
+widthInches: 2.75   heightInches: null (auto)   portionDivisor: 8
+servingHousehold: ""  (renders "1 portion")    addedSugarsG: 0   transFatG: 0
 ```
 
 ### localStorage keys
@@ -120,13 +134,10 @@ class Settings(BaseSettings):
     db_path: str = "data/nutrition.db"
     cors_origins: list[str] = []          # env CORS_ORIGINS (dev only)
     forwarded_allow_ips: str = "127.0.0.1"
-    allowed_hosts: list[str]              # env ALLOWED_HOSTS
+    allowed_hosts: list[str] = ["nutrition-label-generator.org", "localhost", "127.0.0.1"]
     max_body_bytes: int = 65536           # 64 KB
-    rate_limit_search:   str = "60/minute"
-    rate_limit_food:     str = "120/minute"
-    rate_limit_generate: str = "10/minute"
-    pdf_max_concurrency: int = 2
-    pdf_timeout_seconds: float = 10.0
+    rate_limit_search: str = "60/minute"
+    rate_limit_food:   str = "120/minute"
     release_sha: str = "dev"
 settings = Settings()
 ```
@@ -139,12 +150,13 @@ MIN/MAX_PORTION_DIVISOR=1/999  MIN/MAX_WIDTH=2/12  MIN/MAX_HEIGHT=2/20
 
 IngredientItem(fdc_id: int, name: str[1..120], amount: float(0..1e6], unit: str)
   # unit validated against UNIT_CONVERSIONS keys; name strips control chars (incl. RTL overrides)
-  # extra="forbid" — no portionRef field (client flattens to grams before POST)
+  # extra="forbid"; no portionRef field (server has no PDF endpoint)
 
 GenerateLabelRequest(portion_divisor: int[1..999]=8, label_name: str[0..120]="",
                      width_inches: float[2..12]=2.75, height_inches: float[2..20]|None=None,
                      ingredients: list[IngredientItem][1..100])
   # extra="forbid"; width/height snapped to 0.01" precision
+  # RETAINED but not wired to any route (PDF gen is now client-side)
 
 MacroProfile(calories, fat_total_g, fat_saturated_g, cholesterol_mg, sodium_mg,
              carbohydrates_total_g, fiber_g, sugar_g, protein_g,
@@ -177,7 +189,7 @@ round_half_up(x: float, ndigits: int = 0) -> float
 
 calculate_recipe_macros(
     ingredients: list[IngredientItem],
-    food_rows: list,         # sqlite3.Row (or dict) from get_foods_by_ids()
+    food_rows: list,          # sqlite3.Row (or dict) from get_foods_by_ids()
     portion_divisor: int,
 ) -> tuple[dict[str, float], MacroProfile]
   # Per ingredient:  grams = amount * UNIT_CONVERSIONS[unit]
@@ -201,27 +213,6 @@ ranked_search(query: str, food_rows: list[Row]) -> list[dict]
   # Returns top 40 as [{"fdc_id": int, "name": str, "data_type": str|None}]
 ```
 
-### `pdf.py`
-```python
-_jinja_env: jinja2.Environment        # loads backend/templates/label.html once at import
-_no_external_fetch(url: str) -> bytes # raises ValueError; blocks all URLs (SSRF guard)
-
-render_label_html(
-    macros: MacroProfile,
-    request: GenerateLabelRequest,
-    unrounded_macros: dict[str, float] | None = None,
-) -> str
-  # %DV uses unrounded_macros if provided, else macros.model_dump()
-  # daily_values: {field: compute_daily_value_pct(dv_source[field], field) for field in NUTRIENT_FIELDS}
-  # Ingredients sorted by (amount * UNIT_CONVERSIONS.get(unit, 1.0)) desc, .upper()
-  # ingredients_string = ", ".join(...) + "."  (empty string if no ingredients)
-  # Template vars: macros, daily_values, portion_divisor, label_name,
-  #                ingredients_string, width_inches, height_inches
-
-generate_pdf(html: str) -> bytes
-  # HTML(string=html, url_fetcher=_no_external_fetch).write_pdf()
-```
-
 ### `main.py` — Routes & middleware
 ```
 GET  /api/health                 -> HealthResponse {"status":"ok","release":...}
@@ -229,11 +220,8 @@ GET  /api/health                 -> HealthResponse {"status":"ok","release":...}
 GET  /api/search?query=str       -> list[FoodSearchResult]
                                     [] if query < 2 chars; 400 if > 100; rate 60/min
 GET  /api/food/{fdc_id}          -> FoodDetail; 404 if not found; rate 120/min; Path(ge=1)
-POST /api/generate_label         -> Response(PDF bytes, "application/pdf")
-  Body: GenerateLabelRequest      rate 10/min  timeout 10s  concurrency 2 (semaphore)
-  Headers: Content-Disposition: attachment; filename="nutrition_label.pdf"
-           Cache-Control: no-store
-  Errors: 400 (validation / missing fdc_ids) | 429 (+Retry-After) | 504 (timeout) | 500
+
+# NO POST /api/generate_label — PDF is built client-side via @react-pdf/renderer.
 
 Middleware order:  BodySizeLimitMiddleware(64 KB) -> TrustedHostMiddleware -> CORSMiddleware (dev only)
 Logging:           single-line JSON to stdout; LOG_LEVEL env (default INFO)
@@ -263,27 +251,41 @@ ingredientGrams(item: Pick<IngredientItem,"amount"|"unit"|"portionRef">): number
   // Single source of truth for ingredient weight
 ```
 
-### `nutrition.ts`  (mirrors backend `nutrition.py`)
+### `nutrition.ts`  (mirrors backend `nutrition.py` for the recipe math; adds FDA presentation rounding)
 ```typescript
 FDA_DAILY_VALUES: Partial<Record<keyof MacroProfile, number>>
+ADDED_SUGARS_DV = 50           // outside FDA_DAILY_VALUES (not a MacroProfile key)
 NUTRIENT_FIELDS: (keyof MacroProfile)[]
 
-// Internal roundHalfUp uses x.toFixed(ndigits) — matches Python Decimal ROUND_HALF_UP
-round1(n: number): number       // = roundHalfUp(n, 1)
+roundHalfUp(x: number, ndigits = 0): number    // = Number(x.toFixed(n)); matches Py ROUND_HALF_UP
+round1(n: number): number                       // = roundHalfUp(n, 1)
 
 calculateRecipeMacros(ingredients: IngredientItem[], portionDivisor: number): MacroProfile
   // Uses ingredient.baseMacros (per-100g) + ingredientGrams() for weight
   // Throws RangeError if portionDivisor ∉ [1,999]
-  // Returns rounded MacroProfile only (no unrounded tuple — differs from backend)
-
-computeDailyValues(profile: MacroProfile): Partial<Record<keyof MacroProfile, number>>
-  // {nutrient: roundHalfUp((val / DV) * 100)} for nutrients with DV
-
-formatDV(nutrient: keyof MacroProfile, profile: MacroProfile): string
-  // "—" if no DV | "<1%" if rounds to 0 but val > 0 | "{n}%"
+  // Returns UNROUNDED MacroProfile — presentation layer applies FDA increment rounding
 
 getHighlightKeys(baseMacros: MacroProfile): HighlightSet
   // Top-2 nutrient keys by (baseMacros[k] / DV) ratio — drives hover-sync highlight
+
+computeDailyValues(profile: MacroProfile): Partial<Record<keyof MacroProfile, number>>
+  // {nutrient: roundHalfUp((val / DV) * 100)} for nutrients with DV
+  // Plain numeric form; the label uses formatDV (which applies micro-coarsening + "<1%")
+
+// FDA 21 CFR 101.9(c) increment rounding — returns display string INCLUDING the unit
+formatNutrientAmount(nutrient: keyof MacroProfile, value: number): string
+  // calories: "0" if <5; else 5- or 10-increment.  fat: "0g" if <0.5; else 0.5/1g increments.
+  // cholesterol: "0mg"/"less than 5mg"/5mg increments.   sodium: 5/10mg increments.
+  // carbs/fiber/sugar/protein: "0g"/"less than 1g"/1g increments.
+  // vit_d/iron: 0.1 increment + "mcg"/"mg".              calcium/potassium: 10mg increments.
+formatAddedSugarsAmount(value: number): string         // "0g" / "less than 1g" / 1g increments
+formatTransFatAmount(value: number): string            // same rules as total fat
+
+formatDVFromAmount(amount: number, dv: number, isMicro = false): string
+  // Macro: whole-percent.  Micro: ≤10→2-increment, ≤50→5, else 10.
+  // "<1%" when rounds to 0 but amount > 0.
+formatDV(nutrient: keyof MacroProfile, profile: MacroProfile): string
+  // "—" if no DV; else formatDVFromAmount(...).  isMicro = MICRO_KEYS.has(nutrient)
 
 buildIngredientsString(ingredients: IngredientItem[]): string
   // Sorted by ingredientGrams() desc, ALL CAPS, comma-separated, period-terminated; "" if empty
@@ -328,11 +330,32 @@ makeId(): string
 class ApiError extends Error { status: number; retryAfter?: number }
 searchFoods(query: string): Promise<FoodSearchResult[]>
 getFoodDetail(fdc_id: number): Promise<FoodDetail>
-generateLabel(ingredients, portionDivisor, labelName, dimensions): Promise<Blob>
-  // portionRef rows flattened to grams (unit="g") before POST
-  // amounts rounded to 2 decimals (avoids 28.349500000001)
-  // 429 -> ApiError(retryAfter = Retry-After header, default 60)
-downloadBlob(blob: Blob, filename: string): void
+downloadBlob(blob: Blob, filename: string): void          // anchor-click trick
+// NO generateLabel(): PDF is built client-side, see components/label/LabelPdfDoc + useLabelSave.
+```
+
+### `components/label/labelSpec.ts` — Shared label source of truth
+```typescript
+INK = "#000"
+GEO: { pagePadding, labelName, box, title, servings, servingSize, amountLabel,
+       calories, dvHeader, row, proteinRule, footnote, ingredients, indent }
+       // All values in POINTS; preview renders 1:1 as px at authoring width.
+MACRO_ROWS: readonly LabelRow[]   // Total Fat → Added Sugars (incl. Trans Fat, Added Sugars overrides)
+MICRO_ROWS: readonly LabelRow[]   // Vitamin D, Calcium, Iron, Potassium
+LabelRow: { label; nutrient?; source?: "macro"|"transFat"|"addedSugars"; bold; indent: 0|1|2; noDV? }
+rowDisplay(row, macros, transFatG, addedSugarsG): RowDisplay
+  // { label, amount, boldLabel, dv }  — both renderers must call this; never compute values inline.
+```
+
+### `components/label/LabelPdfDoc.tsx`
+```typescript
+LabelPdfDoc({ macros, portionDivisor, ingredients, labelName,
+              widthInches, heightInches, servingHousehold, addedSugarsG, transFatG }):
+  JSX.Element   // <Document>/<Page wrap={false} size={[w*72, h*72]}>...</Page>
+// Registers TeXGyreHeros (Regular/Bold) OTFs from /fonts/ at module load.
+// Hyphenation disabled to keep multi-word nutrient names intact.
+// servingGrams = round(sum(ingredientGrams) / portionDivisor).
+// Consumed by useLabelSave / GenerateButton: pdf(<LabelPdfDoc .../>).toBlob() → downloadBlob().
 ```
 
 ### `types/index.ts` — Key types
@@ -354,18 +377,39 @@ PortionSize: { amount: number; modifier: string; gram_weight: number }
 FoodSearchResult: { fdc_id; name }                       // backend also returns data_type (unused)
 FoodDetail: { fdc_id; name; macros; portions }
 LabelDimensions: { widthInches: number; heightInches: number | null }   // null = auto
+HighlightSet = Set<keyof MacroProfile>
 RecipeStep: { id: string; text: string }                 // text may contain {Variable Label} tokens
 RecipeVariable: { name (slug); label; value; suffix?; min?; max?; step? }
 RecipeVersion: { id; savedAt; note?; ingredients; portionDivisor; labelName;
-                 dimensions; instructions; variables }
+                 dimensions; instructions; variables;
+                 servingHousehold?; addedSugarsG?; transFatG? }
 SavedRecipe: { id; name; createdAt; versions: RecipeVersion[] }   // versions.at(-1) is latest
+SavedFood: { fdc_id; name }                              // recents / favorites
 ```
 
 ### Stores (Zustand)
-- **`recipeStore`** — active recipe; NOT persisted. All ingredient actions key off `instanceId`. Actions: add/remove/updateName/updateAmount/updateUnit (preserves grams)/updatePortion (preserves grams)/moveIngredient; setPortionDivisor/setLabelName/setDimensions/setHighlightedNutrients; step add/update/remove/move; variable add/set/update/remove; clearRecipe/loadRecipe/loadVersion/exitVersionView/setCurrentRecipeId. Internal `withInstanceIds` back-fills legacy persisted rows.
-- **`savedRecipesStore`** — `nl_saved_recipes` v2; max 50 recipes × 20 versions. `createRecipe/appendVersion/renameRecipe/deleteRecipe/deleteVersion`.
+- **`recipeStore`** — active recipe; NOT persisted. All ingredient actions key off `instanceId`.
+  Fields: ingredients, portionDivisor, labelName, dimensions, highlightedNutrients,
+  instructions, variables, **servingHousehold, addedSugarsG, transFatG**, currentRecipeId, viewingVersionId.
+  Actions: add/remove/updateName/updateAmount/updateUnit (preserves grams)/updatePortion (preserves grams)/
+  moveIngredient; setPortionDivisor/setLabelName/setDimensions/setHighlightedNutrients;
+  setServingHousehold/setAddedSugarsG/setTransFatG;
+  step add/update/remove/move; variable add/set/update/remove;
+  clearRecipe/loadRecipe/loadVersion/exitVersionView/setCurrentRecipeId.
+  Internal `withInstanceIds` back-fills legacy persisted rows; `stateFromVersion` shared by loadRecipe/loadVersion.
+- **`savedRecipesStore`** — `nl_saved_recipes` v2; **max 50 recipes × 20 versions**.
+  `RecipeSnapshot` includes label-meta overrides. Actions: `createRecipe/appendVersion/renameRecipe/deleteRecipe/deleteVersion`. Legacy flat snapshots migrate on hydrate.
 - **`preferencesStore`** — `nl_preferences`; `recents` (max 15) + `favorites` + `isMethodExpanded`.
-- **`themeStore`** — `nl-theme`; ThemeKey: `"paper"|"overcast"|"twilight"|"midnight"`; `useActiveTheme()`, `themeVars(def, accentHex)` → CSS custom props.
+- **`themeStore`** — `nl-theme`; ThemeKey: `"paper"|"overcast"|"twilight"|"midnight"`; `useActiveTheme()`, `themeVars(def, accentHex)` → CSS custom props. Re-exports `THEME_DEFS`, `THEME_ORDER`, types.
 
 ### Hooks (frontend/src/hooks)
-`useNutritionCalc` (memoized live macros) · `useIngredientSearch` (React Query, 300ms debounce, staleTime 30s, enabled ≥2 chars) · `useDebounce<T>` · `useLabelResize` (pointer-drag, 96px/in, clamps 200–600px → 2.08–6.25in) · `useAnimatedNumber` (rAF, default 420ms, cubic ease-out) · `useRecipeActions` (useShallow) · `usePageMeta` (title + meta/canonical) · `useAdSenseBootstrap` (script injection, no-op when disabled) · `useTitleAutoResize`.
+- `useNutritionCalc` — memoized live `MacroProfile` from current recipe (unrounded).
+- `useIngredientSearch` — React Query, 300ms debounce, staleTime 30s, enabled ≥2 chars.
+- `useDebounce<T>` — generic value debounce.
+- `useLabelResize` — pointer-drag width handle, 96px/in, clamps 200–600px (≈2.08–6.25in).
+- `useLabelSave` — encapsulates save/version workflow: builds `RecipeSnapshot` from recipeStore, formats relative time, `handleSaveVersion` (append-to-current-or-create-new), `handleSaveAsNew`, transient `"SAVED ✓"` feedback. Returns `canSave/isLoaded/versionCount/lastSavedRel/savedRecipeName/feedback`.
+- `useAnimatedNumber` — rAF tween, default 420ms, cubic ease-out.
+- `useRecipeActions` — `useShallow` slice of recipeStore action handles.
+- `usePageMeta` — sets title + meta/canonical on route mount.
+- `useAdSenseBootstrap` — script injection, no-op when disabled in `config/adsense.ts`.
+- `useTitleAutoResize` — auto-grow `<textarea>` for the label name.
