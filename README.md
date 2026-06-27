@@ -74,44 +74,18 @@ Retrieve full macro data and portion sizes for one food.
 }
 ```
 
-### `POST /api/generate_label`
+### `GET /api/health`
 
-Calculate per-serving macros for a recipe, render an FDA Nutrition Facts label, and return a PDF.
+Liveness and readiness probe. Confirms the server is up and the SQLite database is reachable.
 
-- **Body:** `GenerateLabelRequest` (JSON)
-- **Returns:** `application/pdf` binary download (`nutrition_label.pdf`)
-- **400** if an `fdc_id` is not in the database
-- **413** if the request body exceeds the server's maximum allowed size
-- **422** if request validation fails (e.g. `portion_divisor` out of range, `amount ≤ 0`)
-- **429** if more than 10 requests are made per minute from the same IP; includes a `Retry-After` header
-- **504** if PDF rendering exceeds the server timeout
+- **Returns:** `HealthResponse` — `{ "status": "ok", "release": "<git-sha>" }`
+- **503** if the database cannot be queried
 
 ```json
-{
-  "portion_divisor": 8,
-  "label_name": "Chocolate Chip Cookies",
-  "width_inches": 2.75,
-  "height_inches": null,
-  "ingredients": [
-    { "fdc_id": 1097512, "name": "Butter", "amount": 227, "unit": "g" },
-    { "fdc_id": 1100209, "name": "Flour",  "amount": 250, "unit": "g" }
-  ]
-}
+{ "status": "ok", "release": "d3d03bf" }
 ```
 
-**Supported units:** `g`, `ml`, `oz`, `lb`, `kg`
-
-**Field constraints:**
-
-| Field              | Rule                                          |
-|--------------------|-----------------------------------------------|
-| `portion_divisor`  | Integer, 1–999                                |
-| `label_name`       | String, max 120 characters                    |
-| `width_inches`     | Float, ≥ 2 and ≤ 12 (snapped to 0.01″)        |
-| `height_inches`    | Float, ≥ 2 and ≤ 20, or `null` (auto-size); snapped to 0.01″ |
-| `ingredients`      | 1–100 items                                   |
-| `amount`           | Float, > 0 and ≤ 1,000,000                    |
-| `name` (ingredient)| String, 1–120 characters (control chars stripped) |
+> **Note:** PDF generation was moved entirely to the browser via `@react-pdf/renderer` (see `frontend/src/components/label/LabelPdfDoc.tsx`). The former `POST /api/generate_label` WeasyPrint endpoint was retired so the in-app preview and the downloaded PDF share a single layout source (`frontend/src/components/label/labelSpec.ts`).
 
 ## Nutrient Tracking
 
@@ -159,11 +133,10 @@ Rounding: calories → nearest integer; all other nutrients → 1 decimal place.
 nutrition-labels/
 ├── backend/                    # FastAPI + SQLite
 │   ├── app/
-│   │   ├── main.py             # 4 API routes + rate limiter
+│   │   ├── main.py             # 3 API routes + rate limiter
 │   │   ├── nutrition.py        # Pure macro calculation math
 │   │   ├── search.py           # Search ranking logic
 │   │   ├── database.py         # SQLite access layer
-│   │   ├── pdf.py              # Jinja2 + WeasyPrint PDF rendering
 │   │   ├── models.py           # Pydantic request/response models
 │   │   ├── constants.py        # Unit conversions, FDA daily values
 │   │   └── config.py           # Environment settings
@@ -217,6 +190,6 @@ npm test
 - **Ingredient ordering** — FDA regulations require ingredients sorted by gram weight descending. Both the frontend label preview and the backend PDF template implement this.
 - **`<1%` rule** — When a nutrient's %DV rounds to 0 but its raw value is > 0, the label shows `<1%` rather than `0%`.
 - **Frontend DV permissiveness** — The frontend `calculateRecipeMacros` throws a `RangeError` for `portionDivisor` outside 1–999. In live preview the UI guards against passing 0.
-- **Rate limiting** — All three data routes are rate-limited per IP: `GET /api/search` at 60/min, `GET /api/food/{id}` at 120/min, and `POST /api/generate_label` at 10/min. Every `429` response includes a `Retry-After` header.
+- **Rate limiting** — Both data routes are rate-limited per IP: `GET /api/search` at 60/min and `GET /api/food/{id}` at 120/min. Every `429` response includes a `Retry-After` header. PDF generation is client-side and therefore not rate-limited server-side.
 - **Body size limit** — Requests whose `Content-Length` exceeds 64 KB are rejected with `413` before FastAPI parses the body. A non-integer `Content-Length` header returns `400`.
 - **Recipe versioning** — Recipes are saved to `localStorage` as a list of timestamped snapshots. Each recipe holds up to 20 versions; older ones are pruned automatically. Max 50 recipes total.
