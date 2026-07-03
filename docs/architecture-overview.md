@@ -118,8 +118,8 @@ App
     │   ├── IngredientRow (×N)         ← hover highlights nutrients in label
     │   ├── NutritionBreakdownTable
     │   ├── MethodSection
-    │   │   ├── StepEditor → StepRow (×N) → StepText
-    │   │   └── VariablesPanel → VariablePopover (×N)
+    │   │   ├── StepRow (×N) → StepText | SlashStepEditor → SlashMenu
+    │   │   └── VariablesPanel
     │   └── AddIngredientForm          ← triggers IngredientSearch modal
     │       └── IngredientSearch (modal overlay)
     │           ├── FoodTabs (common / search)
