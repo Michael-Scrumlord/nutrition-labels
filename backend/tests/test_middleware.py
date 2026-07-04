@@ -7,6 +7,13 @@
 #   1. An invalid (non-integer) Content-Length header → 400
 #   2. Content-Length of "0" (valid integer, no size-limit concern) → not 413
 #   3. Content-Length exactly at the limit → not 413 (boundary: check is strict >)
+#
+# BodySizeLimitMiddleware runs before routing, so the target path below is
+# arbitrary — it doesn't need to match a real route (POST /api/search 404s
+# after the middleware passes it through, which is irrelevant to these
+# assertions). We point at /api/search rather than the retired
+# /api/generate_label endpoint so a reader doesn't mistake this for a live
+# route (PDF generation moved client-side; see README.md).
 
 import json
 
@@ -33,7 +40,7 @@ async def test_invalid_content_length_header_returns_400(client):
     parsing. The middleware's ValueError branch triggers this path."""
     async with client as c:
         response = await c.post(
-            "/api/generate_label",
+            "/api/search",
             content=b"{}",
             headers={
                 "Content-Type": "application/json",
@@ -49,7 +56,7 @@ async def test_float_content_length_header_returns_400(client):
     and must return 400 via the same ValueError branch."""
     async with client as c:
         response = await c.post(
-            "/api/generate_label",
+            "/api/search",
             content=b"{}",
             headers={
                 "Content-Type": "application/json",
@@ -65,7 +72,7 @@ async def test_negative_content_length_header_passes_through(client):
     layer may reject it for other reasons — but NOT with 413)."""
     async with client as c:
         response = await c.post(
-            "/api/generate_label",
+            "/api/search",
             content=b"{}",
             headers={
                 "Content-Type": "application/json",
@@ -84,7 +91,7 @@ async def test_content_length_zero_does_not_trigger_413(client):
     The middleware must pass it through (not 413)."""
     async with client as c:
         response = await c.post(
-            "/api/generate_label",
+            "/api/search",
             content=b"",
             headers={
                 "Content-Type": "application/json",
@@ -100,20 +107,13 @@ async def test_content_length_exactly_at_limit_is_not_rejected(client):
     limit itself is a permitted value."""
     max_bytes = config_module.settings.max_body_bytes
 
-    payload = {
-        "portion_divisor": 1,
-        "label_name": "x",
-        "width_inches": 2.75,
-        "height_inches": None,
-        "ingredients": [
-            {"fdc_id": 1097512, "name": "Butter", "amount": 100, "unit": "g"}
-        ],
-    }
-    body = json.dumps(payload).encode()
+    # Body content is irrelevant here — the middleware only inspects the
+    # Content-Length header before any parsing happens.
+    body = json.dumps({"anything": "goes"}).encode()
 
     async with client as c:
         response = await c.post(
-            "/api/generate_label",
+            "/api/search",
             content=body,
             headers={
                 "Content-Type": "application/json",
@@ -133,7 +133,7 @@ async def test_content_length_one_above_limit_returns_413(client):
 
     async with client as c:
         response = await c.post(
-            "/api/generate_label",
+            "/api/search",
             content=oversized_body,
             headers={
                 "Content-Type": "application/json",

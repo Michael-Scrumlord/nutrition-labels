@@ -3,35 +3,37 @@
 ## System Diagram
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│  Browser                                                         │
-│  React + TypeScript + Zustand + TanStack React Query             │
-│  ┌────────────────┐  ┌────────────────┐  ┌───────────────────┐ │
-│  │ IngredientSearch│  │ RecipeBuilder  │  │   LabelPreview   │ │
-│  │  (search modal)│  │ (Zustand store)│  │  (live FDA label) │ │
-│  └───────┬────────┘  └──────┬─────────┘  └────────┬──────────┘ │
-│          │                  │                      │             │
-│   GET /api/search    GET /api/food/{id}   POST /api/generate_label
-└──────────┼──────────────────┼──────────────────────┼────────────┘
-           │                  │                      │
-┌──────────▼──────────────────▼──────────────────────▼────────────┐
-│  FastAPI Backend                                                  │
-│  ┌────────────┐  ┌─────────────┐  ┌────────────────────────┐    │
-│  │ search.py  │  │ nutrition.py│  │        pdf.py          │    │
-│  │ (ranking)  │  │  (math)     │  │ (Jinja2 + WeasyPrint)  │    │
-│  └────────────┘  └─────────────┘  └────────────────────────┘    │
-│           └──────────────┬──────────────────────────┘            │
-│                          │                                        │
-│                  ┌───────▼───────┐                               │
-│                  │  database.py  │                               │
-│                  └───────┬───────┘                               │
-└──────────────────────────┼────────────────────────────────────────┘
-                            │
-                    ┌───────▼───────┐
-                    │   SQLite DB   │
-                    │ (USDA foods)  │
-                    └───────────────┘
+┌───────────────────────────────────────────────────────────────────────┐
+│  Browser                                                               │
+│  React + TypeScript + Zustand                                          │
+│  ┌────────────────┐  ┌────────────────┐  ┌──────────────────────────┐ │
+│  │ IngredientSearch│  │ RecipeBuilder  │  │  LabelPreview / GenerateButton│
+│  │  (search modal)│  │ (Zustand store)│  │  (labelSpec.ts + LabelPdfDoc) │
+│  └───────┬────────┘  └──────┬─────────┘  └──────────────┬───────────┘ │
+│          │                  │                            │             │
+│   GET /api/search    GET /api/food/{id}         PDF rendered in-browser│
+│                                                  via @react-pdf/renderer│
+│                                                  — no network request  │
+└──────────┼──────────────────┼──────────────────────────────────────────┘
+           │                  │
+┌──────────▼──────────────────▼───────────────────┐
+│  FastAPI Backend                                  │
+│  ┌────────────┐  ┌─────────────────────────────┐ │
+│  │ search.py  │  │        database.py          │ │
+│  │ (ranking)  │  │   (SQLite access layer)     │ │
+│  └─────┬──────┘  └──────────────┬──────────────┘ │
+│        └────────────────────────┘                │
+└─────────────────────────┼──────────────────────────┘
+                           │
+                   ┌───────▼───────┐
+                   │   SQLite DB   │
+                   │ (USDA foods)  │
+                   └───────────────┘
 ```
+
+`nutrition.py` (macro math) still lives in `backend/app/` but no route calls
+it — see [Module Responsibilities](#module-responsibilities) below. It's
+omitted from this diagram because it is off the request path.
 
 ---
 
@@ -52,13 +54,22 @@ Three middleware layers run before any route handler:
 | `/api/health`            | GET    | `database.get_connection` (DB probe); returns `{"status":"ok","release":"..."}` |
 | `/api/search`            | GET    | `search.ranked_search`; rejects queries > 100 chars with `400` |
 | `/api/food/{fdc_id}`     | GET    | `database.get_food_by_id`, `database.get_portions_by_id`  |
-| `/api/generate_label`    | POST   | `nutrition.calculate_recipe_macros` → `pdf.render_label_html` → `pdf.generate_pdf`; `504` on render timeout |
+
+There used to be a fourth route, `POST /api/generate_label`, which rendered a
+Jinja2 template through WeasyPrint (`pdf.py`, since deleted) and returned a
+PDF. It was retired — PDF generation is now entirely client-side (see
+[Data Flow: PDF Generation](#data-flow-pdf-generation) below). `main.py`
+carries a comment at the bottom noting the removal and its replacement.
 
 ### Module Responsibilities
 
-**`nutrition.py`** — Pure functions, no side effects, no I/O.
+**`nutrition.py`** — Pure functions, no side effects, no I/O. **Not called by
+any route** — retired along with `POST /api/generate_label`. Retained purely
+as the parity spec: its pytest suite (`test_nutrition*.py`) is the source of
+truth that `frontend/src/utils/nutrition.ts` is tested against (they share the
+`round_half_up_parity.json` vector file).
 
-- `calculate_recipe_macros(ingredients, food_rows, portion_divisor)` — Converts each ingredient's amount to grams, scales per-100 g database values by the resulting multiplier, sums across all ingredients, divides by `portion_divisor`, and rounds to label-appropriate precision (calories → integer, everything else → 1 decimal).
+- `calculate_recipe_macros(ingredients, food_rows, portion_divisor)` — Converts each ingredient's amount to grams, scales per-100 g database values by the resulting multiplier, sums across all ingredients, divides by `portion_divisor`, and rounds to label-appropriate precision (calories → integer, everything else → 1 decimal). The frontend equivalent, `calculateRecipeMacros`, deliberately does **not** round here — it returns full-precision per-serving values and defers to FDA increment-rounding at display time (`formatNutrientAmount`). The two implementations are "mirrored" in algorithm, not in this rounding step.
 - `compute_daily_value_pct(value, nutrient)` — Returns an integer %DV, or `None` if the nutrient has no established FDA daily value (calories, sugar, and protein have no DV).
 
 **`search.py`** — Pure ranking logic, no I/O.
@@ -67,30 +78,34 @@ Three middleware layers run before any route handler:
 
 **`database.py`** — SQLite access layer. Returns `sqlite3.Row` objects (dict-like). Never does any calculation.
 
-**`pdf.py`** — Jinja2 + WeasyPrint.
-
-- `render_label_html(macros, request, unrounded_macros=None)` — Renders the FDA label as an HTML string. When `unrounded_macros` is supplied, it is used for %DV calculations (avoids double-rounding errors); otherwise the rounded `MacroProfile` values are used as a fallback. Ingredients are sorted by gram weight descending (FDA requirement).
-- `generate_pdf(html)` — Converts the HTML to a PDF binary using WeasyPrint. External URL fetching is disabled to prevent SSRF. Returns bytes.
-
 **`models.py`** — All Pydantic models.
 
 | Model                 | Direction | Purpose                                              |
 |-----------------------|-----------|------------------------------------------------------|
-| `IngredientItem`      | Request   | One ingredient: `fdc_id`, `name`, `amount`, `unit`  |
-| `GenerateLabelRequest`| Request   | Full PDF generation payload                          |
+| `IngredientItem`      | Request   | One ingredient: `fdc_id`, `name`, `amount`, `unit`. No route constructs this today — see note below. |
+| `GenerateLabelRequest`| Request   | The retired PDF-generation payload shape. No route uses it; same status as `IngredientItem` above. |
 | `MacroProfile`        | Response  | 13 nutrient totals (per 100 g or per serving)        |
 | `FoodSearchResult`    | Response  | `fdc_id` + `name` + optional `data_type` for search results |
 | `PortionSize`         | Response  | A named portion (e.g. 1 tablespoon = 14.2 g)         |
 | `FoodDetail`          | Response  | One food: `macros` + `portions`                      |
 | `HealthResponse`      | Response  | `{"status": "ok", "release": "<sha>"}` from `/api/health` |
 
+`IngredientItem` and `GenerateLabelRequest` are unused by any live route (the
+route that consumed them was removed), but are kept because `test_models.py`
+and `test_models_validators.py` still exercise their field constraints below.
+
 **`constants.py`** — Single source of truth for numbers shared across modules.
 
 - `UNIT_CONVERSIONS` — Grams per unit (`g`, `ml`, `oz`, `lb`, `kg`).
 - `FDA_DAILY_VALUES` — 2020 reference values for 10 of the 13 tracked nutrients.
-- `NUTRIENT_FIELDS` — Ordered list of the 13 nutrient field names. Drives DB queries, macro math, and template rendering.
+- `NUTRIENT_FIELDS` — Ordered list of the 13 nutrient field names. Drives DB queries and macro math.
 
 ### Validation Rules (`models.py`)
+
+Not enforced against any live request today (see the note above) — listed
+here as the spec `test_models*.py` checks, and as the numbers the frontend is
+expected to informally respect even though nothing currently enforces them
+client-side either.
 
 | Field                | Rule                                              |
 |----------------------|---------------------------------------------------|
@@ -124,10 +139,13 @@ App
     │       └── IngredientSearch (modal overlay)
     │           ├── FoodTabs (common / search)
     │           └── SearchResults
-    └── [right] LabelColumn
-        ├── LabelPreview               ← live FDA label (ThemedFrame)
+    └── [right] LabelColumn            ← save/version workflow via useLabelSave
+        ├── LabelPreview               ← live FDA label (ThemedFrame); reads labelSpec.ts
+        ├── LabelDetails               ← serving size / added sugars / trans fat overrides
         ├── LabelDimensions            ← width/height controls
-        └── GenerateButton             ← triggers PDF download
+        ├── SaveControls               ← save/save-as-new buttons + feedback flash
+        └── GenerateButton             ← renders LabelPdfDoc client-side, triggers download
+                                          (lazy-loads @react-pdf/renderer; no network request)
 
 RecipesModal (overlay, triggered from Header)
 └── RecipeCard (×N)
@@ -149,12 +167,15 @@ The `IngredientSearch` modal is triggered from `RecipeBuilder` and overlays the 
 | `highlightedNutrients`   | `HighlightSet`      | Nutrient rows to highlight in label (hover)      |
 | `instructions`           | `RecipeStep[]`      | Ordered method steps                             |
 | `variables`              | `RecipeVariable[]`  | Named variables that interpolate into step text  |
+| `servingHousehold`       | `string`            | Household serving description, e.g. "2/3 cup"; empty → label shows "1 portion" |
+| `addedSugarsG`           | `number`            | Added Sugars (g) — mandatory FDA line with its own %DV (50 g); user-supplied, not looked up |
+| `transFatG`              | `number`            | Trans Fat (g) — mandatory FDA line, no %DV; user-supplied, not looked up |
 | `currentRecipeId`        | `string \| null`    | ID of the loaded saved recipe, or null if unsaved|
 | `viewingVersionId`       | `string \| null`    | Non-null when browsing a historical version      |
 
 Ingredient actions: `addIngredient`, `removeIngredient`, `updateIngredientName`, `updateIngredientAmount`, `updateIngredientUnit`, `moveIngredient`.
 
-Recipe meta actions: `setPortionDivisor`, `setLabelName`, `setDimensions`, `setHighlightedNutrients`.
+Recipe meta actions: `setPortionDivisor`, `setLabelName`, `setDimensions`, `setHighlightedNutrients`, `setServingHousehold`, `setAddedSugarsG`, `setTransFatG`.
 
 Method actions: `addStep`, `updateStepText`, `removeStep`, `moveStep`, `addVariable`, `setVariableValue`, `updateVariable`, `removeVariable`.
 
@@ -178,6 +199,7 @@ Lifecycle actions: `clearRecipe`, `loadRecipe`, `loadVersion`, `exitVersionView`
 | `useRecipeActions`      | Returns all `recipeStore` actions in one shallow-equal subscription (prevents unnecessary re-renders) |
 | `useIngredientSearch`   | Manages search API calls and the search modal state                     |
 | `useLabelResize`        | Tracks label panel dimensions for the PDF size controls                 |
+| `useLabelSave`          | Save/version workflow for `LabelColumn`: builds the `RecipeSnapshot`, decides create-vs-append-version, and drives the transient "SAVED ✓" feedback flash |
 | `useAnimatedNumber`     | Animates number transitions in the stats bar                            |
 | `useDebounce`           | Debounces a value by a given delay (used by ingredient search input)    |
 | `useTitleAutoResize`    | Auto-resizes the label-name input to fit its content                    |
@@ -186,16 +208,20 @@ Lifecycle actions: `clearRecipe`, `loadRecipe`, `loadVersion`, `exitVersionView`
 
 ### Utilities (`src/utils/`)
 
-**`nutrition.ts`** — Mirrors backend math exactly. Must stay in sync with `nutrition.py`.
+**`nutrition.ts`** — Mirrors the *algorithm* in `nutrition.py` (grams → multiplier → contribution → sum → per-serving), but not its rounding step: `calculateRecipeMacros` returns unrounded per-serving values, and every display-rounding rule below lives only on the frontend (the backend's `_round_macro_values` has no active caller now that PDF generation is client-side). This is the module both `LabelPreview` and `LabelPdfDoc` (via `labelSpec.ts`) call for every value on the label.
 
 | Function                    | Purpose                                                                  |
 |-----------------------------|--------------------------------------------------------------------------|
-| `calculateRecipeMacros`     | Same algorithm as backend; throws `RangeError` for `portionDivisor` outside 1–999 |
+| `calculateRecipeMacros`     | Same summing algorithm as the backend; returns **unrounded** per-serving values; throws `RangeError` for `portionDivisor` outside 1–999 |
 | `getHighlightKeys`          | Returns a `Set` of the top 2 nutrient keys by %DV contribution           |
 | `computeDailyValues`        | Returns `{ nutrient: %DV }` for all DV-tracked nutrients                 |
-| `formatDV`                  | Returns `"—"`, `"<1%"`, or `"12%"` for label display                    |
+| `formatDV`                  | Returns `"—"`, `"<1%"`, or `"12%"` for label display, from an unrounded amount |
+| `formatDVFromAmount`        | Same as `formatDV` but takes a raw `(amount, dv)` pair directly — used for Added Sugars, which has a DV but isn't part of `MacroProfile` |
+| `formatNutrientAmount`      | Applies the FDA 21 CFR 101.9(c) increment-rounding table (per-nutrient) and returns the full display token, e.g. `"8g"`, `"less than 1g"`, `"160mg"` |
+| `formatTransFatAmount` / `formatAddedSugarsAmount` | Same increment rules as fat/sugar, for the two label-meta overrides that aren't looked up from the USDA DB |
 | `buildIngredientsString`    | Sorts by gram weight desc, uppercases, joins with commas, appends `.`    |
-| `round1`                    | Rounds to 1 decimal place using `roundHalfUp` (matches Python behavior)  |
+| `roundHalfUp`               | Round-half-away-from-zero at `ndigits`, matching Python's `Decimal.quantize(ROUND_HALF_UP)`. Verified against the backend via a shared `round_half_up_parity.json` vector file. |
+| `round1`                    | `roundHalfUp(_, 1)`                                                      |
 
 **`units.ts`** — Unit conversion utilities. Must stay in sync with `backend/app/constants.py`.
 
@@ -207,59 +233,74 @@ Lifecycle actions: `clearRecipe`, `loadRecipe`, `loadVersion`, `exitVersionView`
 | `normalizePortion`     | Converts a FDC `PortionSize` (e.g. `0.5 cup = 113.5 g`) to a per-1-unit `PortionRef` |
 | `ingredientGrams`      | Single source of truth for ingredient weight: uses `portionRef.gramsPerUnit` when set, otherwise falls back to unit conversion |
 
+### Label Rendering (`src/components/label/labelSpec.ts`)
+
+Single source of truth for the FDA 2020 Nutrition Facts panel layout, shared
+by `LabelPreview` (DOM) and `LabelPdfDoc` (`@react-pdf/renderer`) so the two
+renderers can never disagree on a value, its rounding, or its %DV:
+
+| Export         | Purpose                                                                 |
+|-----------------|--------------------------------------------------------------------------|
+| `GEO`           | Every label dimension (font sizes, rule widths, padding) in points — the PDF's native unit. The DOM preview renders the same numbers as px at 1:1, so both are uniform scales of the same layout. |
+| `MACRO_ROWS`    | Total Fat through Added Sugars, in FDA order, with `bold`/`indent`/`noDV` metadata per row |
+| `MICRO_ROWS`    | Vitamin D, Calcium, Iron, Potassium — printed after the Protein rule     |
+| `rowDisplay(row, macros, transFatG, addedSugarsG)` | Resolves one row to its exact `{ label, amount, boldLabel, dv }` display strings. Trans Fat and Added Sugars are "label-meta overrides" (user-supplied, not looked up from the USDA DB) handled via `row.source`; everything else pulls from `MacroProfile` via `row.nutrient`. |
+
+### PDF Rendering (`src/components/label/LabelPdfDoc.tsx`)
+
+Renders the same rows as `LabelPreview`, as a `@react-pdf/renderer` `<Document>`,
+using TeX Gyre Heros (a Helvetica-metrics-compatible OTF) embedded into every
+PDF so printers never substitute fonts. `GenerateButton` lazy-imports both this
+component and `@react-pdf/renderer` on click and calls `pdf(<LabelPdfDoc .../>).toBlob()`
+in the browser — see [Data Flow: PDF Generation](#data-flow-pdf-generation).
+
 ---
 
 ## Key Design Invariants
 
-1. **Mirrored math** — `nutrition.ts` and `nutrition.py` implement the same algorithm. Changes to one must be reflected in the other.
+1. **Mirrored math (algorithm, not rounding)** — `nutrition.ts` and `nutrition.py` implement the same summing algorithm, but `nutrition.py` is no longer called by any route (see [Module Responsibilities](#module-responsibilities)) — it survives purely as the parity spec `nutrition.ts` is tested against. `nutrition.ts`'s `calculateRecipeMacros` also deliberately skips the rounding step `nutrition.py` performs; FDA increment-rounding happens only at display time via `formatNutrientAmount`.
 
 2. **Constants parity** — `UNIT_CONVERSIONS` and `FDA_DAILY_VALUES` are duplicated across frontend and backend. They must remain identical.
 
 3. **Frontend DV permissiveness** — The frontend `calculateRecipeMacros` throws a `RangeError` for any `portionDivisor` outside 1–999. The backend `nutrition.py` raises `ValueError` for `portionDivisor ≤ 0`. The UI never passes 0 to the calculation function.
 
-4. **Backend recalculates on generate** — When `POST /api/generate_label` is called, the backend recalculates all macros independently from the food database. This catches any constant drift that might have crept in between frontend and backend.
+4. **PDF generation is entirely client-side** — There is no backend involvement in producing the downloadable PDF. `LabelPdfDoc` and `LabelPreview` both read from `labelSpec.ts`, so there's no "backend recalculates to catch drift" step anymore — there's only one implementation of the label to begin with.
 
-5. **Ingredient ordering** — FDA regulations require ingredients listed by weight descending. Both `buildIngredientsString` (frontend label preview) and the Jinja2 template (backend PDF) implement this sort.
+5. **Ingredient ordering** — FDA regulations require ingredients listed by weight descending. `buildIngredientsString` (frontend) implements this sort once; both `LabelPreview` and `LabelPdfDoc` call it.
 
-6. **`<1%` rule** — When `round(value / dv * 100) === 0` but `value > 0`, the label must show `<1%` rather than `0%`. Implemented in `formatDV` (frontend) and the Jinja2 template (backend).
+6. **`<1%` rule** — When the computed %DV rounds to 0 but the raw value is > 0, the label must show `<1%` rather than `0%`. Implemented once, in `formatDV` / `formatDVFromAmount`, and consumed by both renderers via `labelSpec.ts`'s `rowDisplay()`.
 
-7. **No business logic in routes** — `main.py` only validates input, delegates to modules, and assembles responses. Math, ranking, and rendering are isolated in their own modules.
+7. **No business logic in routes** — `main.py` only validates input, delegates to modules, and assembles responses. Search ranking and DB access are isolated in their own modules.
 
-8. **Rate limiting** — All three data routes are rate-limited per remote IP via `slowapi`: `GET /api/search` at 60/min, `GET /api/food/{fdc_id}` at 120/min, and `POST /api/generate_label` at 10/min. Every `429` response includes a `Retry-After` header.
+8. **Rate limiting** — Both live data routes are rate-limited per remote IP via `slowapi`: `GET /api/search` at 60/min and `GET /api/food/{fdc_id}` at 120/min. Every `429` response includes a `Retry-After` header.
 
 ---
 
 ## Data Flow: PDF Generation
 
+Entirely client-side — no network request is made.
+
 ```
-Client
-  POST /api/generate_label (GenerateLabelRequest)
+Browser (GenerateButton.handleGenerate)
         │
         ▼
-  Validate with Pydantic (amount > 0, unit valid, divisor 1–999)
+  Lazy-import @react-pdf/renderer + LabelPdfDoc
+  (dynamic import → separate chunk, ~450 KB kept out of the initial bundle)
         │
         ▼
-  database.get_foods_by_ids(fdc_ids)   ← one bulk query
+  macros = useNutritionCalc()   ← same recipeStore-derived MacroProfile the
+        │                          live LabelPreview is already rendering
+        ▼
+  <LabelPdfDoc macros={macros} portionDivisor={...} ingredients={...} .../>
+        │  for each row in MACRO_ROWS / MICRO_ROWS + the Protein row:
+        │    rowDisplay(row, macros, transFatG, addedSugarsG)  ← labelSpec.ts
+        │  buildIngredientsString(ingredients)  ← sorted by gram weight desc
+        ▼
+  pdf(<LabelPdfDoc .../>).toBlob()   ← @react-pdf/renderer, in-browser
         │
         ▼
-  Verify all fdc_ids were found (400 if any missing)
-        │
-        ▼
-  nutrition.calculate_recipe_macros(ingredients, food_rows, portion_divisor)
-        │  for each ingredient:
-        │    grams = amount × UNIT_CONVERSIONS[unit]
-        │    multiplier = grams / 100
-        │    for each nutrient: total += db_value × multiplier
-        │  per_serving = total / portion_divisor
-        │  round calories → int, others → 1 decimal
-        ▼
-  pdf.render_label_html(macros, request)   ← Jinja2 template
-        │
-        ▼
-  pdf.generate_pdf(html)   ← WeasyPrint (bounded by semaphore + timeout)
-        │                      → 504 if render exceeds pdf_timeout_seconds
-        ▼
-  Response(content=pdf_bytes, media_type="application/pdf")
+  downloadBlob(blob, "nutrition_label.pdf")   ← api/client.ts;
+                                                 object URL, click, revoke
 ```
 
 ---
