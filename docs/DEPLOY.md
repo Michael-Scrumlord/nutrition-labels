@@ -91,6 +91,15 @@ via the `caddy-ratelimit` plugin — see [Caddyfile](../Caddyfile). This
 sits in front of the in-process slowapi limits in FastAPI; both layers
 fail closed.
 
+**Known drift:** `POST /api/generate_label` was retired — PDF generation
+moved entirely client-side (see the root [README.md](../README.md#pdf-export-client-side)
+and [architecture-overview.md](architecture-overview.md#data-flow-pdf-generation)).
+The Caddy `rate_limit` zone above still matches that path, so it now
+protects a route that 404s; it's harmless (Caddy will just never see
+traffic there) but should be removed the next time the Caddyfile changes,
+along with the `caddy-ratelimit` plugin build step below if nothing else
+ends up needing it.
+
 To change the threshold, edit the `rate_limit` block in `Caddyfile` and
 `docker compose restart caddy`. No rebuild required for Caddyfile-only
 changes.

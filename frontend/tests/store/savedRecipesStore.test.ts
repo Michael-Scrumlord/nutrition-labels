@@ -24,6 +24,9 @@ function makeSnapshot(labelName = "Test Recipe"): RecipeSnapshot {
     ingredients: [],
     instructions: [],
     variables: [],
+    servingHousehold: "",
+    addedSugarsG: 0,
+    transFatG: 0,
   };
 }
 
