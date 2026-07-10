@@ -70,22 +70,3 @@ export function referencedVariableNames(
   }
   return out;
 }
-
-/** Insert a variable reference into text at the given cursor position. */
-export function insertVariableAt(
-  text: string,
-  cursor: number,
-  variable: RecipeVariable,
-): { text: string; cursorAfter: number } {
-  const token = `{${variable.label}}`;
-  const before = text.slice(0, cursor);
-  const after  = text.slice(cursor);
-  // Insert a leading space if the cursor isn't at a word boundary
-  const needsSpaceBefore = before.length > 0 && !/\s$/.test(before);
-  const needsSpaceAfter  = after.length > 0 && !/^\s/.test(after);
-  const insert = `${needsSpaceBefore ? " " : ""}${token}${needsSpaceAfter ? " " : ""}`;
-  return {
-    text: before + insert + after,
-    cursorAfter: before.length + insert.length,
-  };
-}
