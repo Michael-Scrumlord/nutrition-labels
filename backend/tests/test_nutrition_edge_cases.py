@@ -9,8 +9,8 @@ from pathlib import Path
 
 import pytest
 from app.nutrition import calculate_recipe_macros, compute_daily_value_pct, round_half_up
-from app.models import IngredientItem
-from app.constants import UNIT_CONVERSIONS
+from app.models import IngredientItem, MAX_PORTION_DIVISOR
+from app.constants import UNIT_CONVERSIONS, NUTRIENT_FIELDS
 
 _PARITY_VECTORS = json.loads(
     (Path(__file__).parent / "data" / "round_half_up_parity.json").read_text()
@@ -259,3 +259,51 @@ def test_round_half_up_parity_vector(case):
     the same outputs for these inputs — see the matching vitest case.
     """
     assert round_half_up(case["input"], case["ndigits"]) == case["expected"]
+
+
+# ---------------------------------------------------------------------------
+# calculate_recipe_macros — compounding extreme divisor + near-zero amount
+# ---------------------------------------------------------------------------
+# test_very_small_amount_does_not_raise covers a trace amount alone;
+# test_divisor_at_maximum_boundary covers MAX_PORTION_DIVISOR alone. Neither
+# combines them. calculate_recipe_macros has no lower bound on amount (only
+# Pydantic's IngredientItem does, via gt=0), so this exercises the pure
+# function directly at the boundary Pydantic does allow through — see
+# test_amount_very_small_positive_accepted in test_models_validators.py.
+
+def test_trace_amount_at_max_portion_divisor_does_not_raise():
+    """1e-9 g at portion_divisor=999 must not raise or produce a negative result."""
+    ingredient = make_ingredient(1097512, 1e-9, "g")
+    unrounded, result = calculate_recipe_macros(
+        [ingredient], [butter_row()], portion_divisor=MAX_PORTION_DIVISOR
+    )
+    assert result.calories == 0
+    assert result.fat_total_g == 0.0
+    assert unrounded["calories"] >= 0.0
+
+
+def test_trace_amount_at_max_portion_divisor_rounds_all_fields_to_zero():
+    """Every rounded field collapses to 0 at this compounding extreme."""
+    ingredient = make_ingredient(1097512, 1e-9, "g")
+    _, result = calculate_recipe_macros(
+        [ingredient], [butter_row()], portion_divisor=MAX_PORTION_DIVISOR
+    )
+    for field in NUTRIENT_FIELDS:
+        assert getattr(result, field) == 0
+
+
+def test_trace_amount_at_max_portion_divisor_unrounded_stays_within_tolerance():
+    """
+    The unrounded/rounded tolerance invariant (see test_nutrition_invariants.py)
+    must still hold for a near-zero-gram ingredient at the max portion divisor,
+    not just at the mid-size recipe / divisor=1 case it's normally checked at.
+    """
+    ingredient = make_ingredient(1097512, 1e-9, "g")
+    unrounded, result = calculate_recipe_macros(
+        [ingredient], [butter_row()], portion_divisor=MAX_PORTION_DIVISOR
+    )
+    for field in NUTRIENT_FIELDS:
+        raw = unrounded[field]
+        rounded_val = getattr(result, field)
+        tolerance = 0.5 if field == "calories" else 0.05
+        assert abs(raw - rounded_val) < tolerance
