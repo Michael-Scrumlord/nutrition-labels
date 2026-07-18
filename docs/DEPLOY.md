@@ -86,13 +86,17 @@ first that pushes the latest tarball off-host.
 
 ## Edge rate limiting
 
-Caddy enforces a per-IP cap on `/api/generate_label` (10 req / minute)
-via the `caddy-ratelimit` plugin — see [Caddyfile](../Caddyfile). This
-sits in front of the in-process slowapi limits in FastAPI; both layers
-fail closed.
+PDF generation moved entirely client-side (`@react-pdf/renderer`), and
+`POST /api/generate_label` — the one route Caddy used to rate-limit at the
+edge — was removed from the backend. There is currently no active
+`rate_limit` zone in [Caddyfile](../Caddyfile); `/api/search` and
+`/api/food/{id}` are only rate-limited by the in-process slowapi limits in
+FastAPI (60/min and 120/min respectively).
 
-To change the threshold, edit the `rate_limit` block in `Caddyfile` and
-`docker compose restart caddy`. No rebuild required for Caddyfile-only
+The `caddy-ratelimit` plugin (see `caddy/Dockerfile`) is still built into
+the image, so if a future expensive endpoint needs edge-level protection,
+add a `rate_limit { zone ... }` block scoped to its path and
+`docker compose restart caddy` — no rebuild required for Caddyfile-only
 changes.
 
 ## Monitoring
