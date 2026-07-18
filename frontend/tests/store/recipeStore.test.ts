@@ -5,7 +5,7 @@
 
 import { describe, it, expect, beforeEach } from "vitest";
 import { useRecipeStore } from "../../src/store/recipeStore";
-import type { IngredientItem, MacroProfile, SavedRecipe } from "../../src/types";
+import type { IngredientItem, MacroProfile, SavedRecipe, RecipeVersion } from "../../src/types";
 
 // ── Fixtures ───────────────────────────────────────────────────────────────
 
@@ -38,6 +38,9 @@ const STORE_DEFAULTS = {
   currentRecipeId: null,
   viewingVersionId: null,
   dimensions: { widthInches: 2.75, heightInches: null },
+  servingHousehold: "",
+  addedSugarsG: 0,
+  transFatG: 0,
 };
 
 beforeEach(() => {
@@ -139,6 +142,51 @@ describe("updateIngredientUnit", () => {
     useRecipeStore.getState().updateIngredientUnit(id, "oz");
     expect(useRecipeStore.getState().ingredients[0].unit).toBe("oz");
   });
+
+  it("preserves the ingredient's gram weight across the unit change (100g -> ~3.53oz)", () => {
+    const id = addAndGetId(makeIngredient(1, "Butter", 100, "g"));
+    useRecipeStore.getState().updateIngredientUnit(id, "oz");
+    expect(useRecipeStore.getState().ingredients[0].amount).toBeCloseTo(3.53, 2);
+  });
+
+  it("clears an active portionRef when the unit is changed", () => {
+    const id = addAndGetId(makeIngredient(1, "Butter", 1, "g"));
+    useRecipeStore.getState().updateIngredientPortion(id, { modifier: "tablespoon", gramsPerUnit: 14.2 });
+    useRecipeStore.getState().updateIngredientUnit(id, "oz");
+    expect(useRecipeStore.getState().ingredients[0].portionRef).toBeNull();
+  });
+});
+
+describe("updateIngredientPortion", () => {
+  it("switches to a food-specific portion, re-expressing amount as a portion count", () => {
+    const id = addAndGetId(makeIngredient(1, "Butter", 100, "g"));
+    useRecipeStore.getState().updateIngredientPortion(id, { modifier: "tablespoon", gramsPerUnit: 14.2 });
+    const row = useRecipeStore.getState().ingredients[0];
+    expect(row.portionRef).toEqual({ modifier: "tablespoon", gramsPerUnit: 14.2 });
+    // 100g / 14.2g-per-tbsp ≈ 7.04 tbsp
+    expect(row.amount).toBeCloseTo(7.04, 2);
+  });
+
+  it("clearing the portion (null) falls back to the row's unit, preserving gram weight", () => {
+    const id = addAndGetId(makeIngredient(1, "Butter", 100, "g"));
+    useRecipeStore.getState().updateIngredientPortion(id, { modifier: "tablespoon", gramsPerUnit: 14.2 });
+    useRecipeStore.getState().updateIngredientPortion(id, null);
+    const row = useRecipeStore.getState().ingredients[0];
+    expect(row.portionRef).toBeNull();
+    expect(row.unit).toBe("g");
+    // Round-tripping through a 2-decimal portion count reintroduces a small
+    // rounding drift — should stay within a gram of the original 100g.
+    expect(row.amount).toBeCloseTo(100, 0);
+  });
+
+  it("is scoped to the targeted instanceId only", () => {
+    const butterId = addAndGetId(makeIngredient(1, "Butter", 100, "g"));
+    addAndGetId(makeIngredient(2, "Flour", 100, "g"));
+    useRecipeStore.getState().updateIngredientPortion(butterId, { modifier: "tablespoon", gramsPerUnit: 14.2 });
+    const [butter, flour] = useRecipeStore.getState().ingredients;
+    expect(butter.portionRef).not.toBeNull();
+    expect(flour.portionRef).toBeUndefined();
+  });
 });
 
 describe("moveIngredient", () => {
@@ -225,6 +273,65 @@ describe("setDimensions", () => {
   it("sets heightInches when specified", () => {
     useRecipeStore.getState().setDimensions({ heightInches: 6.0 });
     expect(useRecipeStore.getState().dimensions.heightInches).toBe(6.0);
+  });
+});
+
+describe("setServingHousehold", () => {
+  it("updates the household serving description", () => {
+    useRecipeStore.getState().setServingHousehold("2/3 cup");
+    expect(useRecipeStore.getState().servingHousehold).toBe("2/3 cup");
+  });
+
+  it("allows an empty string", () => {
+    useRecipeStore.getState().setServingHousehold("2/3 cup");
+    useRecipeStore.getState().setServingHousehold("");
+    expect(useRecipeStore.getState().servingHousehold).toBe("");
+  });
+});
+
+describe("setAddedSugarsG", () => {
+  it("sets a normal positive value", () => {
+    useRecipeStore.getState().setAddedSugarsG(12.5);
+    expect(useRecipeStore.getState().addedSugarsG).toBe(12.5);
+  });
+
+  it("clamps a negative value to 0", () => {
+    useRecipeStore.getState().setAddedSugarsG(-5);
+    expect(useRecipeStore.getState().addedSugarsG).toBe(0);
+  });
+
+  it("coerces NaN (e.g. a cleared numeric input) to 0", () => {
+    useRecipeStore.getState().setAddedSugarsG(10);
+    useRecipeStore.getState().setAddedSugarsG(NaN);
+    expect(useRecipeStore.getState().addedSugarsG).toBe(0);
+  });
+
+  it("does not clamp an extreme large value — the store has no upper bound", () => {
+    useRecipeStore.getState().setAddedSugarsG(1_000_000);
+    expect(useRecipeStore.getState().addedSugarsG).toBe(1_000_000);
+  });
+
+  it("treats exactly 0 as valid, not as a clamped/falsy input", () => {
+    useRecipeStore.getState().setAddedSugarsG(5);
+    useRecipeStore.getState().setAddedSugarsG(0);
+    expect(useRecipeStore.getState().addedSugarsG).toBe(0);
+  });
+});
+
+describe("setTransFatG", () => {
+  it("sets a normal positive value", () => {
+    useRecipeStore.getState().setTransFatG(1.5);
+    expect(useRecipeStore.getState().transFatG).toBe(1.5);
+  });
+
+  it("clamps a negative value to 0", () => {
+    useRecipeStore.getState().setTransFatG(-2);
+    expect(useRecipeStore.getState().transFatG).toBe(0);
+  });
+
+  it("coerces NaN to 0", () => {
+    useRecipeStore.getState().setTransFatG(NaN);
+    expect(useRecipeStore.getState().transFatG).toBe(0);
   });
 });
 
@@ -421,6 +528,97 @@ describe("loadRecipe", () => {
     useRecipeStore.getState().loadRecipe(recipe);
     // Should not have changed anything
     expect(useRecipeStore.getState().labelName).toBe("Existing");
+  });
+
+  it("defaults servingHousehold/addedSugarsG/transFatG to \"\"/0/0 for a version saved before those fields existed", () => {
+    const legacyVersion: RecipeVersion = {
+      id: "v1",
+      savedAt: Date.now(),
+      labelName: "Old Recipe",
+      portionDivisor: 8,
+      dimensions: { widthInches: 2.75, heightInches: null },
+      ingredients: [],
+      instructions: [],
+      variables: [],
+      // servingHousehold / addedSugarsG / transFatG intentionally omitted
+    };
+    const recipe: SavedRecipe = {
+      id: "recipe-legacy", name: "Old Recipe", createdAt: Date.now(), versions: [legacyVersion],
+    };
+
+    // Dirty the fields first so a no-op reset wouldn't be caught by chance.
+    useRecipeStore.getState().setServingHousehold("2 tbsp");
+    useRecipeStore.getState().setAddedSugarsG(9);
+    useRecipeStore.getState().setTransFatG(3);
+
+    useRecipeStore.getState().loadRecipe(recipe);
+    const state = useRecipeStore.getState();
+    expect(state.servingHousehold).toBe("");
+    expect(state.addedSugarsG).toBe(0);
+    expect(state.transFatG).toBe(0);
+  });
+
+  it("carries forward servingHousehold/addedSugarsG/transFatG when the version has them", () => {
+    const version: RecipeVersion = {
+      id: "v1",
+      savedAt: Date.now(),
+      labelName: "Cookies",
+      portionDivisor: 8,
+      dimensions: { widthInches: 2.75, heightInches: null },
+      ingredients: [],
+      instructions: [],
+      variables: [],
+      servingHousehold: "2/3 cup",
+      addedSugarsG: 8,
+      transFatG: 0.5,
+    };
+    const recipe: SavedRecipe = {
+      id: "recipe-1", name: "Cookies", createdAt: Date.now(), versions: [version],
+    };
+
+    useRecipeStore.getState().loadRecipe(recipe);
+    const state = useRecipeStore.getState();
+    expect(state.servingHousehold).toBe("2/3 cup");
+    expect(state.addedSugarsG).toBe(8);
+    expect(state.transFatG).toBe(0.5);
+  });
+});
+
+describe("loadVersion", () => {
+  const recipe: SavedRecipe = {
+    id: "recipe-1",
+    name: "Cookies",
+    createdAt: Date.now(),
+    versions: [
+      {
+        id: "v1", savedAt: 1000, labelName: "Cookies v1", portionDivisor: 8,
+        dimensions: { widthInches: 2.75, heightInches: null },
+        ingredients: [], instructions: [], variables: [],
+      },
+      {
+        id: "v2", savedAt: 2000, labelName: "Cookies v2", portionDivisor: 12,
+        dimensions: { widthInches: 2.75, heightInches: null },
+        ingredients: [], instructions: [], variables: [],
+        servingHousehold: "1 cookie", addedSugarsG: 4, transFatG: 0,
+      },
+    ],
+  };
+
+  it("loads the specified (non-latest) version and marks it as being viewed", () => {
+    useRecipeStore.getState().loadVersion(recipe, recipe.versions[0]);
+    const state = useRecipeStore.getState();
+    expect(state.labelName).toBe("Cookies v1");
+    expect(state.portionDivisor).toBe(8);
+    expect(state.currentRecipeId).toBe("recipe-1");
+    expect(state.viewingVersionId).toBe("v1");
+  });
+
+  it("switching between versions updates label-meta overrides accordingly", () => {
+    useRecipeStore.getState().loadVersion(recipe, recipe.versions[1]);
+    const state = useRecipeStore.getState();
+    expect(state.servingHousehold).toBe("1 cookie");
+    expect(state.addedSugarsG).toBe(4);
+    expect(state.viewingVersionId).toBe("v2");
   });
 });
 
