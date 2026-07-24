@@ -18,8 +18,7 @@
 import { Document, Page, View, Text, Font, StyleSheet } from "@react-pdf/renderer";
 import type { MacroProfile, IngredientItem } from "../../types";
 import { buildIngredientsString, formatNutrientAmount } from "../../utils/nutrition";
-import { ingredientGrams } from "../../utils/units";
-import { MACRO_ROWS, MICRO_ROWS, GEO, INK, rowDisplay, type LabelRow } from "./labelSpec";
+import { MACRO_ROWS, MICRO_ROWS, GEO, INK, rowDisplay, resolveServing, type LabelRow } from "./labelSpec";
 
 // Register TeX Gyre Heros once at module load. The family name MUST NOT be
 // "Helvetica" — react-pdf reserves that for the built-in "standard 14", which
@@ -177,9 +176,7 @@ export function LabelPdfDoc({
   const pageSize: [number, number] = [widthInches * 72, heightInches * 72];
   const ingredientsString = buildIngredientsString(ingredients);
 
-  const totalGrams = ingredients.reduce((sum, ing) => sum + ingredientGrams(ing), 0);
-  const servingGrams = Math.round(totalGrams / portionDivisor);
-  const servingLabel = servingHousehold.trim() || "1 portion";
+  const serving = resolveServing(ingredients, portionDivisor, servingHousehold);
 
   return (
     <Document>
@@ -195,7 +192,7 @@ export function LabelPdfDoc({
             <Text>{portionDivisor} servings per container</Text>
             <View style={styles.servingSizeRow}>
               <Text>Serving size</Text>
-              <Text>{servingLabel} ({servingGrams}g)</Text>
+              <Text>{serving.label} ({serving.grams}g)</Text>
             </View>
           </View>
 

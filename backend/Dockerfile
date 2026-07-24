@@ -41,6 +41,9 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
 # a real process model for production. Workers = 2 by default; override in compose.
 # Access log emits one JSON object per request, matching the app log format
 # in app/main.py — pipe both through `jq` or ship straight to an aggregator.
+# --forwarded-allow-ips is hardcoded here (not env-configurable) because it's
+# a gunicorn CLI flag, not something app/config.py reads — see docker-compose.yml
+# for why "*" is safe in this deployment.
 CMD ["gunicorn", "app.main:app", \
      "--workers", "2", \
      "--worker-class", "uvicorn.workers.UvicornWorker", \

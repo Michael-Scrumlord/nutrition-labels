@@ -41,21 +41,15 @@ services:
     env_file:
       - .env
     environment:
-      # `*` is safe here because the backend has no `ports:` mapping —
-      # only `expose:` — so port 8000 is reachable solely from inside
-      # the docker network. The only container on that network that
-      # talks to the backend is nginx, which forwards Caddy's already-
-      # sanitized X-Forwarded-For (see Caddyfile + nginx.conf #4 fix).
-      # Gunicorn's --forwarded-allow-ips doesn't accept CIDR notation,
-      # so we can't narrow this any further without per-IP enumeration.
-      # The backend is `expose`d only (not `ports:` published), so its TCP peer
-      # is always the frontend (nginx) container on the docker bridge — whose
-      # IP is dynamic. Accepting X-Forwarded-For from any peer is acceptable
-      # *only* because nothing outside the docker network can reach :8000.
-      # Do not copy this setting to a deployment where the backend port is
-      # directly reachable — it would let any client spoof their source IP
-      # and bypass the slowapi rate limits. See .env.example for guidance.
-      - FORWARDED_ALLOW_IPS=*
+      # Gunicorn's --forwarded-allow-ips is set to "*" in backend/Dockerfile's
+      # CMD (not here — it's a process CLI flag, not something the app reads
+      # from the environment). That's safe only because the backend has no
+      # `ports:` mapping — only `expose:` — so port 8000 is reachable solely
+      # from inside the docker network, whose only talker is nginx forwarding
+      # Caddy's already-sanitized X-Forwarded-For. Do not copy that "*" to a
+      # deployment where the backend port is directly reachable — it would
+      # let any client spoof their source IP and bypass the slowapi rate
+      # limits. See backend/Dockerfile for the actual setting.
       - CORS_ORIGINS=[]
       - DB_PATH=/db/nutrition.db
     volumes:

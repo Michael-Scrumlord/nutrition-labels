@@ -39,14 +39,6 @@ def _clean_string(v: str, *, allow_empty: bool = False) -> str:
 
 MAX_NAME_LENGTH = 120         # Max length for ingredient/label names
 MAX_INGREDIENT_AMOUNT = 1_000_000  # Max amount in any unit conversion
-MIN_INGREDIENTS = 1           # Minimum ingredients required
-MAX_INGREDIENTS = 100         # Maximum ingredients allowed
-MIN_PORTION_DIVISOR = 1       # Minimum servings
-MAX_PORTION_DIVISOR = 999     # Maximum servings
-MIN_WIDTH = 2                 # Minimum label width in inches (FDA min)
-MAX_WIDTH = 12                # Maximum label width in inches
-MIN_HEIGHT = 2                # Minimum label height in inches (matches frontend clamp)
-MAX_HEIGHT = 20               # Maximum label height in inches
 
 
 # ---------------------------------------------------------------------------
@@ -74,34 +66,6 @@ class IngredientItem(BaseModel):
         if v not in valid:
             raise ValueError(f"unit must be one of {sorted(valid)}")
         return v
-
-
-class GenerateLabelRequest(BaseModel):
-    """The full payload sent when the user clicks Generate PDF."""
-    model_config = ConfigDict(extra="forbid")
-
-    portion_divisor: int = Field(8, ge=MIN_PORTION_DIVISOR, le=MAX_PORTION_DIVISOR)
-    label_name: str = Field("", max_length=MAX_NAME_LENGTH)
-    width_inches: float = Field(2.75, ge=MIN_WIDTH, le=MAX_WIDTH)
-    height_inches: float | None = Field(None, ge=MIN_HEIGHT, le=MAX_HEIGHT)
-    ingredients: list[IngredientItem] = Field(..., min_length=MIN_INGREDIENTS, max_length=MAX_INGREDIENTS)
-
-    @field_validator("label_name")
-    @classmethod
-    def label_name_no_control_chars(cls, v: str) -> str:
-        return _clean_string(v, allow_empty=True)
-
-    # Snap dimensions to 0.01" so float noise (e.g. 2.7500000001) can't drift
-    # the rendered page size between identical-looking client requests.
-    @field_validator("width_inches")
-    @classmethod
-    def round_width(cls, v: float) -> float:
-        return round(v, 2)
-
-    @field_validator("height_inches")
-    @classmethod
-    def round_height(cls, v: float | None) -> float | None:
-        return None if v is None else round(v, 2)
 
 
 # ---------------------------------------------------------------------------

@@ -11,8 +11,7 @@
 
 import type { MacroProfile, IngredientItem, HighlightSet } from "../../types";
 import { buildIngredientsString, formatNutrientAmount } from "../../utils/nutrition";
-import { ingredientGrams } from "../../utils/units";
-import { MACRO_ROWS, MICRO_ROWS, GEO, INK, rowDisplay, type LabelRow } from "./labelSpec";
+import { MACRO_ROWS, MICRO_ROWS, GEO, INK, rowDisplay, resolveServing, type LabelRow } from "./labelSpec";
 
 // Font family registered via @font-face in index.css, matching the PDF's
 // embedded TeXGyreHeros so line breaks are identical.
@@ -70,9 +69,7 @@ export function LabelPreview({
   const ingredientsString = buildIngredientsString(ingredients);
 
   // Per-serving net weight (g) for the FDA serving-size line.
-  const totalGrams = ingredients.reduce((sum, ing) => sum + ingredientGrams(ing), 0);
-  const servingGrams = Math.round(totalGrams / portionDivisor);
-  const servingLabel = servingHousehold.trim() || "1 portion";
+  const serving = resolveServing(ingredients, portionDivisor, servingHousehold);
 
   return (
     <div style={{
@@ -100,7 +97,7 @@ export function LabelPreview({
             fontSize: GEO.servingSize.fontSize, fontWeight: "bold", marginTop: GEO.servingSize.marginTop,
           }}>
             <span>Serving size</span>
-            <span>{servingLabel} ({servingGrams}g)</span>
+            <span>{serving.label} ({serving.grams}g)</span>
           </div>
         </div>
 
