@@ -13,10 +13,6 @@ class Settings(BaseSettings):
     # Set CORS_ORIGINS as a JSON array or comma-separated list via env for dev.
     cors_origins: list[str] = []
 
-    # Trusted reverse-proxy IPs that may set X-Forwarded-For. Comma-separated.
-    # Set to "*" only behind a controlled edge (e.g. Caddy on the same host).
-    forwarded_allow_ips: str = "127.0.0.1"
-
     # Hosts the FastAPI app will respond to. Anything else gets a 400.
     # Defense-in-depth against Host-header injection. Override via the
     # ALLOWED_HOSTS env var (JSON array or comma-separated list).

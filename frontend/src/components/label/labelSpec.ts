@@ -11,7 +11,7 @@
 //   • rowDisplay() — the exact left/right strings for a row, so the renderers
 //                    can never disagree on a value, a %DV, or rounding.
 
-import type { MacroProfile } from "../../types";
+import type { MacroProfile, IngredientItem } from "../../types";
 import {
   formatNutrientAmount,
   formatTransFatAmount,
@@ -20,6 +20,7 @@ import {
   formatDVFromAmount,
   ADDED_SUGARS_DV,
 } from "../../utils/nutrition";
+import { ingredientGrams } from "../../utils/units";
 
 // Regulated print artifact: always black ink on white paper.
 export const INK = "#000";
@@ -80,6 +81,31 @@ export const MICRO_ROWS: readonly LabelRow[] = [
   { label: "Iron",       nutrient: "iron_mg",        bold: false, indent: 0 },
   { label: "Potassium",  nutrient: "potassium_mg",   bold: false, indent: 0 },
 ] as const;
+
+export interface ServingDisplay {
+  /** Household serving description, or "1 portion" when none is set. */
+  label: string;
+  /** Per-serving net weight in whole grams, for the "(Xg)" suffix. */
+  grams: number;
+}
+
+/**
+ * Resolve the FDA serving-size line: total recipe weight divided across
+ * servings, paired with the user's household-measure label (or the "1
+ * portion" fallback). Shared by both renderers so they can't disagree on
+ * rounding.
+ */
+export function resolveServing(
+  ingredients: IngredientItem[],
+  portionDivisor: number,
+  servingHousehold: string,
+): ServingDisplay {
+  const totalGrams = ingredients.reduce((sum, ing) => sum + ingredientGrams(ing), 0);
+  return {
+    label: servingHousehold.trim() || "1 portion",
+    grams: Math.round(totalGrams / portionDivisor),
+  };
+}
 
 export interface RowDisplay {
   /** Bold portion of the left text (nutrient name). */

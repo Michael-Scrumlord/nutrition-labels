@@ -119,7 +119,6 @@ nl_preferences   nl_saved_recipes (schema v2)   nl-theme
 class Settings(BaseSettings):
     db_path: str = "data/nutrition.db"
     cors_origins: list[str] = []          # env CORS_ORIGINS (dev only)
-    forwarded_allow_ips: str = "127.0.0.1"
     allowed_hosts: list[str]              # env ALLOWED_HOSTS
     max_body_bytes: int = 65536           # 64 KB
     rate_limit_search:   str = "60/minute"
