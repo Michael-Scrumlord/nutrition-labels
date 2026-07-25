@@ -69,9 +69,11 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
-    # 1g gives WeasyPrint headroom for transient spikes (150–250 MB per
-    # render) at pdf_max_concurrency=2 + 2 gunicorn workers. The previous
-    # 512m was within OOM range of worst-case concurrent PDF generation.
+    # Sized for WeasyPrint PDF rendering (150–250 MB per render at
+    # pdf_max_concurrency=2 + 2 gunicorn workers), which no longer runs here —
+    # PDF generation moved entirely client-side (see docs/architecture-overview.md).
+    # This limit is now generous headroom rather than a tight fit; left as-is
+    # pending a deliberate review of whether it can be lowered.
     mem_limit: 1g
     cpus: 1.0
     healthcheck:

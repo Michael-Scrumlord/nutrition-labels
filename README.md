@@ -7,7 +7,8 @@ A full-stack web application that lets you build custom recipes from USDA food d
 - **Ingredient Search** — SQLite FTS5 full-text search across three USDA FoodData Central sub-datasets (Foundation Foods, FNDDS, SR Legacy — ~17k foods total; Branded Foods is intentionally excluded). Results re-ranked by prefix match then alphabetically. See [DATA_SOURCES.md](DATA_SOURCES.md).
 - **Recipe Builder** — Add ingredients with custom amounts in g, ml, oz, lb, or kg. Drag to reorder. Adjust serving count with the portion divisor.
 - **Live Label Preview** — An FDA 2020-format Nutrition Facts panel updates in real time as you build your recipe.
-- **PDF Export** — Downloads a print-ready PDF label sized to your chosen dimensions (default 2.75 in wide).
+- **PDF Export** — Downloads a print-ready, vector PDF label sized to your chosen dimensions (default 2.75 in wide). Rendered entirely client-side with `@react-pdf/renderer` from the same layout spec as the live preview, so the download always matches what you see on screen.
+- **Label Details** — Household serving size, Added Sugars (g), and Trans Fat (g): the FDA label fields that aren't derivable from the USDA database.
 - **Recipe Steps & Variables** — Write method notes and define reusable variables (e.g. `servings`) that interpolate into step text.
 - **Recipe Saving & Versioning** — Save snapshots to `localStorage`. Each recipe keeps up to 20 versions; you can browse, restore, or delete individual versions.
 - **Theme Support** — Light and dark themes, stored in `localStorage`.
@@ -74,34 +75,22 @@ Retrieve full macro data and portion sizes for one food.
 }
 ```
 
-### `POST /api/generate_label`
+### PDF generation is client-side
 
-Calculate per-serving macros for a recipe, render an FDA Nutrition Facts label, and return a PDF.
+There is no backend PDF endpoint. Clicking **Generate PDF** lazy-loads
+`@react-pdf/renderer` and renders `LabelPdfDoc` in the browser — the same
+`labelSpec.ts` layout spec that drives the live `LabelPreview`, so the
+download can never drift from what's on screen. The backend only ever
+serves `/api/search` and `/api/food/{fdc_id}`; it does not see recipe
+payloads or render anything.
 
-- **Body:** `GenerateLabelRequest` (JSON)
-- **Returns:** `application/pdf` binary download (`nutrition_label.pdf`)
-- **400** if an `fdc_id` is not in the database
-- **413** if the request body exceeds the server's maximum allowed size
-- **422** if request validation fails (e.g. `portion_divisor` out of range, `amount ≤ 0`)
-- **429** if more than 10 requests are made per minute from the same IP; includes a `Retry-After` header
-- **504** if PDF rendering exceeds the server timeout
-
-```json
-{
-  "portion_divisor": 8,
-  "label_name": "Chocolate Chip Cookies",
-  "width_inches": 2.75,
-  "height_inches": null,
-  "ingredients": [
-    { "fdc_id": 1097512, "name": "Butter", "amount": 227, "unit": "g" },
-    { "fdc_id": 1100209, "name": "Flour",  "amount": 250, "unit": "g" }
-  ]
-}
-```
+(An earlier version generated PDFs server-side via `POST
+/api/generate_label` using Jinja2 + WeasyPrint. That endpoint, and
+`backend/app/pdf.py`, were retired when rendering moved client-side.)
 
 **Supported units:** `g`, `ml`, `oz`, `lb`, `kg`
 
-**Field constraints:**
+**Field constraints (enforced client-side; mirrored from the original request model):**
 
 | Field              | Rule                                          |
 |--------------------|-----------------------------------------------|
@@ -159,11 +148,10 @@ Rounding: calories → nearest integer; all other nutrients → 1 decimal place.
 nutrition-labels/
 ├── backend/                    # FastAPI + SQLite
 │   ├── app/
-│   │   ├── main.py             # 4 API routes + rate limiter
+│   │   ├── main.py             # 3 API routes + rate limiter
 │   │   ├── nutrition.py        # Pure macro calculation math
 │   │   ├── search.py           # Search ranking logic
 │   │   ├── database.py         # SQLite access layer
-│   │   ├── pdf.py              # Jinja2 + WeasyPrint PDF rendering
 │   │   ├── models.py           # Pydantic request/response models
 │   │   ├── constants.py        # Unit conversions, FDA daily values
 │   │   └── config.py           # Environment settings
@@ -173,12 +161,12 @@ nutrition-labels/
 │   │   ├── components/         # React components
 │   │   │   ├── layout/         # AppShell, Header, SiteFooter
 │   │   │   ├── recipe/         # RecipeBuilder, IngredientRow, MethodSection, VariablesPanel, RecipeStatsBar, VersionBanner, SlashMenu
-│   │   │   ├── label/          # LabelPreview, LabelDimensions, GenerateButton, SaveControls, AdSlot, GuidesCard
+│   │   │   ├── label/          # LabelPreview, LabelPdfDoc, labelSpec, LabelDimensions, LabelDetails, GenerateButton, SaveControls, AdSlot, GuidesCard
 │   │   │   ├── search/         # IngredientSearch modal, FoodTabs, SearchResults
 │   │   │   ├── recipes/        # RecipesModal, RecipeCard, VersionTimeline
 │   │   │   ├── theme/          # ThemeSwitcher, ThemedFrame, AuroraGlow
 │   │   │   └── ui/             # Button, Card, Input, Select, Badge, Spinner, ScrubNumber
-│   │   ├── hooks/              # useNutritionCalc, useRecipeActions, useIngredientSearch, useTitleAutoResize, …
+│   │   ├── hooks/              # useNutritionCalc, useRecipeActions, useLabelSave, useIngredientSearch, useTitleAutoResize, …
 │   │   ├── store/              # Zustand stores
 │   │   │   ├── recipeStore.ts      # Current recipe state + all actions
 │   │   │   ├── savedRecipesStore.ts# Recipe catalog with localStorage + versioning
@@ -212,11 +200,12 @@ npm test
 
 ## Key Design Decisions
 
-- **Mirrored math** — `nutrition.py` and `utils/nutrition.ts` implement identical calculation logic. The backend recalculates macros on every PDF request to catch constant drift.
+- **Mirrored math** — `nutrition.py` and `utils/nutrition.ts` implement identical calculation logic and must be kept in sync by hand. There is no longer a backend PDF request to cross-check them against — the frontend is the sole source of truth for the label you download.
+- **Client-side PDF rendering** — `LabelPdfDoc.tsx` and the live `LabelPreview` both render from one spec (`labelSpec.ts`), so the download always matches the preview. There is no backend involvement in PDF generation.
 - **Portion divisor** — Controls how many servings the batch yields. Per-serving values = total recipe macros ÷ divisor. Valid range: 1–999.
-- **Ingredient ordering** — FDA regulations require ingredients sorted by gram weight descending. Both the frontend label preview and the backend PDF template implement this.
+- **Ingredient ordering** — FDA regulations require ingredients sorted by gram weight descending. `buildIngredientsString` implements this for both the preview and the PDF.
 - **`<1%` rule** — When a nutrient's %DV rounds to 0 but its raw value is > 0, the label shows `<1%` rather than `0%`.
 - **Frontend DV permissiveness** — The frontend `calculateRecipeMacros` throws a `RangeError` for `portionDivisor` outside 1–999. In live preview the UI guards against passing 0.
-- **Rate limiting** — All three data routes are rate-limited per IP: `GET /api/search` at 60/min, `GET /api/food/{id}` at 120/min, and `POST /api/generate_label` at 10/min. Every `429` response includes a `Retry-After` header.
+- **Rate limiting** — Both remaining data routes are rate-limited per IP: `GET /api/search` at 60/min and `GET /api/food/{id}` at 120/min. Every `429` response includes a `Retry-After` header.
 - **Body size limit** — Requests whose `Content-Length` exceeds 64 KB are rejected with `413` before FastAPI parses the body. A non-integer `Content-Length` header returns `400`.
 - **Recipe versioning** — Recipes are saved to `localStorage` as a list of timestamped snapshots. Each recipe holds up to 20 versions; older ones are pruned automatically. Max 50 recipes total.

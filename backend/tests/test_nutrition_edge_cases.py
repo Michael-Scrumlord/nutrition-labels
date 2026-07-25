@@ -141,6 +141,28 @@ def test_negative_divisor_raises():
         calculate_recipe_macros([ingredient], [butter_row()], portion_divisor=-5)
 
 
+def test_divisor_far_beyond_the_999_ui_cap_still_computes():
+    """nutrition.py itself has no upper bound on portion_divisor (only the
+    Pydantic model layer caps it at 999) — a divisor far past that UI-facing
+    cap must still divide correctly rather than raising or overflowing."""
+    ingredient = make_ingredient(1097512, 100, "g")
+    _, result = calculate_recipe_macros([ingredient], [butter_row()], portion_divisor=1_000_000)
+    assert result.calories == 0
+    assert result.fat_total_g == 0.0
+
+
+def test_divisor_of_one_with_multiple_ingredients_sums_undivided():
+    """portion_divisor=1 across several ingredients returns the raw recipe
+    total (sum, not average) — the boundary case that most easily hides an
+    off-by-one in the divide step."""
+    butter = make_ingredient(1097512, 100, "g")
+    oil    = make_ingredient(1103301, 100, "g")
+    _, result = calculate_recipe_macros(
+        [butter, oil], [butter_row(), olive_oil_row()], portion_divisor=1
+    )
+    assert result.calories == 717 + 884
+
+
 # ---------------------------------------------------------------------------
 # calculate_recipe_macros — amount edge cases
 # ---------------------------------------------------------------------------

@@ -160,6 +160,21 @@ describe("calculateRecipeMacros — portion divisor", () => {
     // Should throw an error to match backend validation
     expect(() => calculateRecipeMacros([ingredient], 0)).toThrow(RangeError);
   });
+
+  it("divisor=1000 (one past the 999 cap) throws RangeError", () => {
+    const ingredient = makeIngredient(1, 100, "g");
+    expect(() => calculateRecipeMacros([ingredient], 1000)).toThrow(RangeError);
+  });
+
+  it("divisor=999 (exactly at the cap) does not throw", () => {
+    const ingredient = makeIngredient(1, 100, "g");
+    expect(() => calculateRecipeMacros([ingredient], 999)).not.toThrow();
+  });
+
+  it("negative divisor throws RangeError, same as zero", () => {
+    const ingredient = makeIngredient(1, 100, "g");
+    expect(() => calculateRecipeMacros([ingredient], -5)).toThrow(RangeError);
+  });
 });
 
 // ── calculateRecipeMacros — amount edge cases ────────────────────────────
