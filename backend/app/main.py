@@ -125,13 +125,19 @@ def health() -> HealthResponse:
 @limiter.limit(settings.rate_limit_search)
 def search(
     request: Request,
-    query: str = Query("", max_length=100),
+    query: str = Query(""),
 ) -> list[dict]:
     """
     Search foods by name. Returns up to 40 results ranked by relevance:
     prefix matches first (alphabetically), then contains matches (alphabetically).
     Returns an empty list if the query is less than 2 characters.
     """
+    # Raised manually (rather than Query(max_length=100)) so this is a 400,
+    # not FastAPI's default 422, for a client-correctable "bad request" —
+    # see commit 396e7bc, which this restores after a refactor silently
+    # dropped it back to the Query(max_length=...) 422 behavior.
+    if len(query) > 100:
+        raise HTTPException(status_code=400, detail="Query string too long (maximum 100 characters)")
     if len(query) < 2:
         return []
     rows = database.search_foods(query)

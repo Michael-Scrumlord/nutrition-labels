@@ -66,6 +66,27 @@ async def test_search_no_query_returns_empty(client):
     assert response.json() == []
 
 
+async def test_search_query_exactly_100_chars_accepted(client):
+    """A query at the 100-character boundary must return 200, not 400."""
+    query = "a" * 100
+    async with client as c:
+        response = await c.get(f"/api/search?query={query}")
+    assert response.status_code == 200
+
+
+async def test_search_query_101_chars_rejected_with_400(client):
+    """A query one character over the 100-char limit must return 400 (not
+    FastAPI's default 422 for a Query(max_length=...) violation) — this is a
+    deliberate API contract, not incidental Pydantic behavior. Regression
+    coverage: a prior refactor swapped the manual check for
+    Query(max_length=100) and silently reverted this to 422."""
+    query = "a" * 101
+    async with client as c:
+        response = await c.get(f"/api/search?query={query}")
+    assert response.status_code == 400
+    assert "too long" in response.json()["detail"]
+
+
 async def test_food_endpoint_found(client):
     """GET /api/food/1097512 should return full macro + portion data for butter."""
     async with client as c:

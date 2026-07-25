@@ -38,6 +38,9 @@ const STORE_DEFAULTS = {
   currentRecipeId: null,
   viewingVersionId: null,
   dimensions: { widthInches: 2.75, heightInches: null },
+  servingHousehold: "",
+  addedSugarsG: 0,
+  transFatG: 0,
 };
 
 beforeEach(() => {
@@ -225,6 +228,59 @@ describe("setDimensions", () => {
   it("sets heightInches when specified", () => {
     useRecipeStore.getState().setDimensions({ heightInches: 6.0 });
     expect(useRecipeStore.getState().dimensions.heightInches).toBe(6.0);
+  });
+});
+
+describe("setServingHousehold", () => {
+  it("updates the household serving description", () => {
+    useRecipeStore.getState().setServingHousehold("2/3 cup");
+    expect(useRecipeStore.getState().servingHousehold).toBe("2/3 cup");
+  });
+
+  it("allows an empty string", () => {
+    useRecipeStore.getState().setServingHousehold("1 cup");
+    useRecipeStore.getState().setServingHousehold("");
+    expect(useRecipeStore.getState().servingHousehold).toBe("");
+  });
+});
+
+describe("setAddedSugarsG", () => {
+  it("updates added sugars to a positive value", () => {
+    useRecipeStore.getState().setAddedSugarsG(12.5);
+    expect(useRecipeStore.getState().addedSugarsG).toBe(12.5);
+  });
+
+  it("clamps a negative value to zero", () => {
+    useRecipeStore.getState().setAddedSugarsG(-5);
+    expect(useRecipeStore.getState().addedSugarsG).toBe(0);
+  });
+
+  it("zero-grams is a valid explicit value (not just the unset default)", () => {
+    useRecipeStore.getState().setAddedSugarsG(8);
+    useRecipeStore.getState().setAddedSugarsG(0);
+    expect(useRecipeStore.getState().addedSugarsG).toBe(0);
+  });
+
+  it("falls back to zero for NaN (e.g. a cleared number input)", () => {
+    useRecipeStore.getState().setAddedSugarsG(NaN);
+    expect(useRecipeStore.getState().addedSugarsG).toBe(0);
+  });
+});
+
+describe("setTransFatG", () => {
+  it("updates trans fat to a positive value", () => {
+    useRecipeStore.getState().setTransFatG(1.5);
+    expect(useRecipeStore.getState().transFatG).toBe(1.5);
+  });
+
+  it("clamps a negative value to zero", () => {
+    useRecipeStore.getState().setTransFatG(-1);
+    expect(useRecipeStore.getState().transFatG).toBe(0);
+  });
+
+  it("falls back to zero for NaN (e.g. a cleared number input)", () => {
+    useRecipeStore.getState().setTransFatG(NaN);
+    expect(useRecipeStore.getState().transFatG).toBe(0);
   });
 });
 
@@ -421,6 +477,72 @@ describe("loadRecipe", () => {
     useRecipeStore.getState().loadRecipe(recipe);
     // Should not have changed anything
     expect(useRecipeStore.getState().labelName).toBe("Existing");
+  });
+
+  it("defaults servingHousehold/addedSugarsG/transFatG when loading a legacy version that predates those fields", () => {
+    // Recipes saved before LabelDetails existed have no servingHousehold,
+    // addedSugarsG, or transFatG in their persisted version — stateFromVersion
+    // must fall back to "" / 0 / 0 rather than storing `undefined`.
+    const recipe: SavedRecipe = {
+      id: "legacy",
+      name: "Pre-LabelDetails Recipe",
+      createdAt: Date.now(),
+      versions: [
+        {
+          id: "v1",
+          savedAt: Date.now(),
+          note: "",
+          labelName: "Legacy",
+          portionDivisor: 8,
+          dimensions: { widthInches: 2.75, heightInches: null },
+          ingredients: [makeIngredient(1, "Butter") as IngredientItem],
+          instructions: [],
+          variables: [],
+          // servingHousehold / addedSugarsG / transFatG intentionally absent
+          // (they're optional on RecipeVersion — added after this shape shipped)
+        },
+      ],
+    };
+
+    useRecipeStore.getState().setServingHousehold("stale value");
+    useRecipeStore.getState().setAddedSugarsG(99);
+    useRecipeStore.getState().setTransFatG(99);
+
+    useRecipeStore.getState().loadRecipe(recipe);
+    const state = useRecipeStore.getState();
+    expect(state.servingHousehold).toBe("");
+    expect(state.addedSugarsG).toBe(0);
+    expect(state.transFatG).toBe(0);
+  });
+
+  it("preserves servingHousehold/addedSugarsG/transFatG when the version carries them", () => {
+    const recipe: SavedRecipe = {
+      id: "modern",
+      name: "Modern Recipe",
+      createdAt: Date.now(),
+      versions: [
+        {
+          id: "v1",
+          savedAt: Date.now(),
+          note: "",
+          labelName: "Modern",
+          portionDivisor: 8,
+          dimensions: { widthInches: 2.75, heightInches: null },
+          ingredients: [makeIngredient(1, "Butter") as IngredientItem],
+          instructions: [],
+          variables: [],
+          servingHousehold: "2/3 cup",
+          addedSugarsG: 6,
+          transFatG: 0.5,
+        },
+      ],
+    };
+
+    useRecipeStore.getState().loadRecipe(recipe);
+    const state = useRecipeStore.getState();
+    expect(state.servingHousehold).toBe("2/3 cup");
+    expect(state.addedSugarsG).toBe(6);
+    expect(state.transFatG).toBe(0.5);
   });
 });
 

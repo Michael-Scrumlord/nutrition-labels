@@ -7,6 +7,15 @@
 #   1. An invalid (non-integer) Content-Length header → 400
 #   2. Content-Length of "0" (valid integer, no size-limit concern) → not 413
 #   3. Content-Length exactly at the limit → not 413 (boundary: check is strict >)
+#
+# BodySizeLimitMiddleware is a BaseHTTPMiddleware wrapping the whole ASGI
+# app, so it runs — and can short-circuit with 400/413 — before Starlette
+# resolves a route. These tests POST to MW_TEST_PATH, a path that does not
+# (and need not) match any real route: only the middleware's behavior is
+# under test here, never route-level logic. The former POST
+# /api/generate_label endpoint that these tests originally targeted was
+# retired (PDF generation moved client-side); MW_TEST_PATH keeps that
+# retirement from silently invalidating what these tests exercise.
 
 import json
 
@@ -14,6 +23,8 @@ import pytest
 import app.config as config_module
 
 pytestmark = pytest.mark.anyio
+
+MW_TEST_PATH = "/api/__middleware_test__"
 
 
 @pytest.fixture(autouse=True)
@@ -33,7 +44,7 @@ async def test_invalid_content_length_header_returns_400(client):
     parsing. The middleware's ValueError branch triggers this path."""
     async with client as c:
         response = await c.post(
-            "/api/generate_label",
+            MW_TEST_PATH,
             content=b"{}",
             headers={
                 "Content-Type": "application/json",
@@ -49,7 +60,7 @@ async def test_float_content_length_header_returns_400(client):
     and must return 400 via the same ValueError branch."""
     async with client as c:
         response = await c.post(
-            "/api/generate_label",
+            MW_TEST_PATH,
             content=b"{}",
             headers={
                 "Content-Type": "application/json",
@@ -65,7 +76,7 @@ async def test_negative_content_length_header_passes_through(client):
     layer may reject it for other reasons — but NOT with 413)."""
     async with client as c:
         response = await c.post(
-            "/api/generate_label",
+            MW_TEST_PATH,
             content=b"{}",
             headers={
                 "Content-Type": "application/json",
@@ -84,7 +95,7 @@ async def test_content_length_zero_does_not_trigger_413(client):
     The middleware must pass it through (not 413)."""
     async with client as c:
         response = await c.post(
-            "/api/generate_label",
+            MW_TEST_PATH,
             content=b"",
             headers={
                 "Content-Type": "application/json",
@@ -100,20 +111,12 @@ async def test_content_length_exactly_at_limit_is_not_rejected(client):
     limit itself is a permitted value."""
     max_bytes = config_module.settings.max_body_bytes
 
-    payload = {
-        "portion_divisor": 1,
-        "label_name": "x",
-        "width_inches": 2.75,
-        "height_inches": None,
-        "ingredients": [
-            {"fdc_id": 1097512, "name": "Butter", "amount": 100, "unit": "g"}
-        ],
-    }
-    body = json.dumps(payload).encode()
+    # Content is arbitrary — only its byte length matters to this middleware.
+    body = json.dumps({"data": "x"}).encode()
 
     async with client as c:
         response = await c.post(
-            "/api/generate_label",
+            MW_TEST_PATH,
             content=body,
             headers={
                 "Content-Type": "application/json",
@@ -133,7 +136,7 @@ async def test_content_length_one_above_limit_returns_413(client):
 
     async with client as c:
         response = await c.post(
-            "/api/generate_label",
+            MW_TEST_PATH,
             content=oversized_body,
             headers={
                 "Content-Type": "application/json",
